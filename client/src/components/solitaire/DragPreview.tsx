@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Card as CardType } from '../../lib/solitaire/types';
 import { Card } from './Card';
 import { createPortal } from 'react-dom';
@@ -10,13 +10,21 @@ interface DragPreviewProps {
 
 export function DragPreview({ cards, startPosition }: DragPreviewProps) {
   const [position, setPosition] = useState(startPosition);
+  const isDragging = useRef(false);
   
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      setPosition({
-        x: e.clientX - 32, // Half card width
-        y: e.clientY - 48  // Half card height  
-      });
+      // Only update position after initial drag movement
+      if (!isDragging.current && (Math.abs(e.clientX - startPosition.x) > 5 || Math.abs(e.clientY - startPosition.y) > 5)) {
+        isDragging.current = true;
+      }
+      
+      if (isDragging.current) {
+        setPosition({
+          x: e.clientX - 32, // Half card width
+          y: e.clientY - 48  // Half card height  
+        });
+      }
     };
     
     document.addEventListener('mousemove', handleMouseMove);
@@ -24,7 +32,7 @@ export function DragPreview({ cards, startPosition }: DragPreviewProps) {
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
     };
-  }, []);
+  }, [startPosition]);
   
   if (cards.length === 0) return null;
   
