@@ -12,10 +12,21 @@ export function WastePile({ cards }: WastePileProps) {
   const { 
     startDrag, 
     canAutoMoveToFoundation, 
-    autoMoveToFoundation 
+    autoMoveToFoundation,
+    isDragging,
+    draggedCards,
+    sourceType
   } = useSolitaire();
 
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
+
+  // Check if the top card is being dragged
+  const isTopCardBeingDragged = () => {
+    if (!isDragging || sourceType !== 'waste' || !topCard) {
+      return false;
+    }
+    return draggedCards.some(draggedCard => draggedCard.id === topCard.id);
+  };
 
   const handleCardClick = () => {
     if (!topCard) return;
@@ -57,6 +68,7 @@ export function WastePile({ cards }: WastePileProps) {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           isPlayable={true}
+          isDragging={isTopCardBeingDragged()}
         />
       ) : (
         <div className="w-full h-full" />

@@ -15,7 +15,11 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     dropCards, 
     getMovableCardsFromTableau,
     canAutoMoveToFoundation,
-    autoMoveToFoundation
+    autoMoveToFoundation,
+    isDragging,
+    draggedCards,
+    sourceType,
+    sourceIndex
   } = useSolitaire();
 
   const handleCardClick = (cardIndex: number) => {
@@ -59,6 +63,17 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   const movableCards = getMovableCardsFromTableau(columnIndex);
   const movableStartIndex = cards.length - movableCards.length;
 
+  // Check if this card is being dragged from this column
+  const isCardBeingDragged = (cardIndex: number) => {
+    if (!isDragging || sourceType !== 'tableau' || sourceIndex !== columnIndex) {
+      return false;
+    }
+    
+    // Check if this card is in the dragged cards list
+    const card = cards[cardIndex];
+    return draggedCards.some(draggedCard => draggedCard.id === card.id);
+  };
+
   return (
     <div className="relative">
       <Pile
@@ -88,6 +103,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
               onDragStart={(e) => handleDragStart(e, index)}
               onDragEnd={handleDragEnd}
               isPlayable={card.faceUp && index >= movableStartIndex}
+              isDragging={isCardBeingDragged(index)}
             />
           </div>
         ))}
