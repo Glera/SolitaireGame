@@ -16,7 +16,7 @@ export function CardAnimation({
   startPosition, 
   endPosition, 
   onComplete,
-  speed = 1000 // Default speed: 1000 pixels per second
+  speed = 1500 // Default speed: 1500 pixels per second (increased by 1.5x)
 }: CardAnimationProps) {
   const [position, setPosition] = useState(startPosition);
   const animationRef = useRef<number>();
