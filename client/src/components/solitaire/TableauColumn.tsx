@@ -53,6 +53,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   const handleDrop = () => {
+    console.log('💧 Попытка разместить карты в столбец:', columnIndex);
     dropCards('tableau', columnIndex);
   };
 
@@ -78,6 +79,8 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
             key={card.id}
             className="absolute"
             style={{ top: `${index * 18}px` }}
+            onDragOver={(e) => { e.preventDefault(); console.log('🔄 DragOver на карте'); }}
+            onDrop={(e) => { e.preventDefault(); console.log('💧 Drop на карте'); handleDrop(); }}
           >
             <Card
               card={card}

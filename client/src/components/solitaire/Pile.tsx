@@ -22,11 +22,13 @@ export function Pile({
 }: PileProps) {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    console.log('🔄 DragOver на pile');
     onDragOver?.(e);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    console.log('💧 Drop на pile');
     onDrop?.(e);
   };
 
