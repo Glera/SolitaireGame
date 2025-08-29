@@ -43,10 +43,20 @@ export function getRankValue(rank: Rank): number {
 
 export function canPlaceOnTableau(bottomCard: Card, topCard: Card): boolean {
   // Can place if colors are different and topCard rank is one less than bottomCard
-  return (
-    bottomCard.color !== topCard.color &&
-    getRankValue(topCard.rank) === getRankValue(bottomCard.rank) - 1
-  );
+  const colorsDifferent = bottomCard.color !== topCard.color;
+  const bottomValue = getRankValue(bottomCard.rank);
+  const topValue = getRankValue(topCard.rank);
+  const rankValid = topValue === bottomValue - 1;
+  
+  console.log('🔍 Проверка размещения на столе:', {
+    bottom: `${bottomCard.rank} ${bottomCard.suit} (${bottomCard.color}, value: ${bottomValue})`,
+    top: `${topCard.rank} ${topCard.suit} (${topCard.color}, value: ${topValue})`,
+    colorsDifferent,
+    rankValid,
+    result: colorsDifferent && rankValid
+  });
+  
+  return colorsDifferent && rankValid;
 }
 
 export function canPlaceOnFoundation(foundationCards: Card[], card: Card): boolean {

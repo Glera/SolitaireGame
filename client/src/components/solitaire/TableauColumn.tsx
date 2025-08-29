@@ -30,15 +30,26 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
         return;
       }
     }
+  };
 
-    // Start drag for movable cards from this position
+  const handleDragStart = (e: React.DragEvent, cardIndex: number) => {
+    console.log('🚀 Начинаем перетаскивание карты:', cardIndex);
     const movableCards = getMovableCardsFromTableau(columnIndex);
     const cardPosition = cards.length - movableCards.length;
     
     if (cardIndex >= cardPosition) {
       const cardsToMove = movableCards.slice(cardIndex - cardPosition);
+      console.log('📋 Карты для перемещения:', cardsToMove.map(c => `${c.rank} ${c.suit}`));
       startDrag(cardsToMove, 'tableau', columnIndex);
+      e.dataTransfer.effectAllowed = 'move';
+    } else {
+      e.preventDefault();
     }
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    console.log('🏁 Завершение перетаскивания');
+    // Note: endDrag will be called by the global mouse handler
   };
 
   const handleDrop = () => {
@@ -72,6 +83,8 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
               card={card}
               onClick={() => handleCardClick(index)}
               onDoubleClick={() => handleCardClick(index)}
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragEnd={handleDragEnd}
               isPlayable={card.faceUp && index >= movableStartIndex}
             />
           </div>
