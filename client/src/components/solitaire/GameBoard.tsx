@@ -74,10 +74,10 @@ export function GameBoard() {
       )}
       
       {/* Render drag preview for multiple cards */}
-      {showDragPreview && draggedCards.length > 0 && (
+      {showDragPreview && draggedCards.length > 1 && dragPreviewPosition && (
         <DragPreview
           cards={draggedCards}
-          startPosition={dragPreviewPosition || { x: 0, y: 0 }}
+          startPosition={dragPreviewPosition}
         />
       )}
     </div>

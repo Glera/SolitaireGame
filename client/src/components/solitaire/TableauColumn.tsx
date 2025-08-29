@@ -78,23 +78,19 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     if (cardIndex >= cardPosition) {
       const cardsToMove = movableCards.slice(cardIndex - cardPosition);
       
-      // Set initial position for drag preview
+      // For multiple cards, show our custom drag preview first
       if (cardsToMove.length > 1) {
-        const rect = e.currentTarget.getBoundingClientRect();
-        setShowDragPreview(true, { x: rect.left, y: rect.top });
-        
-        // Hide the default drag image by setting it to a transparent 1x1 pixel
-        const canvas = document.createElement('canvas');
-        canvas.width = 1;
-        canvas.height = 1;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.clearRect(0, 0, 1, 1);
-        }
-        e.dataTransfer.setDragImage(canvas, 0, 0);
+        // Use mouse position for initial preview position
+        setShowDragPreview(true, { x: e.clientX - 32, y: e.clientY - 48 });
       }
       
+      // Start drag after setting preview
       startDrag(cardsToMove, 'tableau', columnIndex);
+      
+      // Hide the default drag image
+      const img = new Image();
+      img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+      e.dataTransfer.setDragImage(img, 0, 0);
       e.dataTransfer.effectAllowed = 'move';
     } else {
       e.preventDefault();
