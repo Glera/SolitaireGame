@@ -47,7 +47,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "w-16 h-24 bg-amber-50 border-2 border-amber-200 p-1 cursor-pointer select-none shadow-md",
+        "w-16 h-24 bg-amber-50 border-2 border-amber-700 p-1 cursor-pointer select-none shadow-md",
         "hover:shadow-lg transition-all duration-200",
         "outline-none focus:outline-none",
         "rounded-lg",
