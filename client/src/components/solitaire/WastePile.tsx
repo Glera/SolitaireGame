@@ -15,10 +15,12 @@ export function WastePile({ cards }: WastePileProps) {
     autoMoveToFoundation,
     isDragging,
     draggedCards,
-    sourceType
+    sourceType,
+    endDrag
   } = useSolitaire();
   
   const cardRef = useRef<HTMLDivElement>(null);
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
 
@@ -42,12 +44,29 @@ export function WastePile({ cards }: WastePileProps) {
       return;
     }
 
-    // Otherwise start drag
+    // Start drag temporarily for visual feedback
     startDrag([topCard], 'waste');
+    
+    // Clear drag state after a short delay if no actual drag happens
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+    }
+    clickTimeoutRef.current = setTimeout(() => {
+      if (isDragging && sourceType === 'waste') {
+        endDrag();
+      }
+    }, 150);
   };
 
   const handleDragStart = (e: React.DragEvent) => {
     if (!topCard) return;
+    
+    // Clear the click timeout since we're actually dragging
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+    }
+    
     startDrag([topCard], 'waste');
     e.dataTransfer.effectAllowed = 'move';
   };

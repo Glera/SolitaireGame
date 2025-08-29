@@ -21,10 +21,12 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     sourceType,
     sourceIndex,
     showDragPreview,
-    setShowDragPreview
+    setShowDragPreview,
+    endDrag
   } = useSolitaire();
   
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleCardClick = (cardIndex: number) => {
     const card = cards[cardIndex];
@@ -40,9 +42,34 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
         return;
       }
     }
+    
+    // Get movable cards for visual feedback
+    const movableCards = getMovableCardsFromTableau(columnIndex);
+    const cardPosition = cards.length - movableCards.length;
+    
+    if (cardIndex >= cardPosition) {
+      const cardsToMove = movableCards.slice(cardIndex - cardPosition);
+      startDrag(cardsToMove, 'tableau', columnIndex);
+      
+      // Clear drag state after a short delay if no actual drag happens
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+      }
+      clickTimeoutRef.current = setTimeout(() => {
+        if (isDragging && sourceType === 'tableau' && sourceIndex === columnIndex) {
+          endDrag();
+        }
+      }, 150);
+    }
   };
 
   const handleDragStart = (e: React.DragEvent, cardIndex: number) => {
+    // Clear the click timeout since we're actually dragging
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+    }
+    
     const movableCards = getMovableCardsFromTableau(columnIndex);
     const cardPosition = cards.length - movableCards.length;
     
