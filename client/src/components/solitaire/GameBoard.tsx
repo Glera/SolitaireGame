@@ -29,19 +29,19 @@ export function GameBoard() {
   // Note: Drag end is now handled by individual drag components via onDragEnd
 
   return (
-    <div className="min-h-screen bg-green-800 p-4">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-green-800 p-3">
+      <div className="max-w-5xl mx-auto">
         <GameControls />
         
-        <div className="space-y-8">
+        <div className="space-y-6">
           {/* Top row: Stock, Waste, and Foundation piles */}
           <div className="flex justify-between items-start">
-            <div className="flex gap-4">
+            <div className="flex gap-3">
               <StockPile cards={stock} />
               <WastePile cards={waste} />
             </div>
             
-            <div className="flex gap-4">
+            <div className="flex gap-3">
               <FoundationPile cards={foundations.hearts} suit="hearts" />
               <FoundationPile cards={foundations.diamonds} suit="diamonds" />
               <FoundationPile cards={foundations.clubs} suit="clubs" />
@@ -50,7 +50,7 @@ export function GameBoard() {
           </div>
           
           {/* Bottom row: Tableau columns */}
-          <div className="flex gap-4 justify-center">
+          <div className="flex gap-3 justify-center">
             {tableau.map((column, index) => (
               <div key={index} className="min-h-32">
                 <TableauColumn cards={column} columnIndex={index} />
