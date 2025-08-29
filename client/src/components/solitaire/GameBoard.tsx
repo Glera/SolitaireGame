@@ -37,27 +37,23 @@ export function GameBoard() {
 
   return (
     <div className="min-h-screen bg-green-800 p-3">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-fit mx-auto">
         <GameControls />
         
-        <div className="space-y-3">
-          {/* Top row: Stock, Waste, and Foundation piles */}
-          <div className="flex justify-between items-start">
-            <div className="flex gap-2">
-              <StockPile cards={stock} />
-              <WastePile cards={waste} />
-            </div>
-            
-            <div className="flex gap-2">
-              <FoundationPile cards={foundations.hearts} suit="hearts" id="foundation-hearts" />
-              <FoundationPile cards={foundations.diamonds} suit="diamonds" id="foundation-diamonds" />
-              <FoundationPile cards={foundations.clubs} suit="clubs" id="foundation-clubs" />
-              <FoundationPile cards={foundations.spades} suit="spades" id="foundation-spades" />
-            </div>
+        <div className="inline-block space-y-3">
+          {/* Top row: Stock, Waste, and Foundation piles - aligned with 7 columns */}
+          <div className="flex gap-2 items-start">
+            <StockPile cards={stock} />
+            <WastePile cards={waste} />
+            <div className="w-16" /> {/* Empty space equivalent to 1 card */}
+            <FoundationPile cards={foundations.hearts} suit="hearts" id="foundation-hearts" />
+            <FoundationPile cards={foundations.diamonds} suit="diamonds" id="foundation-diamonds" />
+            <FoundationPile cards={foundations.clubs} suit="clubs" id="foundation-clubs" />
+            <FoundationPile cards={foundations.spades} suit="spades" id="foundation-spades" />
           </div>
           
           {/* Bottom row: Tableau columns */}
-          <div className="flex gap-2 justify-center">
+          <div className="flex gap-2">
             {tableau.map((column, index) => (
               <div key={index} className="min-h-32">
                 <TableauColumn cards={column} columnIndex={index} />
