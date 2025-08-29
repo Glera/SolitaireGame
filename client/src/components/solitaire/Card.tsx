@@ -28,10 +28,12 @@ export function Card({
     return (
       <div 
         className={cn(
-          "w-16 h-24 bg-green-950 border border-green-900 rounded-lg flex items-center justify-center cursor-pointer select-none",
-          "shadow-md",
+          "w-16 h-24 bg-green-950 border border-green-900 flex items-center justify-center cursor-pointer select-none",
+          "shadow-md outline-none focus:outline-none",
+          "rounded-lg",
           className
         )}
+        style={{ borderRadius: '0.5rem' }}
         onClick={onClick}
       >
         <div className="w-12 h-20 border border-green-700 rounded opacity-30" />
@@ -45,11 +47,14 @@ export function Card({
   return (
     <div
       className={cn(
-        "w-16 h-24 bg-amber-50 border-2 border-amber-200 rounded-lg p-1 cursor-pointer select-none shadow-md",
+        "w-16 h-24 bg-amber-50 border-2 border-amber-200 p-1 cursor-pointer select-none shadow-md",
         "hover:shadow-lg transition-all duration-200",
+        "outline-none focus:outline-none",
+        "rounded-lg",
         isDragging && "opacity-50 scale-95",
         className
       )}
+      style={{ borderRadius: '0.5rem' }}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onDragStart={onDragStart}

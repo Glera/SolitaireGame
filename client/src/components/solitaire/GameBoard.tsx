@@ -30,7 +30,7 @@ export function GameBoard() {
 
   return (
     <div className="min-h-screen bg-green-800 p-3">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         <GameControls />
         
         <div className="space-y-3">
@@ -50,7 +50,7 @@ export function GameBoard() {
           </div>
           
           {/* Bottom row: Tableau columns */}
-          <div className="flex gap-2 justify-end">
+          <div className="flex gap-2 justify-center">
             {tableau.map((column, index) => (
               <div key={index} className="min-h-32">
                 <TableauColumn cards={column} columnIndex={index} />

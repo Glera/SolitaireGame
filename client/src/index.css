@@ -6,6 +6,18 @@
   * {
     @apply border-border;
   }
+  
+  /* Remove all focus outlines */
+  *:focus {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  
+  /* Remove yellow/orange focus rings */
+  *:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
