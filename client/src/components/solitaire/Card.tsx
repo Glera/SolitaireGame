@@ -28,13 +28,13 @@ export function Card({
     return (
       <div 
         className={cn(
-          "w-16 h-24 bg-blue-800 border-2 border-blue-900 rounded-lg flex items-center justify-center cursor-pointer select-none",
-          "bg-gradient-to-br from-blue-700 to-blue-900",
+          "w-16 h-24 bg-teal-700 border-2 border-teal-800 rounded-xl flex items-center justify-center cursor-pointer select-none",
+          "shadow-md",
           className
         )}
         onClick={onClick}
       >
-        <div className="w-12 h-20 border border-blue-400 rounded opacity-50" />
+        <div className="w-12 h-20 border border-teal-500 rounded opacity-30" />
       </div>
     );
   }
@@ -45,10 +45,10 @@ export function Card({
   return (
     <div
       className={cn(
-        "w-16 h-24 bg-white border-2 border-gray-300 rounded-lg p-1 cursor-pointer select-none shadow-sm",
-        "hover:shadow-md transition-shadow duration-200",
+        "w-16 h-24 bg-amber-50 border-2 border-amber-200 rounded-xl p-1 cursor-pointer select-none shadow-md",
+        "hover:shadow-lg transition-all duration-200",
         isDragging && "opacity-50 scale-95",
-        isPlayable && "ring-2 ring-green-400 ring-opacity-50",
+        isPlayable && "ring-2 ring-yellow-400 ring-opacity-50",
         className
       )}
       onClick={onClick}

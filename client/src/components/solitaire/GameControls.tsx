@@ -15,26 +15,36 @@ export function GameControls() {
   };
 
   return (
-    <Card className="p-4 mb-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button onClick={newGame} variant="outline">
-            New Game
-          </Button>
-          <div className="text-sm text-gray-600">
-            Moves: <span className="font-medium">{moves}</span>
-          </div>
-          <div className="text-sm text-gray-600">
-            Time: <span className="font-medium">{formatTime()}</span>
-          </div>
-        </div>
-        
-        {isWon && (
-          <div className="text-lg font-bold text-green-600">
+    <div className="relative mb-4 h-12 flex items-center">
+      {/* Score on the left */}
+      <div className="absolute left-0 text-white text-lg font-semibold">
+        Score: {moves}
+      </div>
+      
+      {/* New Game button in center */}
+      <div className="flex-1 flex justify-center">
+        <Button 
+          onClick={newGame} 
+          variant="outline"
+          className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+        >
+          New Game
+        </Button>
+      </div>
+      
+      {/* Time on the right */}
+      <div className="absolute right-0 text-white text-lg font-semibold">
+        Time: {formatTime()}
+      </div>
+      
+      {/* Win message overlay */}
+      {isWon && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg">
             🎉 Congratulations! You won!
           </div>
-        )}
-      </div>
-    </Card>
+        </div>
+      )}
+    </div>
   );
 }

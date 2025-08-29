@@ -25,7 +25,7 @@ export function FoundationPile({ cards, suit }: FoundationPileProps) {
     <Pile
       onDrop={handleDrop}
       isEmpty={cards.length === 0}
-      className="bg-green-50"
+      className="bg-teal-600/20 border-teal-400/50"
     >
       {topCard ? (
         <Card card={topCard} />

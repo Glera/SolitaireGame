@@ -58,7 +58,7 @@ export function WastePile({ cards }: WastePileProps) {
   return (
     <Pile
       isEmpty={cards.length === 0}
-      className="bg-gray-50"
+      className="bg-teal-600/10"
     >
       {topCard ? (
         <Card 

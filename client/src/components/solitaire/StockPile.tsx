@@ -17,7 +17,7 @@ export function StockPile({ cards }: StockPileProps) {
     <Pile
       onClick={drawCard}
       isEmpty={cards.length === 0}
-      className="cursor-pointer hover:bg-blue-50"
+      className="cursor-pointer hover:bg-teal-600/10"
     >
       {topCard ? (
         <Card card={topCard} />
