@@ -78,24 +78,22 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     if (cardIndex >= cardPosition) {
       const cardsToMove = movableCards.slice(cardIndex - cardPosition);
       
-      // For multiple cards, show our custom drag preview and hide default
-      if (cardsToMove.length > 1) {
-        // Calculate offset from the click position to the card position
-        const rect = e.currentTarget.getBoundingClientRect();
-        const offsetX = e.clientX - rect.left;
-        const offsetY = e.clientY - rect.top;
-        
-        // Set preview position with the card position and the offset from the click
-        setShowDragPreview(true, 
-          { x: rect.left, y: rect.top },
-          { x: offsetX, y: offsetY }
-        );
-        
-        // Hide the default drag image only for multiple cards
-        const img = new Image();
-        img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-        e.dataTransfer.setDragImage(img, 0, 0);
-      }
+      // Always use custom drag preview for tableau cards
+      // Calculate offset from the click position to the card position
+      const rect = e.currentTarget.getBoundingClientRect();
+      const offsetX = e.clientX - rect.left;
+      const offsetY = e.clientY - rect.top;
+      
+      // Set preview position with the card position and the offset from the click
+      setShowDragPreview(true, 
+        { x: rect.left, y: rect.top },
+        { x: offsetX, y: offsetY }
+      );
+      
+      // Hide the default drag image for all cards
+      const img = new Image();
+      img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+      e.dataTransfer.setDragImage(img, 0, 0);
       
       // Start drag after setting preview
       startDrag(cardsToMove, 'tableau', columnIndex);

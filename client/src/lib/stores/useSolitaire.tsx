@@ -95,7 +95,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       sourceIndex,
       sourceFoundation,
       // Keep existing drag preview state if it was already set
-      showDragPreview: currentState.showDragPreview || cards.length > 1,
+      showDragPreview: currentState.showDragPreview || sourceType === 'tableau',
       dragPreviewPosition: currentState.dragPreviewPosition
     });
   },

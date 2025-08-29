@@ -74,8 +74,8 @@ export function GameBoard() {
         />
       )}
       
-      {/* Render drag preview for multiple cards */}
-      {showDragPreview && draggedCards.length > 1 && dragPreviewPosition && (
+      {/* Render drag preview for dragged cards */}
+      {showDragPreview && draggedCards.length > 0 && dragPreviewPosition && (
         <DragPreview
           cards={draggedCards}
           startPosition={dragPreviewPosition}

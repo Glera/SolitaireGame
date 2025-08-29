@@ -37,9 +37,6 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
   
   if (cards.length === 0) return null;
   
-  // Only show preview for multiple cards
-  if (cards.length === 1) return null;
-  
   return createPortal(
     <div 
       style={{
