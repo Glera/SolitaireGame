@@ -16,7 +16,8 @@ export function WastePile({ cards }: WastePileProps) {
     isDragging,
     draggedCards,
     sourceType,
-    endDrag
+    endDrag,
+    animatingCard
   } = useSolitaire();
   
   const cardRef = useRef<HTMLDivElement>(null);
@@ -24,9 +25,17 @@ export function WastePile({ cards }: WastePileProps) {
 
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
 
-  // Check if the top card is being dragged
+  // Check if the top card is being dragged or animating
   const isTopCardBeingDragged = () => {
-    if (!isDragging || sourceType !== 'waste' || !topCard) {
+    if (!topCard) return false;
+    
+    // Check if animating
+    if (animatingCard && animatingCard.card.id === topCard.id) {
+      return true;
+    }
+    
+    // Check if dragging
+    if (!isDragging || sourceType !== 'waste') {
       return false;
     }
     return draggedCards.some(draggedCard => draggedCard.id === topCard.id);

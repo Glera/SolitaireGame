@@ -22,7 +22,8 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     sourceIndex,
     showDragPreview,
     setShowDragPreview,
-    endDrag
+    endDrag,
+    animatingCard
   } = useSolitaire();
   
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -108,14 +109,20 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   const movableCards = getMovableCardsFromTableau(columnIndex);
   const movableStartIndex = cards.length - movableCards.length;
 
-  // Check if this card is being dragged from this column
+  // Check if this card is being dragged from this column or animating
   const isCardBeingDragged = (cardIndex: number) => {
+    const card = cards[cardIndex];
+    
+    // Check if this card is animating
+    if (animatingCard && animatingCard.card.id === card.id) {
+      return true;
+    }
+    
     if (!isDragging || sourceType !== 'tableau' || sourceIndex !== columnIndex) {
       return false;
     }
     
     // Check if this card is in the dragged cards list
-    const card = cards[cardIndex];
     const isBeingDragged = draggedCards.some(draggedCard => draggedCard.id === card.id);
     
     // Hide the card if it's being dragged and we're showing a preview
