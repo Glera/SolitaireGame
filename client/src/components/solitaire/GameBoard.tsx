@@ -33,9 +33,9 @@ export function GameBoard() {
       <div className="max-w-5xl mx-auto">
         <GameControls />
         
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Top row: Stock, Waste, and Foundation piles */}
-          <div className="flex justify-between items-start">
+          <div className="flex justify-between items-start px-2">
             <div className="flex gap-3">
               <StockPile cards={stock} />
               <WastePile cards={waste} />
@@ -50,7 +50,7 @@ export function GameBoard() {
           </div>
           
           {/* Bottom row: Tableau columns */}
-          <div className="flex gap-3 justify-end pr-3">
+          <div className="flex gap-3 justify-end pr-5">
             {tableau.map((column, index) => (
               <div key={index} className="min-h-32">
                 <TableauColumn cards={column} columnIndex={index} />
