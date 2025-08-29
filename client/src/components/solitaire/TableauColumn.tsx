@@ -127,8 +127,8 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     // Check if this card is in the dragged cards list
     const isBeingDragged = draggedCards.some(draggedCard => draggedCard.id === card.id);
     
-    // Hide the card if it's being dragged and we're showing a preview
-    return isBeingDragged && (showDragPreview || draggedCards.length === 1);
+    // Only hide cards if we're showing a multi-card preview
+    return isBeingDragged && showDragPreview;
   };
 
   return (

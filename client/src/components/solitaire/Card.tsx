@@ -58,10 +58,6 @@ export function Card({
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onDragStart={(e) => {
-        // Hide the default drag image
-        const dragImg = new Image();
-        dragImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-        e.dataTransfer.setDragImage(dragImg, 0, 0);
         onDragStart?.(e);
       }}
       onDragEnd={onDragEnd}
