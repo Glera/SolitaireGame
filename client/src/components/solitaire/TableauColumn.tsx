@@ -121,11 +121,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   const isCardBeingDragged = (cardIndex: number) => {
     const card = cards[cardIndex];
     
-    // Check if this card is animating
-    if (animatingCard && animatingCard.card.id === card.id) {
-      return true;
-    }
-    
+    // Check if dragging
     if (!isDragging || sourceType !== 'tableau' || sourceIndex !== columnIndex) {
       return false;
     }
@@ -137,6 +133,12 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     // For single cards, the browser handles the preview
     // For multiple cards, we show our custom preview
     return isBeingDragged;
+  };
+  
+  // Check if card is animating to foundation
+  const isCardAnimating = (cardIndex: number) => {
+    const card = cards[cardIndex];
+    return !!(animatingCard && animatingCard.card.id === card.id);
   };
 
   return (
@@ -170,6 +172,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
               onDragEnd={handleDragEnd}
               isPlayable={card.faceUp && index >= movableStartIndex}
               isDragging={isCardBeingDragged(index)}
+              isAnimating={isCardAnimating(index)}
             />
           </div>
         ))}

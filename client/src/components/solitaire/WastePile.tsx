@@ -25,20 +25,21 @@ export function WastePile({ cards }: WastePileProps) {
 
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
 
-  // Check if the top card is being dragged or animating
+  // Check if the top card is being dragged
   const isTopCardBeingDragged = () => {
     if (!topCard) return false;
-    
-    // Check if animating
-    if (animatingCard && animatingCard.card.id === topCard.id) {
-      return true;
-    }
     
     // Check if dragging
     if (!isDragging || sourceType !== 'waste') {
       return false;
     }
     return draggedCards.some(draggedCard => draggedCard.id === topCard.id);
+  };
+  
+  // Check if the top card is animating to foundation
+  const isTopCardAnimating = () => {
+    if (!topCard) return false;
+    return !!(animatingCard && animatingCard.card.id === topCard.id);
   };
 
   const handleCardClick = () => {
@@ -103,6 +104,7 @@ export function WastePile({ cards }: WastePileProps) {
             onDragEnd={handleDragEnd}
             isPlayable={true}
             isDragging={isTopCardBeingDragged()}
+            isAnimating={isTopCardAnimating()}
           />
         </div>
       ) : (

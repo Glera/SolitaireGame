@@ -12,6 +12,7 @@ interface CardProps {
   className?: string;
   isDragging?: boolean;
   isPlayable?: boolean;
+  isAnimating?: boolean;
 }
 
 export function Card({ 
@@ -22,7 +23,8 @@ export function Card({
   onDragEnd, 
   className,
   isDragging = false,
-  isPlayable = false
+  isPlayable = false,
+  isAnimating = false
 }: CardProps) {
   if (!card.faceUp) {
     return (
@@ -52,6 +54,7 @@ export function Card({
         "outline-none focus:outline-none",
         "rounded-lg",
         isDragging && "opacity-50 scale-95",
+        isAnimating && "opacity-0",
         className
       )}
       style={{ borderRadius: '0.5rem' }}
