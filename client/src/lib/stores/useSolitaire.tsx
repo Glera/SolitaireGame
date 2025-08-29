@@ -2,6 +2,13 @@ import { create } from 'zustand';
 import { GameState, DragState, Card, Suit } from '../solitaire/types';
 import { initializeGame, drawFromStock, moveCards, getMovableCards } from '../solitaire/gameLogic';
 
+interface AnimatingCard {
+  card: Card;
+  startPosition: { x: number; y: number };
+  endPosition: { x: number; y: number };
+  targetSuit: Suit;
+}
+
 interface SolitaireStore extends GameState, DragState {
   // Game actions
   newGame: () => void;
@@ -12,10 +19,15 @@ interface SolitaireStore extends GameState, DragState {
   endDrag: () => void;
   dropCards: (targetType: 'tableau' | 'foundation', targetIndex?: number, targetFoundation?: Suit) => void;
   
+  // Animation state
+  animatingCard: AnimatingCard | null;
+  setAnimatingCard: (card: AnimatingCard | null) => void;
+  
   // Utility functions
   getMovableCardsFromTableau: (columnIndex: number) => Card[];
   canAutoMoveToFoundation: (card: Card) => Suit | null;
-  autoMoveToFoundation: (card: Card, suit: Suit) => void;
+  autoMoveToFoundation: (card: Card, suit: Suit, startElement?: HTMLElement, endElement?: HTMLElement) => void;
+  completeCardAnimation: (card: Card, suit: Suit) => void;
 }
 
 export const useSolitaire = create<SolitaireStore>((set, get) => ({
@@ -29,6 +41,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   sourceIndex: undefined,
   sourceFoundation: undefined,
   
+  // Animation state
+  animatingCard: null,
+  
   newGame: () => {
     const newGameState = initializeGame();
     set({
@@ -37,8 +52,13 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       draggedCards: [],
       sourceType: 'tableau',
       sourceIndex: undefined,
-      sourceFoundation: undefined
+      sourceFoundation: undefined,
+      animatingCard: null
     });
+  },
+  
+  setAnimatingCard: (card) => {
+    set({ animatingCard: card });
   },
   
   drawCard: () => {
@@ -134,7 +154,27 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     return null;
   },
   
-  autoMoveToFoundation: (card, suit) => {
+  autoMoveToFoundation: (card, suit, startElement, endElement) => {
+    // If we have DOM elements, trigger animation
+    if (startElement && endElement) {
+      const startRect = startElement.getBoundingClientRect();
+      const endRect = endElement.getBoundingClientRect();
+      
+      set({
+        animatingCard: {
+          card,
+          startPosition: { x: startRect.left, y: startRect.top },
+          endPosition: { x: endRect.left, y: endRect.top },
+          targetSuit: suit
+        }
+      });
+    } else {
+      // No animation, move immediately
+      get().completeCardAnimation(card, suit);
+    }
+  },
+  
+  completeCardAnimation: (card, suit) => {
     const state = get();
     
     // Find the source of the card
@@ -169,7 +209,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     );
     
     if (newGameState) {
-      set(newGameState);
+      set({ ...newGameState, animatingCard: null });
+    } else {
+      set({ animatingCard: null });
     }
   }
 }));

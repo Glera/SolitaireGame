@@ -8,9 +8,10 @@ import { getSuitSymbol } from '../../lib/solitaire/cardUtils';
 interface FoundationPileProps {
   cards: CardType[];
   suit: Suit;
+  id?: string;
 }
 
-export function FoundationPile({ cards, suit }: FoundationPileProps) {
+export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   const { dropCards } = useSolitaire();
 
   const handleDrop = () => {
@@ -22,11 +23,12 @@ export function FoundationPile({ cards, suit }: FoundationPileProps) {
   const isRed = suit === 'hearts' || suit === 'diamonds';
 
   return (
-    <Pile
-      onDrop={handleDrop}
-      isEmpty={cards.length === 0}
-      className="bg-teal-600/20 border-teal-400/50"
-    >
+    <div id={id}>
+      <Pile
+        onDrop={handleDrop}
+        isEmpty={cards.length === 0}
+        className="bg-teal-600/20 border-teal-400/50"
+      >
       {topCard ? (
         <Card card={topCard} />
       ) : (
@@ -37,6 +39,7 @@ export function FoundationPile({ cards, suit }: FoundationPileProps) {
           <div className="text-xs text-gray-400 font-medium">A</div>
         </div>
       )}
-    </Pile>
+      </Pile>
+    </div>
   );
 }

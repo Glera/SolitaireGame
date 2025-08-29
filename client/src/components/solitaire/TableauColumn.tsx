@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Card } from './Card';
 import { Pile } from './Pile';
 import { Card as CardType } from '../../lib/solitaire/types';
@@ -21,6 +21,8 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     sourceType,
     sourceIndex
   } = useSolitaire();
+  
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const handleCardClick = (cardIndex: number) => {
     const card = cards[cardIndex];
@@ -30,7 +32,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     if (cardIndex === cards.length - 1) {
       const foundationSuit = canAutoMoveToFoundation(card);
       if (foundationSuit) {
-        autoMoveToFoundation(card, foundationSuit);
+        const startElement = cardRefs.current[cardIndex];
+        const endElement = document.getElementById(`foundation-${foundationSuit}`);
+        autoMoveToFoundation(card, foundationSuit, startElement || undefined, endElement || undefined);
         return;
       }
     }
@@ -91,6 +95,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
         {cards.map((card, index) => (
           <div
             key={card.id}
+            ref={el => cardRefs.current[index] = el}
             className="absolute"
             style={{ top: `${index * 18}px` }}
             onDragOver={(e) => { e.preventDefault(); }}

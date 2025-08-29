@@ -6,6 +6,7 @@ import { FoundationPile } from './FoundationPile';
 import { StockPile } from './StockPile';
 import { WastePile } from './WastePile';
 import { GameControls } from './GameControls';
+import { CardAnimation } from './CardAnimation';
 
 export function GameBoard() {
   const { 
@@ -14,7 +15,9 @@ export function GameBoard() {
     stock, 
     waste, 
     isWon,
-    endDrag 
+    endDrag,
+    animatingCard,
+    completeCardAnimation
   } = useSolitaire();
   
   const { playSuccess } = useAudio();
@@ -42,10 +45,10 @@ export function GameBoard() {
             </div>
             
             <div className="flex gap-2">
-              <FoundationPile cards={foundations.hearts} suit="hearts" />
-              <FoundationPile cards={foundations.diamonds} suit="diamonds" />
-              <FoundationPile cards={foundations.clubs} suit="clubs" />
-              <FoundationPile cards={foundations.spades} suit="spades" />
+              <FoundationPile cards={foundations.hearts} suit="hearts" id="foundation-hearts" />
+              <FoundationPile cards={foundations.diamonds} suit="diamonds" id="foundation-diamonds" />
+              <FoundationPile cards={foundations.clubs} suit="clubs" id="foundation-clubs" />
+              <FoundationPile cards={foundations.spades} suit="spades" id="foundation-spades" />
             </div>
           </div>
           
@@ -59,6 +62,16 @@ export function GameBoard() {
           </div>
         </div>
       </div>
+      
+      {/* Render animating card */}
+      {animatingCard && (
+        <CardAnimation
+          card={animatingCard.card}
+          startPosition={animatingCard.startPosition}
+          endPosition={animatingCard.endPosition}
+          onComplete={() => completeCardAnimation(animatingCard.card, animatingCard.targetSuit)}
+        />
+      )}
     </div>
   );
 }

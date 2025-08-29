@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Card } from './Card';
 import { Pile } from './Pile';
 import { Card as CardType } from '../../lib/solitaire/types';
@@ -17,6 +17,8 @@ export function WastePile({ cards }: WastePileProps) {
     draggedCards,
     sourceType
   } = useSolitaire();
+  
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
 
@@ -34,7 +36,9 @@ export function WastePile({ cards }: WastePileProps) {
     // Try auto-move to foundation first
     const foundationSuit = canAutoMoveToFoundation(topCard);
     if (foundationSuit) {
-      autoMoveToFoundation(topCard, foundationSuit);
+      const startElement = cardRef.current;
+      const endElement = document.getElementById(`foundation-${foundationSuit}`);
+      autoMoveToFoundation(topCard, foundationSuit, startElement || undefined, endElement || undefined);
       return;
     }
 
@@ -61,15 +65,17 @@ export function WastePile({ cards }: WastePileProps) {
       className="bg-teal-600/10"
     >
       {topCard ? (
-        <Card 
-          card={topCard} 
-          onClick={handleCardClick}
-          onDoubleClick={handleCardClick}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          isPlayable={true}
-          isDragging={isTopCardBeingDragged()}
-        />
+        <div ref={cardRef}>
+          <Card 
+            card={topCard} 
+            onClick={handleCardClick}
+            onDoubleClick={handleCardClick}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            isPlayable={true}
+            isDragging={isTopCardBeingDragged()}
+          />
+        </div>
       ) : (
         <div className="w-full h-full" />
       )}
