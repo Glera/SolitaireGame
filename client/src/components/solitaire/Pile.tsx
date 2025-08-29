@@ -33,7 +33,7 @@ export function Pile({
   return (
     <div
       className={cn(
-        "w-16 h-24 rounded-lg border-2 border-dashed border-teal-500/50 flex items-center justify-center relative",
+        "w-16 h-24 rounded-lg border border-dashed border-teal-500/50 flex items-center justify-center relative",
         "hover:border-teal-400/70 transition-colors duration-200",
         onClick && "cursor-pointer",
         className
