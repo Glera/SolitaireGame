@@ -15,28 +15,22 @@ export function DragPreview({ cards, startPosition }: DragPreviewProps) {
   });
   
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      requestAnimationFrame(() => {
-        setPosition({
-          x: e.clientX - 32, // Half card width
-          y: e.clientY - 48  // Half card height  
-        });
+    // During drag operations, use dragover event instead of mousemove
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault(); // Important for drag operations
+      setPosition({
+        x: e.clientX - 32,
+        y: e.clientY - 48
       });
     };
     
-    // Start tracking mouse immediately
-    document.addEventListener('mousemove', handleMouseMove, { passive: true });
-    
-    // Set initial position to mouse position immediately
-    handleMouseMove(new MouseEvent('mousemove', {
-      clientX: startPosition.x + 32,
-      clientY: startPosition.y + 48
-    }));
+    // Listen to dragover which fires during drag operations
+    window.addEventListener('dragover', handleDragOver as any);
     
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('dragover', handleDragOver as any);
     };
-  }, [startPosition]);
+  }, []);
   
   if (cards.length === 0) return null;
   

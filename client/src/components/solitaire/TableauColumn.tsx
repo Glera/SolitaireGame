@@ -78,19 +78,19 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     if (cardIndex >= cardPosition) {
       const cardsToMove = movableCards.slice(cardIndex - cardPosition);
       
-      // For multiple cards, show our custom drag preview first
+      // For multiple cards, show our custom drag preview and hide default
       if (cardsToMove.length > 1) {
         // Use mouse position for initial preview position
         setShowDragPreview(true, { x: e.clientX - 32, y: e.clientY - 48 });
+        
+        // Hide the default drag image only for multiple cards
+        const img = new Image();
+        img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+        e.dataTransfer.setDragImage(img, 0, 0);
       }
       
       // Start drag after setting preview
       startDrag(cardsToMove, 'tableau', columnIndex);
-      
-      // Hide the default drag image
-      const img = new Image();
-      img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-      e.dataTransfer.setDragImage(img, 0, 0);
       e.dataTransfer.effectAllowed = 'move';
     } else {
       e.preventDefault();
