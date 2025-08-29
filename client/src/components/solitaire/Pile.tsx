@@ -38,6 +38,7 @@ export function Pile({
         onClick && "cursor-pointer",
         className
       )}
+      style={{ borderRadius: '0.5rem' }}
       onClick={onClick}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
