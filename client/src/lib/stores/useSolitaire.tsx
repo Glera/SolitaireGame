@@ -69,7 +69,18 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   
   dropCards: (targetType, targetIndex, targetFoundation) => {
     const state = get();
-    if (!state.isDragging) return;
+    console.log('🎮 dropCards вызвана:', { 
+      isDragging: state.isDragging, 
+      draggedCards: state.draggedCards.map(c => `${c.rank} ${c.suit}`),
+      targetType, 
+      targetIndex, 
+      targetFoundation 
+    });
+    
+    if (!state.isDragging) {
+      console.log('❌ Не в режиме перетаскивания');
+      return;
+    }
     
     const newGameState = moveCards(
       state,
@@ -83,6 +94,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     );
     
     if (newGameState) {
+      console.log('✅ Ход успешен, обновляем состояние');
       set({
         ...newGameState,
         isDragging: false,
@@ -92,7 +104,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         sourceFoundation: undefined
       });
     } else {
-      // Invalid move, just end drag
+      console.log('❌ Ход недопустим, завершаем перетаскивание');
       get().endDrag();
     }
   },
