@@ -61,8 +61,9 @@ export function WastePile({ cards }: WastePileProps) {
       clearTimeout(clickTimeoutRef.current);
     }
     clickTimeoutRef.current = setTimeout(() => {
-      if (isDragging && sourceType === 'waste') {
-        endDrag();
+      const state = useSolitaire.getState();
+      if (state.isDragging && state.sourceType === 'waste') {
+        state.endDrag();
       }
     }, 150);
   };

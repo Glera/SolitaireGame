@@ -57,8 +57,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
         clearTimeout(clickTimeoutRef.current);
       }
       clickTimeoutRef.current = setTimeout(() => {
-        if (isDragging && sourceType === 'tableau' && sourceIndex === columnIndex) {
-          endDrag();
+        const state = useSolitaire.getState();
+        if (state.isDragging && state.sourceType === 'tableau' && state.sourceIndex === columnIndex) {
+          state.endDrag();
         }
       }, 150);
     }
