@@ -19,7 +19,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     isDragging,
     draggedCards,
     sourceType,
-    sourceIndex
+    sourceIndex,
+    showDragPreview,
+    setShowDragPreview
   } = useSolitaire();
   
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -46,6 +48,18 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     
     if (cardIndex >= cardPosition) {
       const cardsToMove = movableCards.slice(cardIndex - cardPosition);
+      
+      // Set initial position for drag preview
+      if (cardsToMove.length > 1) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setShowDragPreview(true, { x: rect.left, y: rect.top });
+        
+        // Create a transparent image for the default drag image
+        const img = new Image();
+        img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=';
+        e.dataTransfer.setDragImage(img, 0, 0);
+      }
+      
       startDrag(cardsToMove, 'tableau', columnIndex);
       e.dataTransfer.effectAllowed = 'move';
     } else {
@@ -75,7 +89,10 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     
     // Check if this card is in the dragged cards list
     const card = cards[cardIndex];
-    return draggedCards.some(draggedCard => draggedCard.id === card.id);
+    const isBeingDragged = draggedCards.some(draggedCard => draggedCard.id === card.id);
+    
+    // Hide the card if it's being dragged and we're showing a preview
+    return isBeingDragged && (showDragPreview || draggedCards.length === 1);
   };
 
   return (

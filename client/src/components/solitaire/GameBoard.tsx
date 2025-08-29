@@ -7,6 +7,7 @@ import { StockPile } from './StockPile';
 import { WastePile } from './WastePile';
 import { GameControls } from './GameControls';
 import { CardAnimation } from './CardAnimation';
+import { DragPreview } from './DragPreview';
 
 export function GameBoard() {
   const { 
@@ -17,7 +18,10 @@ export function GameBoard() {
     isWon,
     endDrag,
     animatingCard,
-    completeCardAnimation
+    completeCardAnimation,
+    showDragPreview,
+    draggedCards,
+    dragPreviewPosition
   } = useSolitaire();
   
   const { playSuccess } = useAudio();
@@ -70,6 +74,14 @@ export function GameBoard() {
           startPosition={animatingCard.startPosition}
           endPosition={animatingCard.endPosition}
           onComplete={() => completeCardAnimation(animatingCard.card, animatingCard.targetSuit)}
+        />
+      )}
+      
+      {/* Render drag preview for multiple cards */}
+      {showDragPreview && draggedCards.length > 0 && (
+        <DragPreview
+          cards={draggedCards}
+          startPosition={dragPreviewPosition || { x: 0, y: 0 }}
         />
       )}
     </div>

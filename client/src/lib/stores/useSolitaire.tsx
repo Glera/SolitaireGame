@@ -23,6 +23,11 @@ interface SolitaireStore extends GameState, DragState {
   animatingCard: AnimatingCard | null;
   setAnimatingCard: (card: AnimatingCard | null) => void;
   
+  // Drag preview state
+  showDragPreview: boolean;
+  dragPreviewPosition: { x: number; y: number } | null;
+  setShowDragPreview: (show: boolean, position?: { x: number; y: number }) => void;
+  
   // Utility functions
   getMovableCardsFromTableau: (columnIndex: number) => Card[];
   canAutoMoveToFoundation: (card: Card) => Suit | null;
@@ -44,6 +49,10 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   // Animation state
   animatingCard: null,
   
+  // Drag preview state
+  showDragPreview: false,
+  dragPreviewPosition: null,
+  
   newGame: () => {
     const newGameState = initializeGame();
     set({
@@ -61,6 +70,10 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     set({ animatingCard: card });
   },
   
+  setShowDragPreview: (show, position) => {
+    set({ showDragPreview: show, dragPreviewPosition: position || null });
+  },
+  
   drawCard: () => {
     const currentState = get();
     const newState = drawFromStock(currentState);
@@ -73,7 +86,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       draggedCards: cards,
       sourceType,
       sourceIndex,
-      sourceFoundation
+      sourceFoundation,
+      showDragPreview: cards.length > 1
     });
   },
   
@@ -83,7 +97,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       draggedCards: [],
       sourceType: 'tableau',
       sourceIndex: undefined,
-      sourceFoundation: undefined
+      sourceFoundation: undefined,
+      showDragPreview: false,
+      dragPreviewPosition: null
     });
   },
   
@@ -112,7 +128,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         draggedCards: [],
         sourceType: 'tableau',
         sourceIndex: undefined,
-        sourceFoundation: undefined
+        sourceFoundation: undefined,
+        showDragPreview: false,
+        dragPreviewPosition: null
       });
     } else {
       get().endDrag();
