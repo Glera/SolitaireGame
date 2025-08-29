@@ -26,7 +26,8 @@ interface SolitaireStore extends GameState, DragState {
   // Drag preview state
   showDragPreview: boolean;
   dragPreviewPosition: { x: number; y: number } | null;
-  setShowDragPreview: (show: boolean, position?: { x: number; y: number }) => void;
+  dragOffset: { x: number; y: number } | null;
+  setShowDragPreview: (show: boolean, position?: { x: number; y: number }, offset?: { x: number; y: number }) => void;
   
   // Utility functions
   getMovableCardsFromTableau: (columnIndex: number) => Card[];
@@ -52,6 +53,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   // Drag preview state
   showDragPreview: false,
   dragPreviewPosition: null,
+  dragOffset: null,
   
   newGame: () => {
     const newGameState = initializeGame();
@@ -70,8 +72,12 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     set({ animatingCard: card });
   },
   
-  setShowDragPreview: (show, position) => {
-    set({ showDragPreview: show, dragPreviewPosition: position || null });
+  setShowDragPreview: (show, position, offset) => {
+    set({ 
+      showDragPreview: show, 
+      dragPreviewPosition: position || null,
+      dragOffset: offset || null 
+    });
   },
   
   drawCard: () => {
@@ -102,7 +108,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       sourceIndex: undefined,
       sourceFoundation: undefined,
       showDragPreview: false,
-      dragPreviewPosition: null
+      dragPreviewPosition: null,
+      dragOffset: null
     });
   },
   

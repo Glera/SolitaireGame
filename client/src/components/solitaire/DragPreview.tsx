@@ -6,9 +6,10 @@ import { createPortal } from 'react-dom';
 interface DragPreviewProps {
   cards: CardType[];
   startPosition: { x: number; y: number };
+  offset?: { x: number; y: number };
 }
 
-export function DragPreview({ cards, startPosition }: DragPreviewProps) {
+export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }: DragPreviewProps) {
   const [position, setPosition] = useState({
     x: startPosition.x,
     y: startPosition.y
@@ -18,9 +19,11 @@ export function DragPreview({ cards, startPosition }: DragPreviewProps) {
     // During drag operations, use dragover event instead of mousemove
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault(); // Important for drag operations
+      
+      // Position the preview maintaining the same offset from cursor
       setPosition({
-        x: e.clientX - 32,
-        y: e.clientY - 48
+        x: e.clientX - offset.x,
+        y: e.clientY - offset.y
       });
     };
     
@@ -30,7 +33,7 @@ export function DragPreview({ cards, startPosition }: DragPreviewProps) {
     return () => {
       window.removeEventListener('dragover', handleDragOver as any);
     };
-  }, []);
+  }, [offset]);
   
   if (cards.length === 0) return null;
   

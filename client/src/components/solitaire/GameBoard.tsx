@@ -21,7 +21,8 @@ export function GameBoard() {
     completeCardAnimation,
     showDragPreview,
     draggedCards,
-    dragPreviewPosition
+    dragPreviewPosition,
+    dragOffset
   } = useSolitaire();
   
   const { playSuccess } = useAudio();
@@ -78,6 +79,7 @@ export function GameBoard() {
         <DragPreview
           cards={draggedCards}
           startPosition={dragPreviewPosition}
+          offset={dragOffset || { x: 32, y: 48 }}
         />
       )}
     </div>

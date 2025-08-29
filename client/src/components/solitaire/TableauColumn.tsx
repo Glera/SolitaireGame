@@ -80,8 +80,16 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       
       // For multiple cards, show our custom drag preview and hide default
       if (cardsToMove.length > 1) {
-        // Use mouse position for initial preview position
-        setShowDragPreview(true, { x: e.clientX - 32, y: e.clientY - 48 });
+        // Calculate offset from the click position to the card position
+        const rect = e.currentTarget.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const offsetY = e.clientY - rect.top;
+        
+        // Set preview position with the card position and the offset from the click
+        setShowDragPreview(true, 
+          { x: rect.left, y: rect.top },
+          { x: offsetX, y: offsetY }
+        );
         
         // Hide the default drag image only for multiple cards
         const img = new Image();
@@ -127,8 +135,10 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     // Check if this card is in the dragged cards list
     const isBeingDragged = draggedCards.some(draggedCard => draggedCard.id === card.id);
     
-    // Only hide cards if we're showing a multi-card preview
-    return isBeingDragged && showDragPreview;
+    // Hide cards that are being dragged (both single and multiple)
+    // For single cards, the browser handles the preview
+    // For multiple cards, we show our custom preview
+    return isBeingDragged;
   };
 
   return (
