@@ -42,10 +42,10 @@ export function getRankValue(rank: Rank): number {
 }
 
 export function canPlaceOnTableau(bottomCard: Card, topCard: Card): boolean {
-  // Can place if colors are different and rank is one less
+  // Can place if colors are different and topCard rank is one less than bottomCard
   return (
     bottomCard.color !== topCard.color &&
-    getRankValue(bottomCard.rank) === getRankValue(topCard.rank) - 1
+    getRankValue(topCard.rank) === getRankValue(bottomCard.rank) - 1
   );
 }
 
