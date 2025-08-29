@@ -31,6 +31,19 @@ export function WastePile({ cards }: WastePileProps) {
     startDrag([topCard], 'waste');
   };
 
+  const handleDragStart = (e: React.DragEvent) => {
+    if (!topCard) return;
+    startDrag([topCard], 'waste');
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    // Delay endDrag to allow drop events to process first
+    setTimeout(() => {
+      useSolitaire.getState().endDrag();
+    }, 0);
+  };
+
   return (
     <Pile
       isEmpty={cards.length === 0}
@@ -41,6 +54,8 @@ export function WastePile({ cards }: WastePileProps) {
           card={topCard} 
           onClick={handleCardClick}
           onDoubleClick={handleCardClick}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
           isPlayable={true}
         />
       ) : (

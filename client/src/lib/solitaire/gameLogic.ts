@@ -119,13 +119,6 @@ function isValidMove(
   targetIndex: number | undefined,
   targetFoundation: Suit | undefined
 ): boolean {
-  console.log('🎯 Проверка хода:', {
-    cards: cards.map(c => `${c.rank} ${c.suit} (${c.color})`),
-    targetType,
-    targetIndex,
-    targetFoundation
-  });
-
   if (targetType === 'foundation') {
     // Can only move single card to foundation
     if (cards.length !== 1 || !targetFoundation) return false;
@@ -138,22 +131,13 @@ function isValidMove(
     
     if (targetColumn.length === 0) {
       // Can place King on empty column
-      const canPlace = cards[0].rank === 'K';
-      console.log('🏁 Пустой столбец - можно разместить только короля:', canPlace);
-      return canPlace;
+      return cards[0].rank === 'K';
     }
     
     const bottomCard = targetColumn[targetColumn.length - 1];
-    const canPlace = canPlaceOnTableau(bottomCard, cards[0]);
-    console.log('🃏 Проверка размещения на карту:', {
-      bottomCard: `${bottomCard.rank} ${bottomCard.suit} (${bottomCard.color})`,
-      topCard: `${cards[0].rank} ${cards[0].suit} (${cards[0].color})`,
-      canPlace
-    });
-    return canPlace;
+    return canPlaceOnTableau(bottomCard, cards[0]);
   }
   
-  console.log('❌ Неверные параметры хода');
   return false;
 }
 

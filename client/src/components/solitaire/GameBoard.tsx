@@ -26,15 +26,7 @@ export function GameBoard() {
     }
   }, [isWon, playSuccess]);
 
-  // Handle global drag end
-  useEffect(() => {
-    const handleMouseUp = () => {
-      endDrag();
-    };
-
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => document.removeEventListener('mouseup', handleMouseUp);
-  }, [endDrag]);
+  // Note: Drag end is now handled by individual drag components via onDragEnd
 
   return (
     <div className="min-h-screen bg-green-800 p-4">

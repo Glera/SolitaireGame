@@ -33,13 +33,11 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   const handleDragStart = (e: React.DragEvent, cardIndex: number) => {
-    console.log('🚀 Начинаем перетаскивание карты:', cardIndex);
     const movableCards = getMovableCardsFromTableau(columnIndex);
     const cardPosition = cards.length - movableCards.length;
     
     if (cardIndex >= cardPosition) {
       const cardsToMove = movableCards.slice(cardIndex - cardPosition);
-      console.log('📋 Карты для перемещения:', cardsToMove.map(c => `${c.rank} ${c.suit}`));
       startDrag(cardsToMove, 'tableau', columnIndex);
       e.dataTransfer.effectAllowed = 'move';
     } else {
@@ -48,12 +46,13 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   const handleDragEnd = (e: React.DragEvent) => {
-    console.log('🏁 Завершение перетаскивания');
-    // Note: endDrag will be called by the global mouse handler
+    // Delay endDrag to allow drop events to process first
+    setTimeout(() => {
+      useSolitaire.getState().endDrag();
+    }, 0);
   };
 
   const handleDrop = () => {
-    console.log('💧 Попытка разместить карты в столбец:', columnIndex);
     dropCards('tableau', columnIndex);
   };
 
@@ -79,8 +78,8 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
             key={card.id}
             className="absolute"
             style={{ top: `${index * 18}px` }}
-            onDragOver={(e) => { e.preventDefault(); console.log('🔄 DragOver на карте'); }}
-            onDrop={(e) => { e.preventDefault(); console.log('💧 Drop на карте'); handleDrop(); }}
+            onDragOver={(e) => { e.preventDefault(); }}
+            onDrop={(e) => { e.preventDefault(); handleDrop(); }}
           >
             <Card
               card={card}

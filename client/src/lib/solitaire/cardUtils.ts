@@ -48,14 +48,6 @@ export function canPlaceOnTableau(bottomCard: Card, topCard: Card): boolean {
   const topValue = getRankValue(topCard.rank);
   const rankValid = topValue === bottomValue - 1;
   
-  console.log('🔍 Проверка размещения на столе:', {
-    bottom: `${bottomCard.rank} ${bottomCard.suit} (${bottomCard.color}, value: ${bottomValue})`,
-    top: `${topCard.rank} ${topCard.suit} (${topCard.color}, value: ${topValue})`,
-    colorsDifferent,
-    rankValid,
-    result: colorsDifferent && rankValid
-  });
-  
   return colorsDifferent && rankValid;
 }
 
