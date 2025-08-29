@@ -30,18 +30,18 @@ export function GameBoard() {
 
   return (
     <div className="min-h-screen bg-green-800 p-3">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <GameControls />
         
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* Top row: Stock, Waste, and Foundation piles */}
-          <div className="flex justify-between items-start px-2">
-            <div className="flex gap-3">
+          <div className="flex justify-between items-start">
+            <div className="flex gap-2">
               <StockPile cards={stock} />
               <WastePile cards={waste} />
             </div>
             
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <FoundationPile cards={foundations.hearts} suit="hearts" />
               <FoundationPile cards={foundations.diamonds} suit="diamonds" />
               <FoundationPile cards={foundations.clubs} suit="clubs" />
@@ -50,7 +50,7 @@ export function GameBoard() {
           </div>
           
           {/* Bottom row: Tableau columns */}
-          <div className="flex gap-3 justify-end pr-5">
+          <div className="flex gap-2 justify-end">
             {tableau.map((column, index) => (
               <div key={index} className="min-h-32">
                 <TableauColumn cards={column} columnIndex={index} />
