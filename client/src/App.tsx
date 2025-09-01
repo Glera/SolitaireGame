@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { GameBoard } from './components/solitaire/GameBoard';
 import { useAudio } from './lib/stores/useAudio';
+import { useSolitaire } from './lib/stores/useSolitaire';
 import { DeviceTestPanel } from './components/DeviceTestPanel';
 import { GameViewport } from './components/GameViewport';
 import "@fontsource/inter";
 
 function App() {
   const { setHitSound, setSuccessSound } = useAudio();
+  const { newGame } = useSolitaire();
   const [testPanelVisible, setTestPanelVisible] = useState(false);
   const [testViewport, setTestViewport] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [isTestMode, setIsTestMode] = useState(false);
+  const [gameKey, setGameKey] = useState(0);
 
   // Initialize audio on component mount
   useEffect(() => {
@@ -29,16 +32,26 @@ function App() {
   const handleSizeChange = (width: number, height: number) => {
     setTestViewport({ width, height });
     setIsTestMode(width !== window.innerWidth || height !== window.innerHeight);
+    
+    // Force game reinitialization by changing key and starting new game
+    setGameKey(prev => prev + 1);
+    setTimeout(() => {
+      newGame();
+    }, 0);
   };
 
   const handleTogglePanel = () => {
     const newVisible = !testPanelVisible;
     setTestPanelVisible(newVisible);
     
-    // If closing panel, reset to normal view
+    // If closing panel, reset to normal view and reinitialize game
     if (!newVisible) {
       setIsTestMode(false);
       setTestViewport({ width: window.innerWidth, height: window.innerHeight });
+      setGameKey(prev => prev + 1);
+      setTimeout(() => {
+        newGame();
+      }, 0);
     }
   };
 
@@ -49,7 +62,16 @@ function App() {
         height={testViewport.height}
         isTestMode={isTestMode}
       >
-        <GameBoard />
+        <div 
+          key={gameKey}
+          style={{
+            width: isTestMode ? `${testViewport.width}px` : '100%',
+            height: isTestMode ? `${testViewport.height}px` : '100%',
+            overflow: 'hidden'
+          }}
+        >
+          <GameBoard />
+        </div>
       </GameViewport>
       
       <DeviceTestPanel
