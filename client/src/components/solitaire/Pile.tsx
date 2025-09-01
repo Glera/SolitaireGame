@@ -23,10 +23,24 @@ export function Pile({
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     onDragOver?.(e);
+    // Simplified drop zone - always accept drops, let game logic validate
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    (e.currentTarget as HTMLElement).style.borderColor = '';
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    (e.currentTarget as HTMLElement).style.borderColor = '';
+    // DEBUG: Log pile drop coordinates
+    console.log('🎯 Drop on pile', { 
+      clientX: e.clientX, 
+      clientY: e.clientY,
+      isEmpty,
+      label 
+    });
     onDrop?.(e);
   };
 
@@ -41,6 +55,7 @@ export function Pile({
       style={{ borderRadius: '0.5rem' }}
       onClick={onClick}
       onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {isEmpty && label && (

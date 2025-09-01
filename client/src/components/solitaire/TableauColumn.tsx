@@ -113,7 +113,14 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     }, 0);
   };
 
-  const handleDrop = () => {
+  const handleDrop = (e: React.DragEvent) => {
+    // DEBUG: Log drop coordinates
+    console.log('🎯 Drop on tableau column', columnIndex, {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      target: e.target,
+      currentTarget: e.currentTarget
+    });
     dropCards('tableau', columnIndex);
   };
 
@@ -163,8 +170,16 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
             ref={el => cardRefs.current[index] = el}
             className="absolute"
             style={{ top: `${index * 18}px` }}
-            onDragOver={(e) => { e.preventDefault(); }}
-            onDrop={(e) => { e.preventDefault(); handleDrop(); }}
+            onDragOver={(e) => { 
+              e.preventDefault();
+              // Simplified drop zone logic - accept drops on any tableau card area
+              e.dataTransfer.dropEffect = 'move';
+            }}
+            onDrop={(e) => { 
+              e.preventDefault(); 
+              // Use simplified coordinate-free drop handling
+              handleDrop(e); 
+            }}
           >
             <Card
               card={card}

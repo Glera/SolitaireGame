@@ -14,7 +14,13 @@ interface FoundationPileProps {
 export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   const { dropCards } = useSolitaire();
 
-  const handleDrop = () => {
+  const handleDrop = (e: React.DragEvent) => {
+    // DEBUG: Log foundation drop
+    console.log('🏆 Drop on foundation', suit, {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      cardsCount: cards.length
+    });
     dropCards('foundation', undefined, suit);
   };
 
