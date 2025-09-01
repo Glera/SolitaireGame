@@ -156,7 +156,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   return (
-    <div className="relative">
+    <div className="relative" data-tableau-column={columnIndex}>
       <Pile
         onDrop={handleDrop}
         isEmpty={cards.length === 0}

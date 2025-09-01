@@ -46,7 +46,7 @@ export function GameBoard() {
   // Note: Drag end is now handled by individual drag components via onDragEnd
 
   return (
-    <div className="min-h-screen bg-green-800 p-3">
+    <div className="min-h-screen bg-green-800 p-3" data-game-board>
       <div className="max-w-fit mx-auto">
         <GameControls />
         

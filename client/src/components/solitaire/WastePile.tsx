@@ -93,6 +93,7 @@ export function WastePile({ cards }: WastePileProps) {
     <Pile
       isEmpty={cards.length === 0}
       className="bg-teal-600/10"
+      data-waste-pile
     >
       {topCard ? (
         <div ref={cardRef}>

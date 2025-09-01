@@ -9,6 +9,8 @@ interface PileProps {
   className?: string;
   isEmpty?: boolean;
   label?: string;
+  'data-stock-pile'?: boolean;
+  'data-waste-pile'?: boolean;
 }
 
 export function Pile({ 
@@ -18,7 +20,8 @@ export function Pile({
   onDragOver,
   className,
   isEmpty = false,
-  label
+  label,
+  ...props
 }: PileProps) {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -51,6 +54,7 @@ export function Pile({
 
   return (
     <div
+      {...props}
       className={cn(
         "w-16 h-24 rounded-lg border border-dashed border-teal-500/50 flex items-center justify-center relative",
         "hover:border-teal-400/70 transition-colors duration-200",

@@ -6,6 +6,25 @@ export interface DebugInfo {
   target: string;
   timestamp: number;
   extra?: any;
+  viewport?: {
+    width: number;
+    height: number;
+    scrollX: number;
+    scrollY: number;
+  };
+  gameField?: {
+    bounds: DOMRect;
+    offset: { x: number; y: number };
+  };
+  dropZones?: Array<{
+    id: string;
+    bounds: DOMRect;
+    type: string;
+  }>;
+  gameState?: {
+    draggedCards: string[];
+    moveResult: 'success' | 'failed' | 'pending';
+  };
 }
 
 interface DebugPopupProps {
@@ -17,7 +36,52 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
   const copyToClipboard = async () => {
     if (!info) return;
     
-    const debugText = `DEBUG INFO\nEvent: ${info.event}\nCoords: ${info.coords.x}, ${info.coords.y}\nTarget: ${info.target}\nTime: ${new Date(info.timestamp).toLocaleTimeString()}\nExtra: ${info.extra ? JSON.stringify(info.extra, null, 2) : 'none'}`;
+    let debugText = `=== DEBUG INFO ===\n`;
+    debugText += `Event: ${info.event}\n`;
+    debugText += `Drop Coords: ${info.coords.x}, ${info.coords.y}\n`;
+    debugText += `Target: ${info.target}\n`;
+    debugText += `Time: ${new Date(info.timestamp).toLocaleTimeString()}\n\n`;
+    
+    if (info.viewport) {
+      debugText += `=== VIEWPORT ===\n`;
+      debugText += `Size: ${info.viewport.width} × ${info.viewport.height}\n`;
+      debugText += `Scroll: ${info.viewport.scrollX}, ${info.viewport.scrollY}\n\n`;
+    }
+    
+    if (info.gameField) {
+      debugText += `=== GAME FIELD ===\n`;
+      debugText += `Bounds: ${Math.round(info.gameField.bounds.x)}, ${Math.round(info.gameField.bounds.y)}, ${Math.round(info.gameField.bounds.width)} × ${Math.round(info.gameField.bounds.height)}\n`;
+      debugText += `Offset: ${info.gameField.offset.x}, ${info.gameField.offset.y}\n\n`;
+    }
+    
+    if (info.dropZones && info.dropZones.length > 0) {
+      debugText += `=== DROP ZONES ===\n`;
+      info.dropZones.forEach(zone => {
+        debugText += `${zone.id} (${zone.type}): ${Math.round(zone.bounds.x)}, ${Math.round(zone.bounds.y)}, ${Math.round(zone.bounds.width)} × ${Math.round(zone.bounds.height)}\n`;
+      });
+      debugText += `\n`;
+    }
+    
+    if (info.extra) {
+      debugText += `=== EXTRA INFO ===\n${JSON.stringify(info.extra, null, 2)}\n\n`;
+    }
+    
+    // Check which drop zone the coords fall into
+    if (info.dropZones) {
+      debugText += `=== DROP ZONE CHECK ===\n`;
+      const matchingZones = info.dropZones.filter(zone => {
+        return info.coords.x >= zone.bounds.left && 
+               info.coords.x <= zone.bounds.right &&
+               info.coords.y >= zone.bounds.top && 
+               info.coords.y <= zone.bounds.bottom;
+      });
+      
+      if (matchingZones.length > 0) {
+        debugText += `Drop coords match zones: ${matchingZones.map(z => z.id).join(', ')}\n`;
+      } else {
+        debugText += `Drop coords DO NOT match any drop zone!\n`;
+      }
+    }
     
     try {
       await navigator.clipboard.writeText(debugText);
@@ -45,11 +109,42 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
           </button>
         </div>
         <div><span className="text-blue-300">Event:</span> {info.event}</div>
-        <div><span className="text-blue-300">Coords:</span> {info.coords.x}, {info.coords.y}</div>
+        <div><span className="text-blue-300">Drop:</span> {info.coords.x}, {info.coords.y}</div>
         <div><span className="text-blue-300">Target:</span> {info.target}</div>
-        <div><span className="text-blue-300">Time:</span> {new Date(info.timestamp).toLocaleTimeString()}</div>
+        
+        {info.viewport && (
+          <div className="mt-2 pt-2 border-t border-gray-600">
+            <div className="text-yellow-300 text-xs font-bold">VIEWPORT</div>
+            <div className="text-xs">{info.viewport.width} × {info.viewport.height}</div>
+          </div>
+        )}
+        
+        {info.gameField && (
+          <div className="mt-2 pt-2 border-t border-gray-600">
+            <div className="text-yellow-300 text-xs font-bold">GAME FIELD</div>
+            <div className="text-xs">{Math.round(info.gameField.bounds.x)}, {Math.round(info.gameField.bounds.y)}</div>
+          </div>
+        )}
+        
+        {info.dropZones && info.dropZones.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-gray-600">
+            <div className="text-yellow-300 text-xs font-bold">DROP ZONES</div>
+            <div className="text-xs max-h-20 overflow-y-auto">
+              {info.dropZones.slice(0, 3).map(zone => (
+                <div key={zone.id} className="mb-1">
+                  {zone.id}: {Math.round(zone.bounds.x)}, {Math.round(zone.bounds.y)}
+                </div>
+              ))}
+              {info.dropZones.length > 3 && <div>... +{info.dropZones.length - 3} more</div>}
+            </div>
+          </div>
+        )}
+        
         {info.extra && (
-          <div><span className="text-blue-300">Extra:</span> {JSON.stringify(info.extra, null, 1)}</div>
+          <div className="mt-2 pt-2 border-t border-gray-600">
+            <div className="text-yellow-300 text-xs font-bold">EXTRA</div>
+            <div className="text-xs">{JSON.stringify(info.extra, null, 1)}</div>
+          </div>
         )}
         <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-600">
           <div className="text-gray-400 text-xs">Manual close only</div>
@@ -74,12 +169,83 @@ export function setDebugCallback(callback: (info: DebugInfo) => void) {
 
 export function showDebugInfo(event: string, coords: { x: number; y: number }, target: string, extra?: any) {
   if (debugCallback) {
+    // Collect comprehensive debug info
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      scrollX: window.scrollX,
+      scrollY: window.scrollY
+    };
+
+    // Try to find game field bounds
+    const gameField = document.querySelector('[data-game-board]') as HTMLElement;
+    const gameFieldInfo = gameField ? {
+      bounds: gameField.getBoundingClientRect(),
+      offset: {
+        x: gameField.offsetLeft,
+        y: gameField.offsetTop
+      }
+    } : undefined;
+
+    // Collect all drop zones
+    const dropZones: Array<{id: string; bounds: DOMRect; type: string}> = [];
+    
+    // Foundation piles
+    ['hearts', 'diamonds', 'clubs', 'spades'].forEach(suit => {
+      const el = document.getElementById(`foundation-${suit}`);
+      if (el) {
+        dropZones.push({
+          id: `foundation-${suit}`,
+          bounds: el.getBoundingClientRect(),
+          type: 'foundation'
+        });
+      }
+    });
+
+    // Tableau columns
+    for (let i = 0; i < 7; i++) {
+      const el = document.querySelector(`[data-tableau-column="${i}"]`) as HTMLElement;
+      if (el) {
+        dropZones.push({
+          id: `tableau-${i}`,
+          bounds: el.getBoundingClientRect(),
+          type: 'tableau'
+        });
+      }
+    }
+
+    // Stock and waste piles
+    const stockEl = document.querySelector('[data-stock-pile]') as HTMLElement;
+    if (stockEl) {
+      dropZones.push({
+        id: 'stock',
+        bounds: stockEl.getBoundingClientRect(),
+        type: 'stock'
+      });
+    }
+    
+    const wasteEl = document.querySelector('[data-waste-pile]') as HTMLElement;
+    if (wasteEl) {
+      dropZones.push({
+        id: 'waste',
+        bounds: wasteEl.getBoundingClientRect(),
+        type: 'waste'
+      });
+    }
+
     debugCallback({
       event,
       coords,
       target,
       timestamp: Date.now(),
-      extra
+      extra,
+      viewport,
+      gameField: gameFieldInfo,
+      dropZones,
+      gameState: {
+        draggedCards: [], // Will be filled by game components
+        moveResult: 'pending'
+      }
     });
   }
 }
