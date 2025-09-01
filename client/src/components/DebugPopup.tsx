@@ -14,22 +14,36 @@ interface DebugPopupProps {
 }
 
 export function DebugPopup({ info, onClose }: DebugPopupProps) {
-  useEffect(() => {
-    if (info) {
-      const timer = setTimeout(onClose, 3000); // Auto close after 3 seconds
-      return () => clearTimeout(timer);
+  const copyToClipboard = async () => {
+    if (!info) return;
+    
+    const debugText = `DEBUG INFO\nEvent: ${info.event}\nCoords: ${info.coords.x}, ${info.coords.y}\nTarget: ${info.target}\nTime: ${new Date(info.timestamp).toLocaleTimeString()}\nExtra: ${info.extra ? JSON.stringify(info.extra, null, 2) : 'none'}`;
+    
+    try {
+      await navigator.clipboard.writeText(debugText);
+      alert('Debug info copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+      // Fallback - show text in alert for manual copy
+      alert(`Copy this:\n\n${debugText}`);
     }
-  }, [info, onClose]);
+  };
 
   if (!info) return null;
 
   return (
-    <div 
-      className="fixed top-4 right-4 bg-black/90 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm"
-      onClick={onClose}
-    >
+    <div className="fixed top-4 right-4 bg-black/90 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm">
       <div className="text-sm font-mono">
-        <div className="text-yellow-300 font-bold mb-2">🐛 DEBUG INFO</div>
+        <div className="text-yellow-300 font-bold mb-2 flex items-center justify-between">
+          🐛 DEBUG INFO
+          <button 
+            onClick={copyToClipboard}
+            className="text-xs bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-white ml-2"
+            title="Copy to clipboard"
+          >
+            📋 Copy
+          </button>
+        </div>
         <div><span className="text-blue-300">Event:</span> {info.event}</div>
         <div><span className="text-blue-300">Coords:</span> {info.coords.x}, {info.coords.y}</div>
         <div><span className="text-blue-300">Target:</span> {info.target}</div>
@@ -37,7 +51,15 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
         {info.extra && (
           <div><span className="text-blue-300">Extra:</span> {JSON.stringify(info.extra, null, 1)}</div>
         )}
-        <div className="text-gray-400 text-xs mt-2">Click to close</div>
+        <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-600">
+          <div className="text-gray-400 text-xs">Manual close only</div>
+          <button 
+            onClick={onClose}
+            className="text-xs bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-white"
+          >
+            ✕ Close
+          </button>
+        </div>
       </div>
     </div>
   );
