@@ -19,9 +19,8 @@ export function GameControls() {
   return (
     <div className="relative mb-4 h-12 flex items-center">
       {/* Score on the left */}
-      <div className="absolute left-0 text-white">
-        <div className="text-lg font-semibold">Score: {moves}</div>
-        <div className="text-xs text-white/70 mt-1">v{GAME_VERSION}</div>
+      <div className="absolute left-0 text-white text-lg font-semibold">
+        Score: {moves} <span className="text-xs text-white/70 font-normal">v{GAME_VERSION}</span>
       </div>
       
       {/* New Game button in center */}
