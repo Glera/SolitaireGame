@@ -34,12 +34,17 @@ export function Pile({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     (e.currentTarget as HTMLElement).style.borderColor = '';
-    // DEBUG: Log pile drop coordinates
-    console.log('🎯 Drop on pile', { 
-      clientX: e.clientX, 
-      clientY: e.clientY,
-      isEmpty,
-      label 
+    // DEBUG: Show popup with pile drop info
+    import('../DebugPopup').then(({ showDebugInfo }) => {
+      showDebugInfo(
+        'Drop on Pile',
+        { x: e.clientX, y: e.clientY },
+        label || 'Stock/Waste pile',
+        { 
+          isEmpty,
+          pileType: label || 'stock/waste'
+        }
+      );
     });
     onDrop?.(e);
   };

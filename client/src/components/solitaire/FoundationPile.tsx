@@ -15,11 +15,17 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   const { dropCards } = useSolitaire();
 
   const handleDrop = (e: React.DragEvent) => {
-    // DEBUG: Log foundation drop
-    console.log('🏆 Drop on foundation', suit, {
-      clientX: e.clientX,
-      clientY: e.clientY,
-      cardsCount: cards.length
+    // DEBUG: Show popup with foundation drop info
+    import('../DebugPopup').then(({ showDebugInfo }) => {
+      showDebugInfo(
+        'Drop on Foundation',
+        { x: e.clientX, y: e.clientY },
+        `${suit.toUpperCase()} foundation`,
+        { 
+          cardsInFoundation: cards.length,
+          topCard: cards.length > 0 ? `${cards[cards.length-1].rank}${cards[cards.length-1].suit}` : 'empty'
+        }
+      );
     });
     dropCards('foundation', undefined, suit);
   };

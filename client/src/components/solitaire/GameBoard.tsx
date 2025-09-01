@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { useAudio } from '../../lib/stores/useAudio';
 import { TableauColumn } from './TableauColumn';
@@ -8,6 +8,7 @@ import { WastePile } from './WastePile';
 import { GameControls } from './GameControls';
 import { CardAnimation } from './CardAnimation';
 import { DragPreview } from './DragPreview';
+import { DebugPopup, setDebugCallback, type DebugInfo } from '../DebugPopup';
 
 export function GameBoard() {
   const { 
@@ -26,6 +27,14 @@ export function GameBoard() {
   } = useSolitaire();
   
   const { playSuccess } = useAudio();
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+
+  // Set up debug callback
+  useEffect(() => {
+    setDebugCallback((info: DebugInfo) => {
+      setDebugInfo(info);
+    });
+  }, []);
 
   // Play success sound when game is won
   useEffect(() => {
@@ -82,6 +91,12 @@ export function GameBoard() {
           offset={dragOffset || { x: 32, y: 48 }}
         />
       )}
+      
+      {/* Debug popup */}
+      <DebugPopup 
+        info={debugInfo}
+        onClose={() => setDebugInfo(null)}
+      />
     </div>
   );
 }
