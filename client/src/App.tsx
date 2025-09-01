@@ -74,11 +74,12 @@ function App() {
         </div>
       </GameViewport>
       
-      <DeviceTestPanel
+{/* DeviceTestPanel temporarily hidden */}
+      {/* <DeviceTestPanel
         onSizeChange={handleSizeChange}
         isVisible={testPanelVisible}
         onToggle={handleTogglePanel}
-      />
+      /> */}
     </div>
   );
 }
