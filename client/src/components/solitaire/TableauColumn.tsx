@@ -78,7 +78,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     if (cardIndex >= cardPosition) {
       const cardsToMove = movableCards.slice(cardIndex - cardPosition);
       
-      // Always use custom drag preview for tableau cards
+      // TEMPORARY TEST: Use standard browser drag behavior like WastePile
+      // Comment out custom drag preview logic
+      /*
       // Calculate offset from the click position to the card position
       const rect = e.currentTarget.getBoundingClientRect();
       const offsetX = e.clientX - rect.left;
@@ -94,8 +96,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       const img = new Image();
       img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
       e.dataTransfer.setDragImage(img, 0, 0);
+      */
       
-      // Start drag after setting preview
+      // Start drag with standard browser behavior
       startDrag(cardsToMove, 'tableau', columnIndex);
       e.dataTransfer.effectAllowed = 'move';
     } else {
@@ -129,10 +132,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     // Check if this card is in the dragged cards list
     const isBeingDragged = draggedCards.some(draggedCard => draggedCard.id === card.id);
     
-    // Hide cards that are being dragged (both single and multiple)
-    // For single cards, the browser handles the preview
-    // For multiple cards, we show our custom preview
-    return isBeingDragged;
+    // TEMPORARY TEST: Don't hide dragged cards, let browser handle it
+    // return isBeingDragged;
+    return false;
   };
   
   // Check if card is animating to foundation
