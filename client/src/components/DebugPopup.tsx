@@ -96,7 +96,14 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
   if (!info) return null;
 
   return (
-    <div className="fixed top-4 right-4 bg-black/90 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm">
+    <div 
+      className="fixed bg-black/90 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm"
+      style={{
+        top: '16px',
+        left: info.gameField ? `${info.gameField.bounds.right + 10}px` : '16px',
+        right: info.gameField ? 'auto' : '16px'
+      }}
+    >
       <div className="text-sm font-mono">
         <div className="text-yellow-300 font-bold mb-2 flex items-center justify-between">
           🐛 DEBUG INFO
