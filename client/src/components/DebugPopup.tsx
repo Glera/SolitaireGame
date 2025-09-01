@@ -101,8 +101,8 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
       style={{
         top: '16px',
         left: info.gameField && (info.gameField.bounds.right + 320 < window.innerWidth) 
-          ? `${info.gameField.bounds.right + 10}px` 
-          : '16px',
+          ? `${info.gameField.bounds.right + 16}px` 
+          : 'auto',
         right: info.gameField && (info.gameField.bounds.right + 320 < window.innerWidth)
           ? 'auto'
           : '16px',
@@ -191,13 +191,26 @@ export function showDebugInfo(event: string, coords: { x: number; y: number }, t
 
     // Try to find game field bounds
     const gameField = document.querySelector('[data-game-board]') as HTMLElement;
-    const gameFieldInfo = gameField ? {
+    let gameFieldInfo = gameField ? {
       bounds: gameField.getBoundingClientRect(),
       offset: {
         x: gameField.offsetLeft,
         y: gameField.offsetTop
       }
     } : undefined;
+    
+    // Find the rightmost tableau column (column 6) for better positioning
+    const lastTableauColumn = document.querySelector('[data-tableau-column="6"]') as HTMLElement;
+    if (lastTableauColumn) {
+      const columnBounds = lastTableauColumn.getBoundingClientRect();
+      gameFieldInfo = {
+        bounds: {
+          ...gameFieldInfo?.bounds,
+          right: columnBounds.right
+        } as DOMRect,
+        offset: gameFieldInfo?.offset || { x: 0, y: 0 }
+      };
+    }
 
     // Collect all drop zones
     const dropZones: Array<{id: string; bounds: DOMRect; type: string}> = [];
