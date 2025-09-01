@@ -97,11 +97,16 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
 
   return (
     <div 
-      className="fixed bg-black/90 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm"
+      className="fixed bg-black/90 text-white p-4 rounded-lg shadow-lg max-w-sm"
       style={{
         top: '16px',
-        left: info.gameField ? `${info.gameField.bounds.right + 10}px` : '16px',
-        right: info.gameField ? 'auto' : '16px'
+        left: info.gameField && (info.gameField.bounds.right + 320 < window.innerWidth) 
+          ? `${info.gameField.bounds.right + 10}px` 
+          : '16px',
+        right: info.gameField && (info.gameField.bounds.right + 320 < window.innerWidth)
+          ? 'auto'
+          : '16px',
+        zIndex: 9999
       }}
     >
       <div className="text-sm font-mono">
