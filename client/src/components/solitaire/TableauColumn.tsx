@@ -168,9 +168,20 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
         onDragOver={(e) => { 
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
+          // Visual feedback for tableau drop zone
+          e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
+          e.currentTarget.style.border = '2px dashed rgb(34, 197, 94)';
+        }}
+        onDragLeave={(e) => {
+          // Remove visual feedback
+          e.currentTarget.style.backgroundColor = '';
+          e.currentTarget.style.border = '';
         }}
         onDrop={(e) => { 
-          e.preventDefault(); 
+          e.preventDefault();
+          // Remove visual feedback
+          e.currentTarget.style.backgroundColor = '';
+          e.currentTarget.style.border = '';
           handleDrop(e); 
         }}
       />
@@ -194,12 +205,21 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
             style={{ top: `${index * 18}px` }}
             onDragOver={(e) => { 
               e.preventDefault();
-              // Simplified drop zone logic - accept drops on any tableau card area
               e.dataTransfer.dropEffect = 'move';
+              // Visual feedback when dragging over a card
+              e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
+              e.currentTarget.style.outline = '2px dashed rgb(34, 197, 94)';
+            }}
+            onDragLeave={(e) => {
+              // Remove visual feedback
+              e.currentTarget.style.backgroundColor = '';
+              e.currentTarget.style.outline = '';
             }}
             onDrop={(e) => { 
               e.preventDefault();
-              // Use simplified coordinate-free drop handling
+              // Remove visual feedback
+              e.currentTarget.style.backgroundColor = '';
+              e.currentTarget.style.outline = '';
               handleDrop(e); 
             }}
           >
