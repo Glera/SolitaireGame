@@ -18,6 +18,13 @@
   animation: slideIn 200ms ease-out;
 }
 
+/* New card slide-in with immediate application */
+.card-slide-in {
+  animation: slideIn 200ms ease-out forwards;
+  transform: translateX(-30px);
+  opacity: 0.7;
+}
+
 /* Click animation for stock pile */
 @keyframes clickScale {
   0% {

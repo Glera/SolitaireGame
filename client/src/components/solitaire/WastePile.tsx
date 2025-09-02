@@ -30,10 +30,13 @@ export function WastePile({ cards }: WastePileProps) {
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   
   // Track card animation state for flip effect
-  const [animateCard, setAnimateCard] = useState(false);
   const [showPreviousCard, setShowPreviousCard] = useState(false);
   const previousCardRef = useRef<CardType | null>(null);
   const previousCardCountRef = useRef<number>(0);
+  const [cardKey, setCardKey] = useState(0);
+  
+  // Determine if we should animate this card
+  const shouldAnimate = cards.length > previousCardCountRef.current;
   
   // Detect when a NEW card appears from stock pile (count increases)
   useEffect(() => {
@@ -47,12 +50,11 @@ export function WastePile({ cards }: WastePileProps) {
         setShowPreviousCard(true);
       }
       
-      // Start animation
-      setAnimateCard(true);
+      // Force new key to trigger animation
+      setCardKey(prev => prev + 1);
       
       // End animation after transition completes
       const timer = setTimeout(() => {
-        setAnimateCard(false);
         setShowPreviousCard(false);
       }, 200);
       
@@ -152,14 +154,12 @@ export function WastePile({ cards }: WastePileProps) {
       {/* Show top card */}
       {topCard ? (
         <div 
+          key={`card-${cardKey}`}
           ref={cardRef} 
+          className={shouldAnimate ? 'card-slide-in' : ''}
           style={{ 
             position: 'relative', 
-            zIndex: 1,
-            // Apply initial transform and opacity for smooth animation
-            transform: animateCard ? 'translateX(-30px)' : 'translateX(0)',
-            opacity: animateCard ? 0.7 : 1,
-            animation: animateCard ? 'slideIn 200ms ease-out forwards' : 'none'
+            zIndex: 1
           }}
         >
           <Card 
