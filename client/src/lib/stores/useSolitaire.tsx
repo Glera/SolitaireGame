@@ -94,8 +94,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       sourceType,
       sourceIndex,
       sourceFoundation,
-      // TEMPORARY TEST: Disable custom drag preview for tableau
-      showDragPreview: false, // currentState.showDragPreview || sourceType === 'tableau',
+      // Keep the current showDragPreview state (set by TableauColumn)
+      showDragPreview: currentState.showDragPreview,
       dragPreviewPosition: currentState.dragPreviewPosition
     });
   },
