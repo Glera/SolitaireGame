@@ -33,9 +33,12 @@ export function GameBoard() {
   // Set up debug callback
   useEffect(() => {
     setDebugCallback((info: DebugInfo) => {
-      setDebugInfo(info);
+      // Only show debug info if panel is open
+      if (showDebugPanel) {
+        setDebugInfo(info);
+      }
     });
-  }, []);
+  }, [showDebugPanel]);
 
   // Play success sound when game is won
   useEffect(() => {

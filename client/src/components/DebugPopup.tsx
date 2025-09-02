@@ -93,17 +93,35 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
     }
   };
 
+  // Calculate positioning based on game field
+  const getPositioning = () => {
+    // Try to find game field bounds
+    const gameField = document.querySelector('[data-game-board]') as HTMLElement;
+    if (gameField) {
+      const bounds = gameField.getBoundingClientRect();
+      // Position to the right of game field with small gap
+      if (bounds.right + 320 < window.innerWidth) {
+        return {
+          top: '16px',
+          left: `${bounds.right + 16}px`,
+          right: 'auto'
+        };
+      }
+    }
+    
+    // Fallback to right side
+    return {
+      top: '16px',
+      left: 'auto',
+      right: '16px'
+    };
+  };
+
   return (
     <div 
       className="fixed bg-black/90 text-white p-4 rounded-lg shadow-lg max-w-sm"
       style={{
-        top: '16px',
-        left: info?.gameField && (info.gameField.bounds.right + 320 < window.innerWidth) 
-          ? `${info.gameField.bounds.right + 16}px` 
-          : 'auto',
-        right: info?.gameField && (info.gameField.bounds.right + 320 < window.innerWidth)
-          ? 'auto'
-          : '16px',
+        ...getPositioning(),
         zIndex: 9999
       }}
     >
