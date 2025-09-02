@@ -75,7 +75,20 @@ export function unregisterDropTarget(type: string, index?: number, suit?: Suit) 
   console.log('📌 Unregistered drop target:', type, index ?? suit, 'removed:', before - after, 'remaining:', after);
 }
 
-export function updateDropTargetBounds() {
+// Cache bounds and update them less frequently for performance
+let lastBoundsUpdate = 0;
+const BOUNDS_UPDATE_INTERVAL = 100; // Update max 10 times per second
+
+export function updateDropTargetBounds(force = false) {
+  const now = Date.now();
+  
+  // Skip if updated recently (unless forced)
+  if (!force && now - lastBoundsUpdate < BOUNDS_UPDATE_INTERVAL) {
+    return;
+  }
+  
+  lastBoundsUpdate = now;
+  
   dropTargets = dropTargets.map(target => ({
     ...target,
     bounds: target.element.getBoundingClientRect()
@@ -117,18 +130,12 @@ export function findBestDropTarget(
   //   draggedCard: draggedCards[0]?.id
   // });
   
-  // Find all intersecting targets with optimized bounds caching
+  // Find all intersecting targets using cached bounds
   const intersectingTargets = dropTargets.filter(target => {
-    // Only update bounds if element has moved (most cards are static)
-    const currentBounds = target.element.getBoundingClientRect();
-    
-    // Quick intersection check with current bounds
-    if (!checkIntersection(dragBounds, currentBounds)) {
+    // Use cached bounds for performance (updated periodically)
+    if (!target.bounds || !checkIntersection(dragBounds, target.bounds)) {
       return false;
     }
-    
-    // Update bounds for later use
-    target.bounds = currentBounds;
     
     // Reduced logging for performance
     // console.log('Found intersection with:', {

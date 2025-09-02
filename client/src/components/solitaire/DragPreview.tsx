@@ -1,13 +1,13 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Card as CardType } from '../../lib/solitaire/types';
-import { Card } from './Card';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { findBestDropTarget, DropTarget, setCurrentBestTarget, getCurrentBestTarget } from '../../lib/solitaire/dropTargets';
+import { Card } from '../../lib/types/solitaire';
+import { PlayingCard } from './Card';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
-import { applyDropTargetHighlight, clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
+import { findBestDropTarget, DropTarget, clearAllDropTargetHighlights, applyDropTargetHighlight, setCurrentBestTarget, getCurrentBestTarget } from '../../lib/solitaire/dropTargets';
+import type { Suit } from '../../lib/types/solitaire';
 
 interface DragPreviewProps {
-  cards: CardType[];
+  cards: Card[];
   startPosition: { x: number; y: number };
   offset?: { x: number; y: number };
 }
@@ -21,16 +21,17 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
   const [highlightedTarget, setHighlightedTarget] = useState<DropTarget | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const lastHighlightedElement = useRef<HTMLElement | null>(null);
+  const lastCursorPosRef = useRef({ x: startPosition.x + offset.x, y: startPosition.y + offset.y });
   const { sourceType, sourceIndex, sourceFoundation, draggedCards, collisionHighlightEnabled } = useSolitaire();
   
   useEffect(() => {
-    let animationFrameId: number;
-    let lastCursorPos = { x: startPosition.x + offset.x, y: startPosition.y + offset.y };
+    let collisionCheckTimer: number;
     
     // During drag operations, use dragover event instead of mousemove
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault(); // Important for drag operations
       
+      // Update position immediately for smooth movement
       const newPos = {
         x: e.clientX - offset.x,
         y: e.clientY - offset.y
@@ -38,7 +39,7 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
       
       setPosition(newPos);
       setCursorPos({ x: e.clientX, y: e.clientY });
-      lastCursorPos = { x: e.clientX, y: e.clientY };
+      lastCursorPosRef.current = { x: e.clientX, y: e.clientY };
     };
     
     // Global drop handler to catch missed drops
@@ -61,63 +62,47 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
       }
     };
     
-    // Throttled collision checking with reduced frequency
-    let lastCheckTime = 0;
+    // Separate collision checking from position updates
     const checkCollisions = () => {
-      const now = Date.now();
+      if (!previewRef.current) return;
       
-      // Throttle to max 30fps for performance
-      if (now - lastCheckTime < 33) {
-        animationFrameId = requestAnimationFrame(checkCollisions);
-        return;
-      }
-      lastCheckTime = now;
+      const bounds = previewRef.current.getBoundingClientRect();
+      const gameState = useSolitaire.getState();
       
-      if (previewRef.current) {
-        const bounds = previewRef.current.getBoundingClientRect();
-        const gameState = useSolitaire.getState();
-        
-        const target = findBestDropTarget(
-          bounds,
-          lastCursorPos,
-          draggedCards,
-          gameState,
-          sourceType,
-          sourceIndex,
-          sourceFoundation
-        );
-        
-        setHighlightedTarget(target);
-        setCurrentBestTarget(target); // Store globally for drop handling
-        
-        // Only apply visual highlights if enabled
-        if (collisionHighlightEnabled) {
-          // Only update highlights if the target changed
-          const currentElement = target?.element || null;
-          if (currentElement !== lastHighlightedElement.current) {
-            // console.log('DragPreview: Target changed from', 
-            //   lastHighlightedElement.current?.getAttribute('data-drop-target'), 
-            //   'to', 
-            //   currentElement?.getAttribute('data-drop-target'));
-            
-            // Clear all highlights first
-            clearAllDropTargetHighlights();
-            
-            // Apply new highlight if there's a target
-            if (currentElement) {
-              applyDropTargetHighlight(currentElement);
-            }
-            
-            lastHighlightedElement.current = currentElement;
+      const target = findBestDropTarget(
+        bounds,
+        lastCursorPosRef.current,
+        draggedCards,
+        gameState,
+        sourceType,
+        sourceIndex,
+        sourceFoundation
+      );
+      
+      setHighlightedTarget(target);
+      setCurrentBestTarget(target); // Store globally for drop handling
+      
+      // Only apply visual highlights if enabled
+      if (collisionHighlightEnabled) {
+        // Only update highlights if the target changed
+        const currentElement = target?.element || null;
+        if (currentElement !== lastHighlightedElement.current) {
+          // Clear all highlights first
+          clearAllDropTargetHighlights();
+          
+          // Apply new highlight if there's a target
+          if (currentElement) {
+            applyDropTargetHighlight(currentElement);
           }
+          
+          lastHighlightedElement.current = currentElement;
         }
       }
-      
-      animationFrameId = requestAnimationFrame(checkCollisions);
     };
     
-    // Start continuous collision checking
-    checkCollisions();
+    // Check collisions every 50ms (20 times per second)
+    // This is separate from position updates to keep movement smooth
+    collisionCheckTimer = window.setInterval(checkCollisions, 50);
     
     // Listen to dragover which fires during drag operations
     window.addEventListener('dragover', handleDragOver as any);
@@ -128,15 +113,12 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
       console.log('DragPreview: Cleaning up');
       window.removeEventListener('dragover', handleDragOver as any);
       window.removeEventListener('drop', handleGlobalDrop as any, true);
-      cancelAnimationFrame(animationFrameId);
-      // Clean up visual feedback and target
-      setCurrentBestTarget(null);
-      
-      // Clear all highlights
+      window.clearInterval(collisionCheckTimer);
       clearAllDropTargetHighlights();
+      setCurrentBestTarget(null);
       lastHighlightedElement.current = null;
     };
-  }, [offset, draggedCards, sourceType, sourceIndex, sourceFoundation, startPosition]);
+  }, [offset, draggedCards, sourceType, sourceIndex, sourceFoundation, collisionHighlightEnabled]);
   
   if (cards.length === 0) return null;
   
@@ -164,25 +146,21 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
               position: 'absolute',
               top: `${index * 18}px`,
               left: 0,
-              opacity: 0.9
+              opacity: 0.95,
+              filter: highlightedTarget ? 'brightness(1.1)' : 'none',
+              transform: highlightedTarget ? 'scale(1.02)' : 'scale(1)',
+              transition: 'all 100ms ease-out'
             }}
           >
-            {/* Render card inline to avoid any prop issues */}
-            <div className="w-16 h-24 bg-amber-50 border border-amber-700 rounded-lg shadow-lg p-1" style={{ borderRadius: '0.5rem' }}>
-              <div className="w-full h-full flex flex-col justify-between">
-                <div className={`text-xs font-bold leading-none ${card.color === 'red' ? 'text-red-600' : 'text-black'}`}>
-                  <div>{card.rank}</div>
-                  <div>{card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : '♠'}</div>
-                </div>
-                <div className={`text-2xl self-center ${card.color === 'red' ? 'text-red-600' : 'text-black'}`}>
-                  {card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : '♠'}
-                </div>
-                <div className={`text-xs font-bold leading-none self-end transform rotate-180 ${card.color === 'red' ? 'text-red-600' : 'text-black'}`}>
-                  <div>{card.rank}</div>
-                  <div>{card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : '♠'}</div>
-                </div>
-              </div>
-            </div>
+            <PlayingCard 
+              card={card} 
+              isClickable={false}
+              isDragging={false}
+              style={{
+                cursor: 'grabbing',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2)'
+              }}
+            />
           </div>
         ))}
       </div>
