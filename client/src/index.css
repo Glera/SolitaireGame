@@ -20,7 +20,7 @@
 
 /* New card slide-in with delay after stock pile click */
 .card-slide-in {
-  animation: cardSlideIn 250ms ease-out 50ms forwards;
+  animation: cardSlideIn 250ms ease-out 100ms forwards;
 }
 
 @keyframes cardSlideIn {
