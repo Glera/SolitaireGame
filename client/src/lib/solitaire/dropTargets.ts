@@ -1,6 +1,7 @@
 import { Card, Suit, GameState } from './types';
 import { canPlaceOnFoundation, canPlaceOnTableau } from './cardUtils';
 import { clearAllDropTargetHighlights } from './styleManager';
+import { perfMonitor } from './performanceMonitor';
 
 export interface DropTarget {
   type: 'tableau' | 'foundation';
@@ -89,10 +90,12 @@ export function updateDropTargetBounds(force = false) {
   
   lastBoundsUpdate = now;
   
+  perfMonitor.start('updateBounds');
   dropTargets = dropTargets.map(target => ({
     ...target,
     bounds: target.element.getBoundingClientRect()
   }));
+  perfMonitor.end('updateBounds');
 }
 
 function checkIntersection(rect1: DOMRect, rect2: DOMRect): boolean {
@@ -120,6 +123,8 @@ export function findBestDropTarget(
   sourceIndex?: number,
   sourceFoundation?: Suit
 ): DropTarget | null {
+  perfMonitor.start('findBestDropTarget');
+  
   // Update bounds before checking
   updateDropTargetBounds();
   
@@ -188,10 +193,12 @@ export function findBestDropTarget(
   // console.log('Total intersecting targets:', intersectingTargets.length);
   
   if (intersectingTargets.length === 0) {
+    perfMonitor.end('findBestDropTarget');
     return null;
   }
   
   if (intersectingTargets.length === 1) {
+    perfMonitor.end('findBestDropTarget');
     return intersectingTargets[0];
   }
   
@@ -226,7 +233,9 @@ export function findBestDropTarget(
     return a.distance - b.distance;
   });
   
-  return targetsWithDistance[0].target;
+  const result = targetsWithDistance[0].target;
+  perfMonitor.end('findBestDropTarget');
+  return result;
 }
 
 export function getDropTargets() {

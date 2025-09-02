@@ -5,6 +5,7 @@ import { Card as PlayingCard } from './Card';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { findBestDropTarget, DropTarget, setCurrentBestTarget, getCurrentBestTarget } from '../../lib/solitaire/dropTargets';
 import { clearAllDropTargetHighlights, applyDropTargetHighlight } from '../../lib/solitaire/styleManager';
+import { perfMonitor } from '../../lib/solitaire/performanceMonitor';
 import type { Suit } from '../../lib/types/solitaire';
 
 interface DragPreviewProps {
@@ -67,6 +68,8 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
     const checkCollisions = () => {
       if (!previewRef.current) return;
       
+      perfMonitor.start('checkCollisions');
+      
       const bounds = previewRef.current.getBoundingClientRect();
       const gameState = useSolitaire.getState();
       
@@ -99,6 +102,8 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
           lastHighlightedElement.current = currentElement;
         }
       }
+      
+      perfMonitor.end('checkCollisions');
     };
     
     // Check collisions every 50ms (20 times per second)

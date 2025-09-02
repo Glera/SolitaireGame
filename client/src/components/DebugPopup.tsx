@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSolitaire } from '../lib/stores/useSolitaire';
+import { perfMonitor } from '../lib/solitaire/performanceMonitor';
 
 export interface DebugInfo {
   event: string;
@@ -35,6 +36,19 @@ interface DebugPopupProps {
 
 export function DebugPopup({ info, onClose }: DebugPopupProps) {
   const { collisionHighlightEnabled, setCollisionHighlight } = useSolitaire();
+  const [perfStats, setPerfStats] = useState<{ name: string; avg: number; count: number; max: number }[]>([]);
+  
+  // Update performance stats every second
+  useEffect(() => {
+    const updateStats = () => {
+      setPerfStats(perfMonitor.getAverages());
+    };
+    
+    updateStats();
+    const interval = setInterval(updateStats, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
   
   const copyToClipboard = async () => {
     if (!info) return;
@@ -153,6 +167,30 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
             <span className="text-sm">Enable collision highlights</span>
           </label>
         </div>
+        
+        {perfStats.length > 0 && (
+          <div className="mb-3 pb-3 border-b border-gray-600">
+            <div className="text-yellow-300 text-xs font-bold mb-2">PERFORMANCE</div>
+            <div className="text-xs">
+              {perfStats.slice(0, 5).map((stat) => (
+                <div key={stat.name} className="mb-1">
+                  <span className="text-blue-300">{stat.name}:</span>{' '}
+                  <span className={stat.avg > 10 ? 'text-red-400' : stat.avg > 5 ? 'text-yellow-400' : 'text-green-400'}>
+                    {stat.avg.toFixed(2)}ms
+                  </span>
+                  <span className="text-gray-400"> (max: {stat.max.toFixed(2)}ms, n={stat.count})</span>
+                </div>
+              ))}
+            </div>
+            <button 
+              onClick={() => perfMonitor.reset()}
+              className="mt-2 text-xs bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-white"
+            >
+              Reset Stats
+            </button>
+          </div>
+        )}
+        
         {info ? (
           <>
             <div><span className="text-blue-300">Event:</span> {info.event}</div>
