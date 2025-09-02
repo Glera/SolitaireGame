@@ -75,8 +75,8 @@ export function Pile({
           </div>
           
           {/* Bottom rank (rotated) */}
-          <div className="text-xs font-bold leading-none text-amber-50 opacity-30 self-end transform rotate-180">
-            <div>{label}</div>
+          <div className="text-xs font-bold leading-none text-amber-50 opacity-30 self-end">
+            <div className="transform rotate-180">{label}</div>
           </div>
         </div>
       )}

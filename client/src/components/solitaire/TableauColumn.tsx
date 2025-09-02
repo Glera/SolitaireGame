@@ -155,11 +155,11 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     <div className="relative" data-tableau-column={columnIndex}>
       <Pile
         onDrop={handleDrop}
-        isEmpty={cards.length === 0}
+        isEmpty={cards.length === 0 || (isDragging && sourceType === 'tableau' && sourceIndex === columnIndex && draggedCards.length === cards.length)}
         label="K"
         className="mb-2"
       >
-        {cards.length === 0 && (
+        {(cards.length === 0 || (isDragging && sourceType === 'tableau' && sourceIndex === columnIndex && draggedCards.length === cards.length)) && (
           <div className="w-full h-full" />
         )}
       </Pile>

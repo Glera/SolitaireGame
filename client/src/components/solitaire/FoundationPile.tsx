@@ -149,9 +149,9 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
           </div>
           
           {/* Bottom rank and suit (rotated) */}
-          <div className="text-xs font-bold leading-none text-amber-50 opacity-30 self-end transform rotate-180">
-            <div>A</div>
-            <div className="text-xs">{suitSymbol}</div>
+          <div className="text-xs font-bold leading-none text-amber-50 opacity-30 self-end">
+            <div className="transform rotate-180">A</div>
+            <div className="text-xs transform rotate-180">{suitSymbol}</div>
           </div>
         </div>
       )}
