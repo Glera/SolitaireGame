@@ -121,6 +121,11 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   const handleDragEnd = (e: React.DragEvent) => {
+    console.log('🔚 handleDragEnd on TableauColumn', columnIndex, {
+      dropEffect: e.dataTransfer.dropEffect,
+      timestamp: Date.now()
+    });
+    
     // Reset actual dragging state
     setIsActuallyDragging(false);
     
@@ -209,7 +214,15 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
         }}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          console.log('🔵 DragEnter on expanded zone', columnIndex);
+        }}
+        onDragLeave={(e) => {
+          console.log('🔴 DragLeave on expanded zone', columnIndex);
+        }}
         onDrop={(e) => { 
+          console.log('💧 Drop on expanded zone', columnIndex);
           e.preventDefault();
           handleDrop(e); 
         }}
@@ -237,6 +250,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
               e.dataTransfer.dropEffect = 'move';
             }}
             onDrop={(e) => { 
+              console.log('💧 Drop on card', card.id, 'in column', columnIndex);
               e.preventDefault();
               handleDrop(e); 
             }}
