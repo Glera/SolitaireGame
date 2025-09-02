@@ -37,14 +37,15 @@ export function WastePile({ cards }: WastePileProps) {
   useEffect(() => {
     if (topCard && topCard.id !== previousCardId) {
       console.log('New card detected:', topCard.id, 'starting animation');
+      // Start with shifted/transparent state
       setIsNewCard(true);
       setPreviousCardId(topCard.id);
       
-      // Wait a tiny bit for the element to render, then start animation
+      // Then animate to final position after a short delay
       const timer = setTimeout(() => {
-        console.log('Animation transition started');
+        console.log('Animation transition to final position');
         setIsNewCard(false);
-      }, 10); // Very small delay to ensure DOM is updated
+      }, 50); // Enough time for initial render
       
       return () => clearTimeout(timer);
     }
@@ -141,7 +142,7 @@ export function WastePile({ cards }: WastePileProps) {
             zIndex: 1,
             transform: isNewCard ? 'translateX(-5px)' : 'translateX(0px)',
             opacity: isNewCard ? 0.5 : 1,
-            transition: 'transform 200ms ease-out, opacity 200ms ease-out'
+            transition: isNewCard ? 'none' : 'transform 200ms ease-out, opacity 200ms ease-out'
           }}
         >
           <Card 
