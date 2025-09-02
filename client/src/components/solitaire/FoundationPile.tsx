@@ -22,7 +22,8 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
     sourceType,
     sourceFoundation,
     endDrag,
-    animatingCard
+    animatingCard,
+    setShowDragPreview
   } = useSolitaire();
   
   const cardRef = useRef<HTMLDivElement>(null);
@@ -91,6 +92,22 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
     
     // Mark that we're actually dragging (not just clicking)
     setIsActuallyDragging(true);
+    
+    // Calculate offset from the click position to the card position
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+    
+    // Use custom drag preview for foundation cards
+    setShowDragPreview(true, 
+      { x: rect.left, y: rect.top },
+      { x: offsetX, y: offsetY }
+    );
+    
+    // Hide the default drag image
+    const img = new Image();
+    img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+    e.dataTransfer.setDragImage(img, 0, 0);
     
     // Start drag from foundation
     startDrag([topCard], 'foundation', undefined, suit);
