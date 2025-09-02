@@ -59,12 +59,20 @@ export function registerDropTarget(target: Omit<DropTarget, 'bounds'>) {
   } else {
     dropTargets.push({ ...target, bounds });
   }
+  
+  console.log('📌 Registered drop target:', 
+    target.type, target.index ?? target.suit, 
+    'total:', dropTargets.length,
+    'bounds:', bounds.left, bounds.top, bounds.width, bounds.height);
 }
 
 export function unregisterDropTarget(type: string, index?: number, suit?: Suit) {
+  const before = dropTargets.length;
   dropTargets = dropTargets.filter(
     t => !(t.type === type && t.index === index && t.suit === suit)
   );
+  const after = dropTargets.length;
+  console.log('📌 Unregistered drop target:', type, index ?? suit, 'removed:', before - after, 'remaining:', after);
 }
 
 export function updateDropTargetBounds() {
