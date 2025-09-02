@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Card } from '../../lib/types/solitaire';
-import { PlayingCard } from './Card';
+import { Card as PlayingCard } from './Card';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { findBestDropTarget, DropTarget, clearAllDropTargetHighlights, applyDropTargetHighlight, setCurrentBestTarget, getCurrentBestTarget } from '../../lib/solitaire/dropTargets';
 import type { Suit } from '../../lib/types/solitaire';
