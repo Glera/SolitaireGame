@@ -50,14 +50,17 @@ export function Card({
     <div
       className={cn(
         "w-16 h-24 bg-amber-50 border border-amber-700 p-1 cursor-pointer select-none shadow-md",
-        "hover:shadow-lg transition-shadow duration-100",
+        "hover:shadow-lg",
         "outline-none focus:outline-none",
         "rounded-lg",
         isDragging && "opacity-0",
         isAnimating && "opacity-0",
         className
       )}
-      style={{ borderRadius: '0.5rem' }}
+      style={{ 
+        borderRadius: '0.5rem',
+        transition: 'box-shadow 100ms'
+      }}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onDragStart={(e) => {
