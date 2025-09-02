@@ -173,7 +173,7 @@ export function WastePile({ cards }: WastePileProps) {
             zIndex: 1,
             // Ensure initial state is correct when animating
             ...(animateCard && newCardId === topCard.id ? {
-              transform: 'translateX(-35px)'
+              transform: 'translateX(-33%)'
             } : {})
           }}
         >

@@ -25,7 +25,7 @@
 
 @keyframes cardSlideIn {
   0% {
-    transform: translateX(-35px);
+    transform: translateX(-33%);
   }
   100% {
     transform: translateX(0);
