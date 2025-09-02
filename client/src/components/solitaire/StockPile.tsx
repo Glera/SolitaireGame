@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from './Card';
 import { Pile } from './Pile';
 import { Card as CardType } from '../../lib/solitaire/types';
@@ -10,6 +10,7 @@ interface StockPileProps {
 
 export function StockPile({ cards }: StockPileProps) {
   const { drawCard } = useSolitaire();
+  const [isAnimating, setIsAnimating] = useState(false);
 
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
   
@@ -18,7 +19,19 @@ export function StockPile({ cards }: StockPileProps) {
       stockCount: cards.length,
       timestamp: Date.now()
     });
-    drawCard();
+    
+    // Start shrink animation if there's a card to flip
+    if (topCard) {
+      setIsAnimating(true);
+      // Reset animation after 50ms, then draw card
+      setTimeout(() => {
+        setIsAnimating(false);
+        drawCard();
+      }, 50);
+    } else {
+      // No animation for recycle action
+      drawCard();
+    }
   };
 
   return (
@@ -29,7 +42,13 @@ export function StockPile({ cards }: StockPileProps) {
       data-stock-pile
     >
       {topCard ? (
-        <div className="w-full h-full">
+        <div 
+          className="w-full h-full transition-transform ease-out"
+          style={{
+            transitionDuration: '50ms',
+            transform: isAnimating ? 'scale(0.95)' : 'scale(1.0)'
+          }}
+        >
           <Card card={topCard} />
         </div>
       ) : (
