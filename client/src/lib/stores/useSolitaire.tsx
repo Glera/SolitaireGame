@@ -101,6 +101,12 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   },
   
   endDrag: () => {
+    // Clear all visual feedback when drag ends
+    document.querySelectorAll('[data-drop-target]').forEach(el => {
+      (el as HTMLElement).style.backgroundColor = '';
+      (el as HTMLElement).style.border = '';
+    });
+    
     set({
       isDragging: false,
       draggedCards: [],

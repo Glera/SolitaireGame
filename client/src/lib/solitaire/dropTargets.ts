@@ -24,6 +24,15 @@ export function setCurrentBestTarget(target: DropTarget | null) {
       suit: target.suit
     } : null);
   }
+  
+  // If clearing target, also clear visual feedback
+  if (!target) {
+    document.querySelectorAll('[data-drop-target]').forEach(el => {
+      (el as HTMLElement).style.backgroundColor = '';
+      (el as HTMLElement).style.border = '';
+    });
+  }
+  
   currentBestTarget = target;
 }
 
