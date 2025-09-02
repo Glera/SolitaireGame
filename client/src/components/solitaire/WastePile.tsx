@@ -31,12 +31,18 @@ export function WastePile({ cards }: WastePileProps) {
   
   // Track card animation state for flip effect
   const [animateCard, setAnimateCard] = useState(false);
-  const previousCardIdRef = useRef<string | null>(null);
+  const [showPreviousCard, setShowPreviousCard] = useState(false);
+  const previousCardRef = useRef<CardType | null>(null);
   
   // Detect when a new card appears and animate it
   useEffect(() => {
-    if (topCard && topCard.id !== previousCardIdRef.current) {
-      previousCardIdRef.current = topCard.id;
+    if (topCard && (!previousCardRef.current || topCard.id !== previousCardRef.current.id)) {
+      // Show previous card during animation
+      if (secondCard) {
+        setShowPreviousCard(true);
+      }
+      
+      previousCardRef.current = topCard;
       
       // Start animation
       setAnimateCard(true);
@@ -44,11 +50,12 @@ export function WastePile({ cards }: WastePileProps) {
       // End animation after transition completes
       const timer = setTimeout(() => {
         setAnimateCard(false);
+        setShowPreviousCard(false);
       }, 200);
       
       return () => clearTimeout(timer);
     }
-  }, [topCard]);
+  }, [topCard, secondCard]);
   
   // Check if the top card is being dragged (only for real drag, not click)
   const isTopCardBeingDragged = () => {
@@ -120,8 +127,8 @@ export function WastePile({ cards }: WastePileProps) {
       className="bg-teal-600/10"
       data-waste-pile
     >
-      {/* Show second card if top card is being dragged and second card exists */}
-      {secondCard && isTopCardBeingDragged() && (
+      {/* Show second card if top card is being dragged OR during animation */}
+      {secondCard && (isTopCardBeingDragged() || showPreviousCard) && (
         <div style={{ position: 'absolute', top: 0, left: 0 }}>
           <Card 
             card={secondCard} 
