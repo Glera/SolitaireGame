@@ -50,7 +50,7 @@ export function Card({
     <div
       className={cn(
         "w-16 h-24 bg-amber-50 border border-amber-700 p-1 cursor-pointer select-none shadow-md",
-        "hover:shadow-lg transition-all duration-100",
+        "hover:shadow-lg transition-shadow duration-100",
         "outline-none focus:outline-none",
         "rounded-lg",
         isDragging && "opacity-0",
