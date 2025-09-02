@@ -129,7 +129,7 @@
             id="gameFrame"
             title="Solitaire Game"
             allow="fullscreen"
-            sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms"
+            sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms allow-modals allow-top-navigation-by-user-activation"
         ></iframe>
     </div>
     
@@ -214,13 +214,21 @@
             }
         });
         
-        // Monitor iframe for errors
+        // Monitor iframe for errors and messages
         document.getElementById('gameFrame').addEventListener('error', function(e) {
             console.error('iframe load error:', e);
         });
         
         document.getElementById('gameFrame').addEventListener('load', function(e) {
             console.log('iframe loaded successfully');
+        });
+        
+        // Listen for messages from iframe
+        window.addEventListener('message', function(event) {
+            console.log('Message from iframe:', event.data);
+            if (event.data.type === 'iframe-ready') {
+                console.log('iframe drag support:', event.data.dragSupport);
+            }
         });
     </script>
 </body>
