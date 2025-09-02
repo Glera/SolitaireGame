@@ -16,10 +16,20 @@ let dropTargets: DropTarget[] = [];
 let currentBestTarget: DropTarget | null = null;
 
 export function setCurrentBestTarget(target: DropTarget | null) {
+  console.log('setCurrentBestTarget:', target ? {
+    type: target.type,
+    index: target.index,
+    suit: target.suit
+  } : null);
   currentBestTarget = target;
 }
 
 export function getCurrentBestTarget(): DropTarget | null {
+  console.log('getCurrentBestTarget called, returning:', currentBestTarget ? {
+    type: currentBestTarget.type,
+    index: currentBestTarget.index,
+    suit: currentBestTarget.suit
+  } : null);
   return currentBestTarget;
 }
 
