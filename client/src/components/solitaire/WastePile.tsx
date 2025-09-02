@@ -36,13 +36,17 @@ export function WastePile({ cards }: WastePileProps) {
   // Detect when a new card appears and trigger animation
   useEffect(() => {
     if (topCard && topCard.id !== previousCardId) {
+      console.log('New card detected:', topCard.id, 'starting animation');
       setIsNewCard(true);
       setPreviousCardId(topCard.id);
       
-      // Start animation immediately on next frame
-      requestAnimationFrame(() => {
+      // Wait a tiny bit for the element to render, then start animation
+      const timer = setTimeout(() => {
+        console.log('Animation transition started');
         setIsNewCard(false);
-      });
+      }, 10); // Very small delay to ensure DOM is updated
+      
+      return () => clearTimeout(timer);
     }
   }, [topCard?.id, previousCardId]);
   
