@@ -68,15 +68,10 @@ export function Pile({
       onDrop={handleDrop}
     >
       {isEmpty && label && (
-        <div className="w-full h-full p-1 flex flex-col justify-between">
+        <div className="w-full h-full p-1">
           {/* Top rank - like real card */}
           <div className="text-xs font-bold leading-none text-amber-50 opacity-30">
             <div>{label}</div>
-          </div>
-          
-          {/* Bottom rank (rotated) */}
-          <div className="text-xs font-bold leading-none text-amber-50 opacity-30 self-end">
-            <div className="transform rotate-180">{label}</div>
           </div>
         </div>
       )}

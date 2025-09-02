@@ -141,17 +141,11 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
           />
         </div>
       ) : (
-        <div className="w-full h-full p-1 flex flex-col justify-between">
+        <div className="w-full h-full p-1">
           {/* Top rank and suit - like real card */}
           <div className="text-xs font-bold leading-none text-amber-50 opacity-30">
             <div>A</div>
             <div className="text-xs">{suitSymbol}</div>
-          </div>
-          
-          {/* Bottom rank and suit (rotated) */}
-          <div className="text-xs font-bold leading-none text-amber-50 opacity-30 self-end">
-            <div className="transform rotate-180">A</div>
-            <div className="text-xs transform rotate-180">{suitSymbol}</div>
           </div>
         </div>
       )}
