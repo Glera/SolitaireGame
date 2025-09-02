@@ -20,9 +20,18 @@
 
 /* New card slide-in with immediate application */
 .card-slide-in {
-  animation: slideIn 200ms ease-out forwards;
-  transform: translateX(-30px);
-  opacity: 0.7;
+  animation: cardSlideIn 250ms ease-out forwards;
+}
+
+@keyframes cardSlideIn {
+  0% {
+    transform: translateX(-35px);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* Click animation for stock pile */

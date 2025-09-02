@@ -30,13 +30,10 @@ export function WastePile({ cards }: WastePileProps) {
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   
   // Track card animation state for flip effect
+  const [animateCard, setAnimateCard] = useState(false);
   const [showPreviousCard, setShowPreviousCard] = useState(false);
-  const previousCardRef = useRef<CardType | null>(null);
-  const previousCardCountRef = useRef<number>(0);
-  const [cardKey, setCardKey] = useState(0);
-  
-  // Determine if we should animate this card
-  const shouldAnimate = cards.length > previousCardCountRef.current;
+  const previousCardCountRef = useRef<number>(cards.length);
+  const [newCardId, setNewCardId] = useState<string | null>(null);
   
   // Detect when a NEW card appears from stock pile (count increases)
   useEffect(() => {
@@ -50,22 +47,29 @@ export function WastePile({ cards }: WastePileProps) {
         setShowPreviousCard(true);
       }
       
-      // Force new key to trigger animation
-      setCardKey(prev => prev + 1);
+      // Track the new card and start animation
+      setNewCardId(topCard.id);
+      setAnimateCard(true);
       
       // End animation after transition completes
       const timer = setTimeout(() => {
+        setAnimateCard(false);
         setShowPreviousCard(false);
+        setNewCardId(null);
       }, 200);
       
-      previousCardRef.current = topCard;
       previousCardCountRef.current = currentCount;
       
       return () => clearTimeout(timer);
     } else {
-      // Update refs without animation for other cases (card removed, revealed, etc.)
-      previousCardRef.current = topCard;
+      // Update refs without animation for other cases
       previousCardCountRef.current = currentCount;
+      
+      // If card was removed, ensure animation is off
+      if (currentCount < previousCount) {
+        setAnimateCard(false);
+        setNewCardId(null);
+      }
     }
   }, [topCard, secondCard, cards.length]);
   
@@ -154,12 +158,17 @@ export function WastePile({ cards }: WastePileProps) {
       {/* Show top card */}
       {topCard ? (
         <div 
-          key={`card-${cardKey}`}
+          key={topCard.id}
           ref={cardRef} 
-          className={shouldAnimate ? 'card-slide-in' : ''}
+          className={animateCard && newCardId === topCard.id ? 'card-slide-in' : ''}
           style={{ 
             position: 'relative', 
-            zIndex: 1
+            zIndex: 1,
+            // Ensure initial state is correct when animating
+            ...(animateCard && newCardId === topCard.id ? {
+              transform: 'translateX(-35px)',
+              opacity: 0.5
+            } : {})
           }}
         >
           <Card 
