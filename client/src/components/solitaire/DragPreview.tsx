@@ -55,18 +55,22 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
           sourceFoundation
         );
         
-        setHighlightedTarget(target);
-        setCurrentBestTarget(target); // Store globally for drop handling
-        
-        // Update visual feedback on all targets
-        document.querySelectorAll('[data-drop-target]').forEach(el => {
-          (el as HTMLElement).style.backgroundColor = '';
-          (el as HTMLElement).style.border = '';
-        });
-        
-        if (target?.element) {
-          target.element.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
-          target.element.style.border = '2px solid rgb(34, 197, 94)';
+        // Only update if target changed
+        if (target !== highlightedTarget) {
+          setHighlightedTarget(target);
+          setCurrentBestTarget(target); // Store globally for drop handling
+          
+          // Clear all visual feedback first
+          document.querySelectorAll('[data-drop-target]').forEach(el => {
+            (el as HTMLElement).style.backgroundColor = '';
+            (el as HTMLElement).style.border = '';
+          });
+          
+          // Apply visual feedback only if there's a valid target
+          if (target?.element) {
+            target.element.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
+            target.element.style.border = '2px solid rgb(34, 197, 94)';
+          }
         }
       }
       

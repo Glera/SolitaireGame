@@ -23,7 +23,8 @@ export function GameBoard() {
     showDragPreview,
     draggedCards,
     dragPreviewPosition,
-    dragOffset
+    dragOffset,
+    isDragging
   } = useSolitaire();
   
   const { playSuccess } = useAudio();
@@ -46,6 +47,17 @@ export function GameBoard() {
       playSuccess();
     }
   }, [isWon, playSuccess]);
+  
+  // Clean up any visual feedback when drag ends
+  useEffect(() => {
+    if (!isDragging) {
+      // Clear all visual feedback when not dragging
+      document.querySelectorAll('[data-drop-target]').forEach(el => {
+        (el as HTMLElement).style.backgroundColor = '';
+        (el as HTMLElement).style.border = '';
+      });
+    }
+  }, [isDragging]);
 
   // Note: Drag end is now handled by individual drag components via onDragEnd
 
