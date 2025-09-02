@@ -5,7 +5,7 @@
 /* Card flip animation */
 @keyframes slideIn {
   from {
-    transform: translateX(-5px);
+    transform: translateX(-10px);
   }
   to {
     transform: translateX(0);
