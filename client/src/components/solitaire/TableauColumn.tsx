@@ -160,7 +160,18 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   return (
-    <div className="relative" data-tableau-column={columnIndex}>
+    <div 
+      className="relative p-3 -m-3" 
+      data-tableau-column={columnIndex}
+      onDragOver={(e) => { 
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }}
+      onDrop={(e) => { 
+        e.preventDefault(); 
+        handleDrop(e); 
+      }}
+    >
       <Pile
         onDrop={handleDrop}
         isEmpty={cards.length === 0 || (isDragging && sourceType === 'tableau' && sourceIndex === columnIndex && draggedCards.length === cards.length)}
@@ -172,12 +183,12 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
         )}
       </Pile>
       
-      <div className="absolute top-0 left-0">
+      <div className="absolute top-3 left-3">
         {cards.map((card, index) => (
           <div
             key={card.id}
             ref={el => cardRefs.current[index] = el}
-            className="absolute"
+            className="absolute p-1 -m-1"
             style={{ top: `${index * 18}px` }}
             onDragOver={(e) => { 
               e.preventDefault();

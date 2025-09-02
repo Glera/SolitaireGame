@@ -147,7 +147,7 @@ export function WastePile({ cards }: WastePileProps) {
   return (
     <Pile
       isEmpty={cards.length === 0}
-      className="bg-teal-600/10"
+      className="bg-teal-600/10 p-2"
       data-waste-pile
     >
       {/* Show second card if top card is being dragged OR during animation */}

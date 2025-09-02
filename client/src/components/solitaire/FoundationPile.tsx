@@ -108,7 +108,18 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   };
 
   return (
-    <div id={id}>
+    <div 
+      id={id} 
+      className="p-2 -m-2"
+      onDragOver={(e) => { 
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }}
+      onDrop={(e) => { 
+        e.preventDefault(); 
+        handleDrop(e); 
+      }}
+    >
       <Pile
         onDrop={handleDrop}
         isEmpty={cards.length === 0}
