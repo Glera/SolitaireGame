@@ -49,7 +49,7 @@ export function GameBoard() {
   return (
     <div className="min-h-screen bg-green-800 p-3" data-game-board>
       <div className="max-w-fit mx-auto">
-        <GameControls />
+        <GameControls onDebugClick={() => setShowDebugPanel(true)} />
         
         <div className="inline-block space-y-3">
           {/* Top row: Stock, Waste, and Foundation piles - aligned with 7 columns */}
@@ -93,13 +93,6 @@ export function GameBoard() {
         />
       )}
       
-      {/* Debug button */}
-      <button
-        onClick={() => setShowDebugPanel(true)}
-        className="fixed bottom-4 right-4 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg hover:bg-gray-700 transition-colors z-50"
-      >
-        Debug
-      </button>
       
       {/* Debug popup */}
       {showDebugPanel && (

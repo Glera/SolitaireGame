@@ -96,16 +96,13 @@ export function WastePile({ cards }: WastePileProps) {
 
   const handleCardClick = () => {
     if (!topCard) return;
-    console.log('WastePile click:', topCard);
 
     // Try auto-move to foundation first
     const foundationSuit = canAutoMoveToFoundation(topCard);
-    console.log('Can auto-move to foundation:', foundationSuit);
     
     if (foundationSuit) {
       const startElement = cardRef.current;
       const endElement = document.getElementById(`foundation-${foundationSuit}`);
-      console.log('Auto-moving to foundation:', foundationSuit, startElement, endElement);
       autoMoveToFoundation(topCard, foundationSuit, startElement || undefined, endElement || undefined);
       return;
     }

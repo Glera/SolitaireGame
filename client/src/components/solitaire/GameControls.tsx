@@ -5,7 +5,11 @@ import { Card } from '../ui/card';
 
 const GAME_VERSION = '1.1.0';
 
-export function GameControls() {
+interface GameControlsProps {
+  onDebugClick?: () => void;
+}
+
+export function GameControls({ onDebugClick }: GameControlsProps = {}) {
   const { newGame, moves, isWon, startTime } = useSolitaire();
 
   const formatTime = () => {
@@ -23,8 +27,8 @@ export function GameControls() {
         Score: {moves} <span className="text-xs text-white/70 font-normal">v{GAME_VERSION}</span>
       </div>
       
-      {/* New Game button in center */}
-      <div className="flex-1 flex justify-center">
+      {/* New Game and Debug buttons in center */}
+      <div className="flex-1 flex justify-center gap-3">
         <Button 
           onClick={newGame} 
           variant="outline"
@@ -32,6 +36,15 @@ export function GameControls() {
         >
           New Game
         </Button>
+        {onDebugClick && (
+          <Button 
+            onClick={onDebugClick} 
+            variant="outline"
+            className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+          >
+            Debug
+          </Button>
+        )}
       </div>
       
       {/* Time on the right */}
