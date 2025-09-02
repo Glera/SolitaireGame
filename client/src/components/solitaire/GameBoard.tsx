@@ -9,6 +9,7 @@ import { GameControls } from './GameControls';
 import { CardAnimation } from './CardAnimation';
 import { DragPreview } from './DragPreview';
 import { DebugPopup, setDebugCallback, type DebugInfo } from '../DebugPopup';
+import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 
 export function GameBoard() {
   const { 
@@ -52,10 +53,7 @@ export function GameBoard() {
   useEffect(() => {
     if (!isDragging) {
       // Clear all visual feedback when not dragging
-      document.querySelectorAll('[data-drop-target]').forEach(el => {
-        (el as HTMLElement).style.backgroundColor = '';
-        (el as HTMLElement).style.border = '';
-      });
+      clearAllDropTargetHighlights();
     }
   }, [isDragging]);
 

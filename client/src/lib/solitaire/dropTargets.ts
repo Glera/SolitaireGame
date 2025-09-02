@@ -1,5 +1,6 @@
 import { Card, Suit, GameState } from './types';
 import { canPlaceOnFoundation, canPlaceOnTableau } from './cardUtils';
+import { clearAllDropTargetHighlights } from './styleManager';
 
 export interface DropTarget {
   type: 'tableau' | 'foundation';
@@ -27,10 +28,7 @@ export function setCurrentBestTarget(target: DropTarget | null) {
   
   // If clearing target, also clear visual feedback
   if (!target) {
-    document.querySelectorAll('[data-drop-target]').forEach(el => {
-      (el as HTMLElement).style.backgroundColor = '';
-      (el as HTMLElement).style.border = '';
-    });
+    clearAllDropTargetHighlights();
   }
   
   currentBestTarget = target;

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { GameState, DragState, Card, Suit } from '../solitaire/types';
 import { initializeGame, drawFromStock, moveCards, getMovableCards } from '../solitaire/gameLogic';
+import { clearAllDropTargetHighlights } from '../solitaire/styleManager';
 
 interface AnimatingCard {
   card: Card;
@@ -102,10 +103,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   
   endDrag: () => {
     // Clear all visual feedback when drag ends
-    document.querySelectorAll('[data-drop-target]').forEach(el => {
-      (el as HTMLElement).style.backgroundColor = '';
-      (el as HTMLElement).style.border = '';
-    });
+    clearAllDropTargetHighlights();
     
     set({
       isDragging: false,

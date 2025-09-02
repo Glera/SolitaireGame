@@ -4,6 +4,7 @@ import { Card } from './Card';
 import { createPortal } from 'react-dom';
 import { findBestDropTarget, DropTarget, setCurrentBestTarget } from '../../lib/solitaire/dropTargets';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
+import { applyDropTargetHighlight, clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 
 interface DragPreviewProps {
   cards: CardType[];
@@ -58,16 +59,12 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
         setHighlightedTarget(target);
         setCurrentBestTarget(target); // Store globally for drop handling
         
-        // Always clear all visual feedback first
-        document.querySelectorAll('[data-drop-target]').forEach(el => {
-          (el as HTMLElement).style.backgroundColor = '';
-          (el as HTMLElement).style.border = '';
-        });
+        // Clear all highlights first
+        clearAllDropTargetHighlights();
         
         // Apply visual feedback only if there's a valid target
-        if (target?.element) {
-          target.element.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
-          target.element.style.border = '2px solid rgb(34, 197, 94)';
+        if (target && target.element) {
+          applyDropTargetHighlight(target.element);
         }
       }
       
@@ -85,10 +82,7 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
       cancelAnimationFrame(animationFrameId);
       // Clean up visual feedback and target
       setCurrentBestTarget(null);
-      document.querySelectorAll('[data-drop-target]').forEach(el => {
-        (el as HTMLElement).style.backgroundColor = '';
-        (el as HTMLElement).style.borderColor = '';
-      });
+      clearAllDropTargetHighlights();
     };
   }, [offset, draggedCards, sourceType, sourceIndex, sourceFoundation, startPosition]);
   
