@@ -153,10 +153,13 @@ export function WastePile({ cards }: WastePileProps) {
       {topCard ? (
         <div 
           ref={cardRef} 
-          className={animateCard ? 'animate-slide-in' : ''}
           style={{ 
             position: 'relative', 
-            zIndex: 1
+            zIndex: 1,
+            // Apply initial transform and opacity for smooth animation
+            transform: animateCard ? 'translateX(-30px)' : 'translateX(0)',
+            opacity: animateCard ? 0.7 : 1,
+            animation: animateCard ? 'slideIn 200ms ease-out forwards' : 'none'
           }}
         >
           <Card 
