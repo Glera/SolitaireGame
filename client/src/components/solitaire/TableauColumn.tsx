@@ -24,6 +24,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     draggedCards,
     sourceType,
     sourceIndex,
+    sourceFoundation,
     showDragPreview,
     setShowDragPreview,
     endDrag,
@@ -135,25 +136,27 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     // Use collision-based target if available
     const bestTarget = getCurrentBestTarget();
     
-    console.log('TableauColumn handleDrop:', {
-      columnIndex,
+    console.log('🎯 DROP EVENT on TableauColumn', columnIndex, {
       bestTarget: bestTarget ? {
         type: bestTarget.type,
         index: bestTarget.index,
         suit: bestTarget.suit
       } : null,
-      draggedCards: draggedCards.map(c => c.id),
+      draggedCards: draggedCards.map(c => `${c.suit}-${c.rank}`),
       sourceType,
-      sourceIndex
+      sourceIndex,
+      sourceFoundation,
+      isDragging,
+      timestamp: Date.now()
     });
     
     if (bestTarget && bestTarget.type === 'tableau' && bestTarget.index === columnIndex) {
       // This is the best target based on collision detection
-      console.log('Dropping on THIS column via collision', columnIndex);
+      console.log('✅ Dropping on THIS column via collision', columnIndex);
       dropCards('tableau', columnIndex);
     } else if (bestTarget) {
       // There's a better target, drop there instead
-      console.log('Redirecting to better target:', bestTarget.type, bestTarget.index || bestTarget.suit);
+      console.log('➡️ Redirecting to better target:', bestTarget.type, bestTarget.index || bestTarget.suit);
       if (bestTarget.type === 'tableau') {
         dropCards('tableau', bestTarget.index);
       } else if (bestTarget.type === 'foundation' && bestTarget.suit) {
@@ -161,10 +164,11 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       }
     } else {
       // No collision detected, use traditional drop
-      console.log('No collision target, using cursor position drop on column', columnIndex);
+      console.log('📍 No collision target, using cursor position drop on column', columnIndex);
       dropCards('tableau', columnIndex);
     }
     
+    console.log('🧹 Clearing highlights after drop');
     // Clear the current target and all visual feedback
     setCurrentBestTarget(null);
     clearAllDropTargetHighlights();

@@ -77,10 +77,19 @@ export function moveCards(
   targetIndex: number | undefined,
   targetFoundation: Suit | undefined
 ): GameState | null {
+  console.log('🎲 moveCards validation:', {
+    cards: cards.map(c => `${c.suit}-${c.rank}`),
+    source: { type: sourceType, index: sourceIndex, foundation: sourceFoundation },
+    target: { type: targetType, index: targetIndex, foundation: targetFoundation }
+  });
+  
   // Validate move
   if (!isValidMove(gameState, cards, targetType, targetIndex, targetFoundation)) {
+    console.log('❌ Move validation failed');
     return null;
   }
+  
+  console.log('✅ Move validation passed');
   
   let newState = { ...gameState };
   
@@ -126,9 +135,16 @@ function isValidMove(
 ): boolean {
   if (targetType === 'foundation') {
     // Can only move single card to foundation
-    if (cards.length !== 1 || !targetFoundation) return false;
+    if (cards.length !== 1 || !targetFoundation) {
+      console.log('🚫 Foundation move invalid: multiple cards or no target foundation');
+      return false;
+    }
     const foundationCards = gameState.foundations[targetFoundation];
-    return canPlaceOnFoundation(foundationCards, cards[0]);
+    const canPlace = canPlaceOnFoundation(foundationCards, cards[0]);
+    if (!canPlace) {
+      console.log('🚫 Foundation move invalid: cannot place', cards[0].suit, cards[0].rank, 'on foundation', targetFoundation);
+    }
+    return canPlace;
   }
   
   if (targetType === 'tableau' && targetIndex !== undefined) {
@@ -136,13 +152,22 @@ function isValidMove(
     
     if (targetColumn.length === 0) {
       // Can place King on empty column
-      return cards[0].rank === 'K';
+      const isKing = cards[0].rank === 'K';
+      if (!isKing) {
+        console.log('🚫 Tableau move invalid: only King can go on empty column, got', cards[0].rank);
+      }
+      return isKing;
     }
     
     const bottomCard = targetColumn[targetColumn.length - 1];
-    return canPlaceOnTableau(bottomCard, cards[0]);
+    const canPlace = canPlaceOnTableau(bottomCard, cards[0]);
+    if (!canPlace) {
+      console.log('🚫 Tableau move invalid: cannot place', cards[0].suit, cards[0].rank, 'on', bottomCard.suit, bottomCard.rank);
+    }
+    return canPlace;
   }
   
+  console.log('🚫 Move invalid: bad target type or index');
   return false;
 }
 

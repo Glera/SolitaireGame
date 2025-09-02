@@ -56,25 +56,26 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
     // Use collision-based target if available
     const bestTarget = getCurrentBestTarget();
     
-    console.log('FoundationPile handleDrop:', {
-      suit,
+    console.log('🎯 DROP EVENT on FoundationPile', suit, {
       bestTarget: bestTarget ? {
         type: bestTarget.type,
         index: bestTarget.index,
         suit: bestTarget.suit
       } : null,
-      draggedCards: draggedCards.map(c => c.id),
+      draggedCards: draggedCards.map(c => `${c.suit}-${c.rank}`),
       sourceType,
-      sourceFoundation
+      sourceFoundation,
+      isDragging,
+      timestamp: Date.now()
     });
     
     if (bestTarget && bestTarget.type === 'foundation' && bestTarget.suit === suit) {
       // This is the best target based on collision detection
-      console.log('Dropping on THIS foundation via collision', suit);
+      console.log('✅ Dropping on THIS foundation via collision', suit);
       dropCards('foundation', undefined, suit);
     } else if (bestTarget) {
       // There's a better target, drop there instead
-      console.log('Redirecting to better target:', bestTarget.type, bestTarget.index || bestTarget.suit);
+      console.log('➡️ Redirecting to better target:', bestTarget.type, bestTarget.index || bestTarget.suit);
       if (bestTarget.type === 'tableau') {
         dropCards('tableau', bestTarget.index);
       } else if (bestTarget.type === 'foundation' && bestTarget.suit) {
@@ -82,10 +83,11 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
       }
     } else {
       // No collision detected, use traditional drop
-      console.log('No collision target, using cursor position drop on foundation', suit);
+      console.log('📍 No collision target, using cursor position drop on foundation', suit);
       dropCards('foundation', undefined, suit);
     }
     
+    console.log('🧹 Clearing highlights after drop');
     // Clear the current target and all visual feedback
     setCurrentBestTarget(null);
     clearAllDropTargetHighlights();
