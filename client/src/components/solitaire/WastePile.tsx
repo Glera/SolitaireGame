@@ -34,14 +34,23 @@ export function WastePile({ cards }: WastePileProps) {
   const [showPreviousCard, setShowPreviousCard] = useState(false);
   const previousCardCountRef = useRef<number>(cards.length);
   const [newCardId, setNewCardId] = useState<string | null>(null);
+  const hasEverDrawnRef = useRef<boolean>(false);
   
   // Detect when a NEW card appears from stock pile (count increases)
   useEffect(() => {
     const currentCount = cards.length;
     const previousCount = previousCardCountRef.current;
     
-    // Only animate if this is a NEW card from stock pile (count increased)
+    // Only animate if this is a NEW card from stock pile (count increased) 
+    // AND it's not the very first card drawn
     if (topCard && currentCount > previousCount) {
+      // Skip animation for the very first card
+      if (!hasEverDrawnRef.current) {
+        hasEverDrawnRef.current = true;
+        previousCardCountRef.current = currentCount;
+        return;
+      }
+      
       // Show previous card during animation
       if (secondCard) {
         setShowPreviousCard(true);
