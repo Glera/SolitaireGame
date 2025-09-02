@@ -132,7 +132,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   const isCardBeingDragged = (cardIndex: number) => {
     const card = cards[cardIndex];
     
-    // Check if dragging
+    // Check if dragging from this specific column
     if (!isDragging || sourceType !== 'tableau' || sourceIndex !== columnIndex) {
       return false;
     }
@@ -141,7 +141,8 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     const isBeingDragged = draggedCards.some(draggedCard => draggedCard.id === card.id);
     
     // Hide dragged cards when using custom drag preview
-    return isBeingDragged;
+    // BUT: Only hide if the card is actually being dragged (not just revealed)
+    return isBeingDragged && card.faceUp;
   };
   
   // Check if card is animating to foundation
