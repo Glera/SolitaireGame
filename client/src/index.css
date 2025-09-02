@@ -30,7 +30,7 @@
 }
 
 .animate-click {
-  animation: clickScale 50ms ease-out;
+  animation: clickScale 100ms ease-out;
 }
 
 @layer base {

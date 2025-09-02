@@ -18,10 +18,10 @@ export function StockPile({ cards }: StockPileProps) {
     setIsClicked(true);
     drawCard();
     
-    // Reset animation after 50ms
+    // Reset animation after 100ms
     setTimeout(() => {
       setIsClicked(false);
-    }, 50);
+    }, 100);
   };
 
   return (
@@ -32,7 +32,7 @@ export function StockPile({ cards }: StockPileProps) {
       data-stock-pile
     >
       {topCard ? (
-        <div className={isClicked ? 'animate-click' : ''} style={{ transition: 'transform 50ms ease-out' }}>
+        <div className={isClicked ? 'animate-click' : ''} style={{ transition: 'transform 100ms ease-out' }}>
           <Card card={topCard} />
         </div>
       ) : (
