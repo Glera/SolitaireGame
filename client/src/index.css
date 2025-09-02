@@ -26,9 +26,11 @@
 @keyframes cardSlideIn {
   0% {
     transform: translateX(-33%);
+    opacity: 0.5;
   }
   100% {
     transform: translateX(0);
+    opacity: 1;
   }
 }
 
