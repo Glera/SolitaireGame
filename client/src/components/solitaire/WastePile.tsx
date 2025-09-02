@@ -24,6 +24,7 @@ export function WastePile({ cards }: WastePileProps) {
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
+  const secondCard = cards.length > 1 ? cards[cards.length - 2] : null;
 
   // Check if the top card is being dragged
   const isTopCardBeingDragged = () => {
@@ -95,8 +96,21 @@ export function WastePile({ cards }: WastePileProps) {
       className="bg-teal-600/10"
       data-waste-pile
     >
+      {/* Show second card if top card is being dragged and second card exists */}
+      {secondCard && isTopCardBeingDragged() && (
+        <div style={{ position: 'absolute', top: 0, left: 0 }}>
+          <Card 
+            card={secondCard} 
+            isPlayable={false}
+            isDragging={false}
+            isAnimating={false}
+          />
+        </div>
+      )}
+      
+      {/* Show top card */}
       {topCard ? (
-        <div ref={cardRef}>
+        <div ref={cardRef} style={{ position: 'relative', zIndex: 1 }}>
           <Card 
             card={topCard} 
             onClick={handleCardClick}
