@@ -3,7 +3,7 @@ import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 
-const GAME_VERSION = '1.0.0';
+const GAME_VERSION = '1.1.0';
 
 export function GameControls() {
   const { newGame, moves, isWon, startTime } = useSolitaire();
