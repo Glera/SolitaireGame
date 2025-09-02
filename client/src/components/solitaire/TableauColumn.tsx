@@ -163,7 +163,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     <div className="relative" data-tableau-column={columnIndex}>
       {/* Invisible expanded drop zone */}
       <div 
-        className="absolute -inset-3 z-0"
+        className="absolute -inset-5 z-0"
         onDragOver={(e) => { 
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
