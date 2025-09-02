@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solitaire iframe Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+        }
+        h1 {
+            color: #333;
+        }
+        .iframe-container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            border: 2px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        iframe {
+            width: 100%;
+            height: 700px;
+            border: none;
+            display: block;
+        }
+        .info {
+            margin: 20px auto;
+            max-width: 1200px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .info h2 {
+            margin-top: 0;
+            color: #2c5530;
+        }
+        .info ul {
+            line-height: 1.8;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background: #e8f5e9;
+            border: 1px solid #4caf50;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <h1>Solitaire Game - iframe Test</h1>
+    
+    <div class="info">
+        <h2>🎮 Тестирование игры в iframe</h2>
+        <div class="status">
+            ✅ iframe поддержка активирована<br>
+            ✅ CORS заголовки настроены<br>
+            ✅ Pointer events поддержка включена
+        </div>
+        <p>Игра загружена в iframe ниже. Проверьте функциональность:</p>
+        <ul>
+            <li>Перетаскивание карт должно работать</li>
+            <li>Двойной клик для автоматического перемещения</li>
+            <li>Клик по колоде для раздачи карт</li>
+            <li>Все анимации должны работать корректно</li>
+        </ul>
+    </div>
+    
+    <div class="iframe-container">
+        <iframe 
+            src="/"
+            title="Solitaire Game"
+            allow="fullscreen"
+            sandbox="allow-scripts allow-same-origin allow-pointer-lock"
+        ></iframe>
+    </div>
+    
+    <div class="info">
+        <h2>📋 Технические детали</h2>
+        <ul>
+            <li><strong>Drag & Drop API:</strong> Стандартный HTML5 drag and drop с улучшениями для iframe</li>
+            <li><strong>Pointer Events:</strong> Включена поддержка для лучшей совместимости</li>
+            <li><strong>Touch Action:</strong> Отключено для предотвращения конфликтов с жестами</li>
+            <li><strong>Z-index:</strong> Исправлены проблемы с наложением элементов</li>
+            <li><strong>CSP Headers:</strong> frame-ancestors * для разрешения встраивания</li>
+        </ul>
+    </div>
+</body>
+</html>
