@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Card as CardType } from '../../lib/solitaire/types';
 import { Card } from './Card';
 import { createPortal } from 'react-dom';
-import { findBestDropTarget, DropTarget, setCurrentBestTarget } from '../../lib/solitaire/dropTargets';
+import { findBestDropTarget, DropTarget, setCurrentBestTarget, getCurrentBestTarget } from '../../lib/solitaire/dropTargets';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { applyDropTargetHighlight, clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 
@@ -39,6 +39,26 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
       setPosition(newPos);
       setCursorPos({ x: e.clientX, y: e.clientY });
       lastCursorPos = { x: e.clientX, y: e.clientY };
+    };
+    
+    // Global drop handler to catch missed drops
+    const handleGlobalDrop = (e: DragEvent) => {
+      const target = getCurrentBestTarget();
+      if (target && !e.defaultPrevented) {
+        console.log('🌍 Global drop caught, best target:', target.type, target.index || target.suit);
+        e.preventDefault();
+        
+        // Trigger drop on the best target
+        if (target.type === 'tableau' && target.index !== undefined) {
+          useSolitaire.getState().dropCards('tableau', target.index);
+        } else if (target.type === 'foundation' && target.suit) {
+          useSolitaire.getState().dropCards('foundation', undefined, target.suit);
+        }
+        
+        // Clear highlights
+        setCurrentBestTarget(null);
+        clearAllDropTargetHighlights();
+      }
     };
     
     // Continuously check collisions using requestAnimationFrame
@@ -88,10 +108,13 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
     
     // Listen to dragover which fires during drag operations
     window.addEventListener('dragover', handleDragOver as any);
+    // Add global drop listener with capture to catch drops before they bubble
+    window.addEventListener('drop', handleGlobalDrop as any, true);
     
     return () => {
       console.log('DragPreview: Cleaning up');
       window.removeEventListener('dragover', handleDragOver as any);
+      window.removeEventListener('drop', handleGlobalDrop as any, true);
       cancelAnimationFrame(animationFrameId);
       // Clean up visual feedback and target
       setCurrentBestTarget(null);
