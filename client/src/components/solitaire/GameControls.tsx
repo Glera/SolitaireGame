@@ -10,21 +10,13 @@ interface GameControlsProps {
 }
 
 export function GameControls({ onDebugClick }: GameControlsProps = {}) {
-  const { newGame, moves, isWon, startTime } = useSolitaire();
-
-  const formatTime = () => {
-    if (!startTime) return '00:00';
-    const elapsed = Math.floor((Date.now() - startTime.getTime()) / 1000);
-    const minutes = Math.floor(elapsed / 60);
-    const seconds = elapsed % 60;
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
+  const { newGame, isWon } = useSolitaire();
 
   return (
     <div className="relative mb-4 h-12 flex items-center">
-      {/* Score on the left */}
+      {/* Version on the left */}
       <div className="absolute left-0 text-white text-lg font-semibold">
-        Score: {moves} <span className="text-xs text-white/70 font-normal">v{GAME_VERSION}</span>
+        version: {GAME_VERSION}
       </div>
       
       {/* New Game and Debug buttons in center */}
@@ -45,11 +37,6 @@ export function GameControls({ onDebugClick }: GameControlsProps = {}) {
             Debug
           </Button>
         )}
-      </div>
-      
-      {/* Time on the right */}
-      <div className="absolute right-0 text-white text-lg font-semibold">
-        Time: {formatTime()}
       </div>
       
       {/* Win message overlay */}
