@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Card } from './Card';
 import { Pile } from './Pile';
 import { Card as CardType } from '../../lib/solitaire/types';
@@ -25,7 +25,7 @@ export function StockPile({ cards }: StockPileProps) {
       data-stock-pile
     >
       {topCard ? (
-        <Card card={topCard} />
+        <Card card={topCard} onClick={handleClick} />
       ) : (
         <div className="flex items-center justify-center h-full">
           <div className="text-lg">🔄</div>
