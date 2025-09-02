@@ -33,16 +33,19 @@ export function WastePile({ cards }: WastePileProps) {
   const [animateCard, setAnimateCard] = useState(false);
   const [showPreviousCard, setShowPreviousCard] = useState(false);
   const previousCardRef = useRef<CardType | null>(null);
+  const previousCardCountRef = useRef<number>(0);
   
-  // Detect when a new card appears and animate it
+  // Detect when a NEW card appears from stock pile (count increases)
   useEffect(() => {
-    if (topCard && (!previousCardRef.current || topCard.id !== previousCardRef.current.id)) {
+    const currentCount = cards.length;
+    const previousCount = previousCardCountRef.current;
+    
+    // Only animate if this is a NEW card from stock pile (count increased)
+    if (topCard && currentCount > previousCount) {
       // Show previous card during animation
       if (secondCard) {
         setShowPreviousCard(true);
       }
-      
-      previousCardRef.current = topCard;
       
       // Start animation
       setAnimateCard(true);
@@ -53,9 +56,16 @@ export function WastePile({ cards }: WastePileProps) {
         setShowPreviousCard(false);
       }, 200);
       
+      previousCardRef.current = topCard;
+      previousCardCountRef.current = currentCount;
+      
       return () => clearTimeout(timer);
+    } else {
+      // Update refs without animation for other cases (card removed, revealed, etc.)
+      previousCardRef.current = topCard;
+      previousCardCountRef.current = currentCount;
     }
-  }, [topCard, secondCard]);
+  }, [topCard, secondCard, cards.length]);
   
   // Check if the top card is being dragged (only for real drag, not click)
   const isTopCardBeingDragged = () => {
