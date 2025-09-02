@@ -39,12 +39,10 @@ export function WastePile({ cards }: WastePileProps) {
       setIsNewCard(true);
       setPreviousCardId(topCard.id);
       
-      // Remove animation state after animation completes
-      const timer = setTimeout(() => {
+      // Start animation immediately on next frame
+      requestAnimationFrame(() => {
         setIsNewCard(false);
-      }, 200);
-      
-      return () => clearTimeout(timer);
+      });
     }
   }, [topCard?.id, previousCardId]);
   
