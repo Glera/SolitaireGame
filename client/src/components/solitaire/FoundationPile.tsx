@@ -126,9 +126,10 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
 
   return (
     <div id={id} className="relative">
-      {/* Invisible expanded drop zone */}
+      {/* Invisible expanded drop zone - doesn't block clicks */}
       <div 
-        className="absolute -inset-8 z-0"
+        className="absolute -inset-8 z-0 pointer-events-none"
+        style={{ pointerEvents: isDragging ? 'auto' : 'none' }}
         onDragOver={(e) => { 
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
