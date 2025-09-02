@@ -52,15 +52,13 @@ export function WastePile({ cards }: WastePileProps) {
     
     // Only animate if this is a NEW card from stock pile (count increased)
     if (topCard && currentCount > previousCount) {
-      // Skip animation ONLY for the very first card at game start, not after recycling
-      if (previousCount === 0 && !wasJustRecycledRef.current) {
-        console.log('WastePile: First card at game start, skipping animation');
+      // Skip animation for first card at game start OR after recycling
+      if (previousCount === 0) {
+        console.log('WastePile: First card (game start or after recycle), skipping animation');
         previousCardCountRef.current = currentCount;
+        wasJustRecycledRef.current = false;
         return;
       }
-      
-      // Reset recycled flag after first card
-      wasJustRecycledRef.current = false;
       
       console.log('WastePile: Starting slide animation', {
         newCardId: topCard.id,
