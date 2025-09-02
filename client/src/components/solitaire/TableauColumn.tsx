@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Card } from './Card';
 import { Pile } from './Pile';
 import { Card as CardType } from '../../lib/solitaire/types';
@@ -28,6 +28,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Track if we're in actual drag mode (not just click)
+  const [isActuallyDragging, setIsActuallyDragging] = useState(false);
 
   const handleCardClick = (cardIndex: number) => {
     const card = cards[cardIndex];
@@ -72,6 +75,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       clickTimeoutRef.current = null;
     }
     
+    // Mark as actually dragging
+    setIsActuallyDragging(true);
+    
     const movableCards = getMovableCardsFromTableau(columnIndex);
     const cardPosition = cards.length - movableCards.length;
     
@@ -103,6 +109,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   const handleDragEnd = (e: React.DragEvent) => {
+    // Reset actual dragging state
+    setIsActuallyDragging(false);
+    
     // Delay endDrag to allow drop events to process first
     setTimeout(() => {
       useSolitaire.getState().endDrag();
@@ -140,9 +149,8 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     // Check if this card is in the dragged cards list
     const isBeingDragged = draggedCards.some(draggedCard => draggedCard.id === card.id);
     
-    // Hide dragged cards when using custom drag preview
-    // BUT: Only hide if the card is actually being dragged (not just revealed)
-    return isBeingDragged && card.faceUp;
+    // Hide dragged cards only during ACTUAL dragging (not just click)
+    return isBeingDragged && card.faceUp && isActuallyDragging;
   };
   
   // Check if card is animating to foundation
