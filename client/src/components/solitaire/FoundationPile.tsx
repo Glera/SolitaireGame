@@ -141,7 +141,7 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
           />
         </div>
       ) : (
-        <div className="w-full h-full bg-amber-50 border border-amber-700 p-1 rounded-lg flex flex-col justify-between" style={{ borderRadius: '0.5rem' }}>
+        <div className="w-full h-full p-1 flex flex-col justify-between">
           {/* Top rank and suit - like real card */}
           <div className={`text-xs font-bold leading-none ${isRed ? 'text-red-600' : 'text-black'}`}>
             <div>A</div>
