@@ -93,17 +93,15 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
     }
   };
 
-  if (!info) return null;
-
   return (
     <div 
       className="fixed bg-black/90 text-white p-4 rounded-lg shadow-lg max-w-sm"
       style={{
         top: '16px',
-        left: info.gameField && (info.gameField.bounds.right + 320 < window.innerWidth) 
+        left: info?.gameField && (info.gameField.bounds.right + 320 < window.innerWidth) 
           ? `${info.gameField.bounds.right + 16}px` 
           : 'auto',
-        right: info.gameField && (info.gameField.bounds.right + 320 < window.innerWidth)
+        right: info?.gameField && (info.gameField.bounds.right + 320 < window.innerWidth)
           ? 'auto'
           : '16px',
         zIndex: 9999
@@ -112,33 +110,41 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
       <div className="text-sm font-mono">
         <div className="text-yellow-300 font-bold mb-2 flex items-center justify-between">
           🐛 DEBUG INFO
-          <button 
-            onClick={copyToClipboard}
-            className="text-xs bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-white ml-2"
-            title="Copy to clipboard"
-          >
-            📋 Copy
-          </button>
+          {info && (
+            <button 
+              onClick={copyToClipboard}
+              className="text-xs bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-white ml-2"
+              title="Copy to clipboard"
+            >
+              📋 Copy
+            </button>
+          )}
         </div>
-        <div><span className="text-blue-300">Event:</span> {info.event}</div>
-        <div><span className="text-blue-300">Drop:</span> {info.coords.x}, {info.coords.y}</div>
-        <div><span className="text-blue-300">Target:</span> {info.target}</div>
+        {info ? (
+          <>
+            <div><span className="text-blue-300">Event:</span> {info.event}</div>
+            <div><span className="text-blue-300">Drop:</span> {info.coords.x}, {info.coords.y}</div>
+            <div><span className="text-blue-300">Target:</span> {info.target}</div>
+          </>
+        ) : (
+          <div className="text-gray-400">Нет дебаг информации. Перетащите карту для отладки.</div>
+        )}
         
-        {info.viewport && (
+        {info?.viewport && (
           <div className="mt-2 pt-2 border-t border-gray-600">
             <div className="text-yellow-300 text-xs font-bold">VIEWPORT</div>
             <div className="text-xs">{info.viewport.width} × {info.viewport.height}</div>
           </div>
         )}
         
-        {info.gameField && (
+        {info?.gameField && (
           <div className="mt-2 pt-2 border-t border-gray-600">
             <div className="text-yellow-300 text-xs font-bold">GAME FIELD</div>
             <div className="text-xs">{Math.round(info.gameField.bounds.x)}, {Math.round(info.gameField.bounds.y)}</div>
           </div>
         )}
         
-        {info.dropZones && info.dropZones.length > 0 && (
+        {info?.dropZones && info.dropZones.length > 0 && (
           <div className="mt-2 pt-2 border-t border-gray-600">
             <div className="text-yellow-300 text-xs font-bold">DROP ZONES</div>
             <div className="text-xs max-h-20 overflow-y-auto">
@@ -152,7 +158,7 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
           </div>
         )}
         
-        {info.extra && (
+        {info?.extra && (
           <div className="mt-2 pt-2 border-t border-gray-600">
             <div className="text-yellow-300 text-xs font-bold">EXTRA</div>
             <div className="text-xs">{JSON.stringify(info.extra, null, 1)}</div>

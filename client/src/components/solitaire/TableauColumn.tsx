@@ -119,18 +119,6 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   const handleDrop = (e: React.DragEvent) => {
-    // DEBUG: Show popup with drop info
-    import('../DebugPopup').then(({ showDebugInfo }) => {
-      showDebugInfo(
-        'Drop on Tableau',
-        { x: e.clientX, y: e.clientY },
-        `Column ${columnIndex}`,
-        { 
-          cardsInColumn: cards.length,
-          targetCard: cards.length > 0 ? `${cards[cards.length-1].rank}${cards[cards.length-1].suit}` : 'empty'
-        }
-      );
-    });
     dropCards('tableau', columnIndex);
   };
 
