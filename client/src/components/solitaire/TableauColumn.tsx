@@ -172,9 +172,20 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
               e.preventDefault();
               // Simplified drop zone logic - accept drops on any tableau card area
               e.dataTransfer.dropEffect = 'move';
+              // Visual feedback for drop zone
+              e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.2)';
+              e.currentTarget.style.border = '2px dashed rgb(34, 197, 94)';
+            }}
+            onDragLeave={(e) => {
+              // Remove visual feedback
+              e.currentTarget.style.backgroundColor = '';
+              e.currentTarget.style.border = '';
             }}
             onDrop={(e) => { 
-              e.preventDefault(); 
+              e.preventDefault();
+              // Remove visual feedback
+              e.currentTarget.style.backgroundColor = '';
+              e.currentTarget.style.border = '';
               // Use simplified coordinate-free drop handling
               handleDrop(e); 
             }}

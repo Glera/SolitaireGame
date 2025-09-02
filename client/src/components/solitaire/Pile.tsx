@@ -58,7 +58,7 @@ export function Pile({
       className={cn(
         "w-16 h-24 rounded-lg flex items-center justify-center relative",
         // Only show border for non-stock-pile components
-        !props['data-stock-pile'] && "border border-dashed border-teal-500/50 hover:border-teal-400/70 transition-colors duration-200",
+        !props['data-stock-pile'] && "border-2 border-dashed border-blue-400 bg-blue-400/10 hover:border-green-400 hover:bg-green-400/20 transition-colors duration-200",
         onClick && "cursor-pointer",
         className
       )}
