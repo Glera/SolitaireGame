@@ -53,7 +53,7 @@ export function Card({
         "hover:shadow-lg transition-all duration-100",
         "outline-none focus:outline-none",
         "rounded-lg",
-        isDragging && "opacity-50 scale-95",
+        isDragging && "opacity-0",
         isAnimating && "opacity-0",
         className
       )}

@@ -140,9 +140,8 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     // Check if this card is in the dragged cards list
     const isBeingDragged = draggedCards.some(draggedCard => draggedCard.id === card.id);
     
-    // TEMPORARY TEST: Don't hide dragged cards, let browser handle it
-    // return isBeingDragged;
-    return false;
+    // Hide dragged cards when using custom drag preview
+    return isBeingDragged;
   };
   
   // Check if card is animating to foundation
