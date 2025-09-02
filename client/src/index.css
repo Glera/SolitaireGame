@@ -16,6 +16,23 @@
   animation: slideIn 200ms ease-out;
 }
 
+/* Click animation for stock pile */
+@keyframes clickScale {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-click {
+  animation: clickScale 50ms ease-out;
+}
+
 @layer base {
   * {
     @apply border-border;
