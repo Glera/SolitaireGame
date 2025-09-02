@@ -46,6 +46,24 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
     
     // Global drop handler to catch missed drops
     const handleGlobalDrop = (e: DragEvent) => {
+      // If highlights are disabled, we need to check collision once on drop
+      if (!collisionHighlightEnabled && previewRef.current) {
+        const bounds = previewRef.current.getBoundingClientRect();
+        const gameState = useSolitaire.getState();
+        
+        const target = findBestDropTarget(
+          bounds,
+          lastCursorPosRef.current,
+          draggedCards,
+          gameState,
+          sourceType,
+          sourceIndex,
+          sourceFoundation
+        );
+        
+        setCurrentBestTarget(target);
+      }
+      
       const target = getCurrentBestTarget();
       if (target && !e.defaultPrevented) {
         console.log('🌍 Global drop caught, best target:', target.type, target.index || target.suit);
@@ -86,29 +104,28 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
       setHighlightedTarget(target);
       setCurrentBestTarget(target); // Store globally for drop handling
       
-      // Only apply visual highlights if enabled
-      if (collisionHighlightEnabled) {
-        // Only update highlights if the target changed
-        const currentElement = target?.element || null;
-        if (currentElement !== lastHighlightedElement.current) {
-          // Clear all highlights first
-          clearAllDropTargetHighlights();
-          
-          // Apply new highlight if there's a target
-          if (currentElement) {
-            applyDropTargetHighlight(currentElement);
-          }
-          
-          lastHighlightedElement.current = currentElement;
+      // Only update highlights if the target changed
+      const currentElement = target?.element || null;
+      if (currentElement !== lastHighlightedElement.current) {
+        // Clear all highlights first
+        clearAllDropTargetHighlights();
+        
+        // Apply new highlight if there's a target and highlights are enabled
+        if (currentElement && collisionHighlightEnabled) {
+          applyDropTargetHighlight(currentElement);
         }
+        
+        lastHighlightedElement.current = currentElement;
       }
       
       perfMonitor.end('checkCollisions');
     };
     
-    // Check collisions every 50ms (20 times per second)
-    // This is separate from position updates to keep movement smooth
-    collisionCheckTimer = window.setInterval(checkCollisions, 50);
+    // Only check collisions continuously if highlights are enabled
+    // If disabled, we'll check only on drop for better performance
+    if (collisionHighlightEnabled) {
+      collisionCheckTimer = window.setInterval(checkCollisions, 50);
+    }
     
     // Listen to dragover which fires during drag operations
     window.addEventListener('dragover', handleDragOver as any);
