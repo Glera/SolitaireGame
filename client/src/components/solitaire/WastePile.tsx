@@ -30,26 +30,25 @@ export function WastePile({ cards }: WastePileProps) {
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   
   // Track card animation state for flip effect
-  const [isNewCard, setIsNewCard] = useState(false);
-  const [previousCardId, setPreviousCardId] = useState<string | null>(null);
+  const [animateCard, setAnimateCard] = useState(false);
+  const previousCardIdRef = useRef<string | null>(null);
   
-  // Detect when a new card appears and trigger animation
+  // Detect when a new card appears and animate it
   useEffect(() => {
-    if (topCard && topCard.id !== previousCardId) {
-      console.log('New card detected:', topCard.id, 'starting animation');
-      // Start with shifted/transparent state
-      setIsNewCard(true);
-      setPreviousCardId(topCard.id);
+    if (topCard && topCard.id !== previousCardIdRef.current) {
+      previousCardIdRef.current = topCard.id;
       
-      // Then animate to final position after a short delay
+      // Start animation
+      setAnimateCard(true);
+      
+      // End animation after transition completes
       const timer = setTimeout(() => {
-        console.log('Animation transition to final position');
-        setIsNewCard(false);
-      }, 50); // Enough time for initial render
+        setAnimateCard(false);
+      }, 200);
       
       return () => clearTimeout(timer);
     }
-  }, [topCard?.id, previousCardId]);
+  }, [topCard]);
   
   // Check if the top card is being dragged (only for real drag, not click)
   const isTopCardBeingDragged = () => {
@@ -137,12 +136,10 @@ export function WastePile({ cards }: WastePileProps) {
       {topCard ? (
         <div 
           ref={cardRef} 
+          className={animateCard ? 'animate-slide-in' : ''}
           style={{ 
             position: 'relative', 
-            zIndex: 1,
-            transform: isNewCard ? 'translateX(-5px)' : 'translateX(0px)',
-            opacity: isNewCard ? 0.5 : 1,
-            transition: isNewCard ? 'none' : 'transform 200ms ease-out, opacity 200ms ease-out'
+            zIndex: 1
           }}
         >
           <Card 

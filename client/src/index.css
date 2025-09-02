@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Card flip animation */
+@keyframes slideIn {
+  from {
+    transform: translateX(-5px);
+    opacity: 0.5;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 200ms ease-out;
+}
+
 @layer base {
   * {
     @apply border-border;
