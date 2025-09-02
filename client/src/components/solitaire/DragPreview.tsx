@@ -108,9 +108,7 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
       <div className="relative" style={{ 
         width: '64px', 
         height: `${96 + (cards.length - 1) * 18}px`, // 96px base card height + 18px per additional card
-        minHeight: '96px', // Ensure at least one card height
-        border: '1px dashed red', // Debug: show card preview bounds
-        boxSizing: 'border-box'
+        minHeight: '96px' // Ensure at least one card height
       }}>
         {cards.map((card, index) => (
           <div

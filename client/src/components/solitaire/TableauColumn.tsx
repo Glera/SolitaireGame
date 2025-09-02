@@ -34,8 +34,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   
-  // Register this column as a drop target
+  // Register this column and each card as drop targets
   useEffect(() => {
+    // Register the column itself for empty columns
     if (columnRef.current) {
       registerDropTarget({
         type: 'tableau',
@@ -44,10 +45,25 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       });
     }
     
+    // Register each card div as a drop target
+    cardRefs.current.forEach((cardEl, index) => {
+      if (cardEl && cards[index]) {
+        registerDropTarget({
+          type: 'tableau',
+          index: columnIndex,
+          element: cardEl
+        });
+      }
+    });
+    
     return () => {
       unregisterDropTarget('tableau', columnIndex);
+      // Also unregister all card targets for this column
+      cardRefs.current.forEach((_, index) => {
+        unregisterDropTarget('tableau', columnIndex, undefined);
+      });
     };
-  }, [columnIndex]);
+  }, [columnIndex, cards.length]); // Re-register when cards change
 
   const handleCardClick = (cardIndex: number) => {
     const card = cards[cardIndex];
@@ -175,7 +191,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   return (
-    <div className="relative" ref={columnRef} data-tableau-column={columnIndex} data-drop-target="tableau" style={{ outline: isDragging ? '1px dotted blue' : 'none' }}>
+    <div className="relative" ref={columnRef} data-tableau-column={columnIndex} data-drop-target="tableau">
       {/* Invisible expanded drop zone - doesn't block clicks */}
       <div 
         className="absolute -inset-8 z-0 pointer-events-none"

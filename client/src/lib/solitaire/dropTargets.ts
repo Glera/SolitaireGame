@@ -88,38 +88,71 @@ export function findBestDropTarget(
   // Update bounds before checking
   updateDropTargetBounds();
   
+  // Reduce logging frequency - only log every 10th call
+  if (Math.random() < 0.1) {
+    console.log('findBestDropTarget called:', {
+      dragBounds: { left: dragBounds.left, top: dragBounds.top, right: dragBounds.right, bottom: dragBounds.bottom },
+      registeredTargets: dropTargets.length,
+      draggedCard: draggedCards[0]?.id
+    });
+  }
+  
   // Find all intersecting targets
   const intersectingTargets = dropTargets.filter(target => {
     // Check physical intersection
-    if (!checkIntersection(dragBounds, target.bounds)) {
+    const intersects = checkIntersection(dragBounds, target.bounds);
+    if (!intersects) {
       return false;
     }
+    
+    console.log('Found intersection with:', {
+      type: target.type,
+      index: target.index,
+      targetBounds: { left: target.bounds.left, top: target.bounds.top, right: target.bounds.right, bottom: target.bounds.bottom }
+    });
     
     // Check if move is valid
     if (target.type === 'foundation' && target.suit) {
       // Don't allow dropping back to the same foundation
       if (sourceType === 'foundation' && sourceFoundation === target.suit) {
+        console.log('Filtered: same foundation');
         return false;
       }
       // Can only move single card to foundation
-      if (draggedCards.length !== 1) return false;
-      return canPlaceOnFoundation(gameState.foundations[target.suit], draggedCards[0]);
+      if (draggedCards.length !== 1) {
+        console.log('Filtered: multiple cards to foundation');
+        return false;
+      }
+      const canPlace = canPlaceOnFoundation(gameState.foundations[target.suit], draggedCards[0]);
+      if (!canPlace) console.log('Filtered: invalid foundation placement');
+      return canPlace;
     } else if (target.type === 'tableau' && target.index !== undefined) {
       // Don't allow dropping back to the same tableau column
       if (sourceType === 'tableau' && sourceIndex === target.index) {
+        console.log('Filtered: same tableau column', sourceIndex, target.index);
         return false;
       }
       const targetColumn = gameState.tableau[target.index];
       if (targetColumn.length === 0) {
         // Can place King on empty column
-        return draggedCards[0].rank === 'K';
+        const isKing = draggedCards[0].rank === 'K';
+        if (!isKing) console.log('Filtered: not King on empty column');
+        return isKing;
       }
       const bottomCard = targetColumn[targetColumn.length - 1];
-      return canPlaceOnTableau(bottomCard, draggedCards[0]);
+      const canPlace = canPlaceOnTableau(bottomCard, draggedCards[0]);
+      if (!canPlace) {
+        console.log('Filtered: invalid tableau placement', 
+          `${bottomCard.rank} of ${bottomCard.suit}`, 'cannot accept',
+          `${draggedCards[0].rank} of ${draggedCards[0].suit}`);
+      }
+      return canPlace;
     }
     
     return false;
   });
+  
+  console.log('Total intersecting targets:', intersectingTargets.length);
   
   if (intersectingTargets.length === 0) {
     return null;

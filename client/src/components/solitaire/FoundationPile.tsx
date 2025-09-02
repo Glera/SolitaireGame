@@ -163,7 +163,7 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   };
 
   return (
-    <div id={id} className="relative" ref={foundationRef} data-drop-target="foundation" style={{ outline: isDragging ? '1px dotted purple' : 'none' }}>
+    <div id={id} className="relative" ref={foundationRef} data-drop-target="foundation">
       {/* Invisible expanded drop zone - doesn't block clicks */}
       <div 
         className="absolute -inset-8 z-0 pointer-events-none"
