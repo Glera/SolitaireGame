@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Card } from './Card';
 import { Pile } from './Pile';
 import { Card as CardType } from '../../lib/solitaire/types';
@@ -28,6 +28,25 @@ export function WastePile({ cards }: WastePileProps) {
 
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
+  
+  // Track card animation state for flip effect
+  const [isNewCard, setIsNewCard] = useState(false);
+  const [previousCardId, setPreviousCardId] = useState<string | null>(null);
+  
+  // Detect when a new card appears and trigger animation
+  useEffect(() => {
+    if (topCard && topCard.id !== previousCardId) {
+      setIsNewCard(true);
+      setPreviousCardId(topCard.id);
+      
+      // Remove animation state after animation completes
+      const timer = setTimeout(() => {
+        setIsNewCard(false);
+      }, 200);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [topCard?.id, previousCardId]);
   
   // Check if the top card is being dragged (only for real drag, not click)
   const isTopCardBeingDragged = () => {
@@ -113,7 +132,16 @@ export function WastePile({ cards }: WastePileProps) {
       
       {/* Show top card */}
       {topCard ? (
-        <div ref={cardRef} style={{ position: 'relative', zIndex: 1 }}>
+        <div 
+          ref={cardRef} 
+          style={{ 
+            position: 'relative', 
+            zIndex: 1,
+            transform: isNewCard ? 'translateX(-5px)' : 'translateX(0px)',
+            opacity: isNewCard ? 0.5 : 1,
+            transition: 'transform 200ms ease-out, opacity 200ms ease-out'
+          }}
+        >
           <Card 
             card={topCard} 
             onClick={handleCardClick}
