@@ -83,12 +83,23 @@ export function updateDropTargetBounds() {
 }
 
 function checkIntersection(rect1: DOMRect, rect2: DOMRect): boolean {
-  return !(
+  const result = !(
     rect1.right < rect2.left ||
     rect1.left > rect2.right ||
     rect1.bottom < rect2.top ||
     rect1.top > rect2.bottom
   );
+  
+  // Log first few checks to debug
+  if (Math.random() < 0.05) {
+    console.log('Intersection check:', {
+      drag: `[${rect1.left.toFixed(0)},${rect1.top.toFixed(0)},${rect1.right.toFixed(0)},${rect1.bottom.toFixed(0)}]`,
+      target: `[${rect2.left.toFixed(0)},${rect2.top.toFixed(0)},${rect2.right.toFixed(0)},${rect2.bottom.toFixed(0)}]`,
+      result
+    });
+  }
+  
+  return result;
 }
 
 function getIntersectionArea(rect1: DOMRect, rect2: DOMRect): number {
@@ -120,6 +131,9 @@ export function findBestDropTarget(
   
   // Find all intersecting targets
   const intersectingTargets = dropTargets.filter(target => {
+    // Recalculate bounds fresh for this target
+    target.bounds = target.element.getBoundingClientRect();
+    
     // Check physical intersection
     const intersects = checkIntersection(dragBounds, target.bounds);
     if (!intersects) {

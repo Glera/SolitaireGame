@@ -36,34 +36,32 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   
-  // Register this column and each card as drop targets
+  // Register this column as drop target
   useEffect(() => {
-    // Register the column itself for empty columns
-    if (columnRef.current) {
-      registerDropTarget({
-        type: 'tableau',
-        index: columnIndex,
-        element: columnRef.current
-      });
-    }
-    
-    // Register each card div as a drop target
-    cardRefs.current.forEach((cardEl, index) => {
-      if (cardEl && cards[index]) {
+    if (cards.length === 0) {
+      // Register the column itself for empty columns
+      if (columnRef.current) {
         registerDropTarget({
           type: 'tableau',
           index: columnIndex,
-          element: cardEl
+          element: columnRef.current
         });
       }
-    });
+    } else {
+      // Register only the last card as a drop target
+      const lastCardIndex = cards.length - 1;
+      const lastCardEl = cardRefs.current[lastCardIndex];
+      if (lastCardEl) {
+        registerDropTarget({
+          type: 'tableau',
+          index: columnIndex,
+          element: lastCardEl
+        });
+      }
+    }
     
     return () => {
       unregisterDropTarget('tableau', columnIndex);
-      // Also unregister all card targets for this column
-      cardRefs.current.forEach((_, index) => {
-        unregisterDropTarget('tableau', columnIndex, undefined);
-      });
     };
   }, [columnIndex, cards.length]); // Re-register when cards change
 
