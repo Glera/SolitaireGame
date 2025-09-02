@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Card } from './Card';
 import { Pile } from './Pile';
 import { Card as CardType } from '../../lib/solitaire/types';
@@ -26,6 +26,9 @@ export function WastePile({ cards }: WastePileProps) {
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
   const secondCard = cards.length > 1 ? cards[cards.length - 2] : null;
 
+  // Track if we're in actual drag mode (not just click)
+  const [isActuallyDragging, setIsActuallyDragging] = useState(false);
+  
   // Check if the top card is being dragged (only for real drag, not click)
   const isTopCardBeingDragged = () => {
     if (!topCard) return false;
@@ -35,12 +38,10 @@ export function WastePile({ cards }: WastePileProps) {
       return false;
     }
     
-    // Only return true if we have an actual drag preview showing
-    // This prevents the temporary click-based drag state from hiding the card
-    const { showDragPreview } = useSolitaire.getState();
     const isInDraggedCards = draggedCards.some(draggedCard => draggedCard.id === topCard.id);
     
-    return isInDraggedCards && showDragPreview;
+    // Only hide card if we're actually dragging (not just clicked)
+    return isInDraggedCards && isActuallyDragging;
   };
   
   // Check if the top card is animating to foundation
@@ -74,13 +75,18 @@ export function WastePile({ cards }: WastePileProps) {
       clickTimeoutRef.current = null;
     }
     
-    // For waste pile, use standard browser drag behavior (no custom preview)
-    // This allows cards to be properly hidden during drag
+    // Mark that we're actually dragging (not just clicking)
+    setIsActuallyDragging(true);
+    
+    // For waste pile, use standard browser drag behavior
     startDrag([topCard], 'waste');
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragEnd = (e: React.DragEvent) => {
+    // Reset drag state
+    setIsActuallyDragging(false);
+    
     // Delay endDrag to allow drop events to process first
     setTimeout(() => {
       useSolitaire.getState().endDrag();
