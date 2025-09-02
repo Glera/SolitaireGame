@@ -160,35 +160,36 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   return (
-    <div 
-      className="relative p-3 -m-3" 
-      data-tableau-column={columnIndex}
-      onDragOver={(e) => { 
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-      }}
-      onDrop={(e) => { 
-        e.preventDefault(); 
-        handleDrop(e); 
-      }}
-    >
+    <div className="relative" data-tableau-column={columnIndex}>
+      {/* Invisible expanded drop zone */}
+      <div 
+        className="absolute -inset-3 z-0"
+        onDragOver={(e) => { 
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        }}
+        onDrop={(e) => { 
+          e.preventDefault(); 
+          handleDrop(e); 
+        }}
+      />
       <Pile
         onDrop={handleDrop}
         isEmpty={cards.length === 0 || (isDragging && sourceType === 'tableau' && sourceIndex === columnIndex && draggedCards.length === cards.length)}
         label="K"
-        className="mb-2"
+        className="mb-2 relative z-10"
       >
         {(cards.length === 0 || (isDragging && sourceType === 'tableau' && sourceIndex === columnIndex && draggedCards.length === cards.length)) && (
           <div className="w-full h-full" />
         )}
       </Pile>
       
-      <div className="absolute top-3 left-3">
+      <div className="absolute top-0 left-0 z-10">
         {cards.map((card, index) => (
           <div
             key={card.id}
             ref={el => cardRefs.current[index] = el}
-            className="absolute p-1 -m-1"
+            className="absolute"
             style={{ top: `${index * 18}px` }}
             onDragOver={(e) => { 
               e.preventDefault();

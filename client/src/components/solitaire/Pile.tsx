@@ -56,7 +56,7 @@ export function Pile({
     <div
       {...props}
       className={cn(
-        "w-20 h-28 rounded-lg flex items-center justify-center relative",
+        "w-16 h-24 rounded-lg flex items-center justify-center relative",
         // Only show border for non-stock-pile components
         !props['data-stock-pile'] && "border border-dashed border-teal-500/50 hover:border-teal-400/70 transition-colors duration-200",
         onClick && "cursor-pointer",

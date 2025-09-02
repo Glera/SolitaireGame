@@ -108,22 +108,23 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   };
 
   return (
-    <div 
-      id={id} 
-      className="p-2 -m-2"
-      onDragOver={(e) => { 
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-      }}
-      onDrop={(e) => { 
-        e.preventDefault(); 
-        handleDrop(e); 
-      }}
-    >
+    <div id={id} className="relative">
+      {/* Invisible expanded drop zone */}
+      <div 
+        className="absolute -inset-3 z-0"
+        onDragOver={(e) => { 
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        }}
+        onDrop={(e) => { 
+          e.preventDefault(); 
+          handleDrop(e); 
+        }}
+      />
       <Pile
         onDrop={handleDrop}
         isEmpty={cards.length === 0}
-        className="bg-teal-600/20 border-teal-400/50"
+        className="bg-teal-600/20 border-teal-400/50 relative z-10"
       >
       {/* Show second card if top card is being dragged and second card exists */}
       {secondCard && isTopCardBeingDragged() && (

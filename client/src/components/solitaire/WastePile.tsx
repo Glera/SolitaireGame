@@ -145,11 +145,20 @@ export function WastePile({ cards }: WastePileProps) {
   };
 
   return (
-    <Pile
-      isEmpty={cards.length === 0}
-      className="bg-teal-600/10 p-2"
-      data-waste-pile
-    >
+    <div className="relative">
+      {/* Invisible expanded drop zone */}
+      <div 
+        className="absolute -inset-3 z-0"
+        onDragOver={(e) => { 
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        }}
+      />
+      <Pile
+        isEmpty={cards.length === 0}
+        className="bg-teal-600/10 relative z-10"
+        data-waste-pile
+      >
       {/* Show second card if top card is being dragged OR during animation */}
       {secondCard && (isTopCardBeingDragged() || showPreviousCard) && (
         <div style={{ position: 'absolute', top: 0, left: 0 }}>
@@ -191,6 +200,7 @@ export function WastePile({ cards }: WastePileProps) {
       ) : (
         <div className="w-full h-full" />
       )}
-    </Pile>
+      </Pile>
+    </div>
   );
 }
