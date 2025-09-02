@@ -20,6 +20,7 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
   const [highlightedTarget, setHighlightedTarget] = useState<DropTarget | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const lastHighlightedElement = useRef<HTMLElement | null>(null);
   const { sourceType, sourceIndex, sourceFoundation, draggedCards } = useSolitaire();
   
   useEffect(() => {
@@ -59,12 +60,23 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
         setHighlightedTarget(target);
         setCurrentBestTarget(target); // Store globally for drop handling
         
-        // Clear all highlights first
-        clearAllDropTargetHighlights();
-        
-        // Apply visual feedback only if there's a valid target
-        if (target && target.element) {
-          applyDropTargetHighlight(target.element);
+        // Only update highlights if the target changed
+        const currentElement = target?.element || null;
+        if (currentElement !== lastHighlightedElement.current) {
+          console.log('DragPreview: Target changed from', 
+            lastHighlightedElement.current?.getAttribute('data-drop-target'), 
+            'to', 
+            currentElement?.getAttribute('data-drop-target'));
+          
+          // Clear all highlights first
+          clearAllDropTargetHighlights();
+          
+          // Apply new highlight if there's a target
+          if (currentElement) {
+            applyDropTargetHighlight(currentElement);
+          }
+          
+          lastHighlightedElement.current = currentElement;
         }
       }
       
@@ -78,11 +90,15 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
     window.addEventListener('dragover', handleDragOver as any);
     
     return () => {
+      console.log('DragPreview: Cleaning up');
       window.removeEventListener('dragover', handleDragOver as any);
       cancelAnimationFrame(animationFrameId);
       // Clean up visual feedback and target
       setCurrentBestTarget(null);
+      
+      // Clear all highlights
       clearAllDropTargetHighlights();
+      lastHighlightedElement.current = null;
     };
   }, [offset, draggedCards, sourceType, sourceIndex, sourceFoundation, startPosition]);
   

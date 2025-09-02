@@ -3,6 +3,7 @@ import { Card } from './Card';
 import { Pile } from './Pile';
 import { Card as CardType } from '../../lib/solitaire/types';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
+import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 
 interface WastePileProps {
   cards: CardType[];
@@ -145,9 +146,14 @@ export function WastePile({ cards }: WastePileProps) {
     // Reset drag state
     setIsActuallyDragging(false);
     
+    // Clear all visual feedback immediately
+    clearAllDropTargetHighlights();
+    
     // Delay endDrag to allow drop events to process first
     setTimeout(() => {
       useSolitaire.getState().endDrag();
+      // Clear again after ending drag
+      clearAllDropTargetHighlights();
     }, 0);
   };
 

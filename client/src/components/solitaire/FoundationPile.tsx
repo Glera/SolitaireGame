@@ -4,7 +4,8 @@ import { Pile } from './Pile';
 import { Card as CardType, Suit } from '../../lib/solitaire/types';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { getSuitSymbol } from '../../lib/solitaire/cardUtils';
-import { registerDropTarget, unregisterDropTarget, getCurrentBestTarget } from '../../lib/solitaire/dropTargets';
+import { registerDropTarget, unregisterDropTarget, getCurrentBestTarget, setCurrentBestTarget } from '../../lib/solitaire/dropTargets';
+import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 
 interface FoundationPileProps {
   cards: CardType[];
@@ -84,6 +85,10 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
       console.log('No collision target, using cursor position drop on foundation', suit);
       dropCards('foundation', undefined, suit);
     }
+    
+    // Clear the current target and all visual feedback
+    setCurrentBestTarget(null);
+    clearAllDropTargetHighlights();
   };
 
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;

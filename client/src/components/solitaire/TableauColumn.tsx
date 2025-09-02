@@ -3,7 +3,8 @@ import { Card } from './Card';
 import { Pile } from './Pile';
 import { Card as CardType } from '../../lib/solitaire/types';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
-import { registerDropTarget, unregisterDropTarget, getCurrentBestTarget } from '../../lib/solitaire/dropTargets';
+import { registerDropTarget, unregisterDropTarget, getCurrentBestTarget, setCurrentBestTarget } from '../../lib/solitaire/dropTargets';
+import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 
 interface TableauColumnProps {
   cards: CardType[];
@@ -163,6 +164,10 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       console.log('No collision target, using cursor position drop on column', columnIndex);
       dropCards('tableau', columnIndex);
     }
+    
+    // Clear the current target and all visual feedback
+    setCurrentBestTarget(null);
+    clearAllDropTargetHighlights();
   };
 
   const movableCards = getMovableCardsFromTableau(columnIndex);
