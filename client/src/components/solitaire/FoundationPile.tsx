@@ -141,11 +141,25 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
           />
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center h-full">
-          <div className={`text-2xl ${isRed ? 'text-red-300' : 'text-gray-400'}`}>
-            {suitSymbol}
+        <div className="w-full h-full bg-amber-50 border border-amber-700 p-1 rounded-lg flex flex-col justify-between" style={{ borderRadius: '0.5rem' }}>
+          {/* Top rank and suit - like real card */}
+          <div className={`text-xs font-bold leading-none ${isRed ? 'text-red-600' : 'text-black'}`}>
+            <div>A</div>
+            <div className="text-xs">{suitSymbol}</div>
           </div>
-          <div className="text-xs text-gray-400 font-medium">A</div>
+          
+          {/* Center suit symbol */}
+          <div className="flex-1 flex items-center justify-center">
+            <div className={`text-xl ${isRed ? 'text-red-600' : 'text-black'} opacity-30`}>
+              {suitSymbol}
+            </div>
+          </div>
+          
+          {/* Bottom rank and suit (rotated) */}
+          <div className={`text-xs font-bold leading-none ${isRed ? 'text-red-600' : 'text-black'} self-end transform rotate-180`}>
+            <div>A</div>
+            <div className="text-xs">{suitSymbol}</div>
+          </div>
         </div>
       )}
       </Pile>
