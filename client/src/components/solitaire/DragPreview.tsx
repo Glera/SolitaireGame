@@ -61,8 +61,18 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
       }
     };
     
-    // Continuously check collisions using requestAnimationFrame
+    // Throttled collision checking with reduced frequency
+    let lastCheckTime = 0;
     const checkCollisions = () => {
+      const now = Date.now();
+      
+      // Throttle to max 30fps for performance
+      if (now - lastCheckTime < 33) {
+        animationFrameId = requestAnimationFrame(checkCollisions);
+        return;
+      }
+      lastCheckTime = now;
+      
       if (previewRef.current) {
         const bounds = previewRef.current.getBoundingClientRect();
         const gameState = useSolitaire.getState();
@@ -85,10 +95,10 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
           // Only update highlights if the target changed
           const currentElement = target?.element || null;
           if (currentElement !== lastHighlightedElement.current) {
-            console.log('DragPreview: Target changed from', 
-              lastHighlightedElement.current?.getAttribute('data-drop-target'), 
-              'to', 
-              currentElement?.getAttribute('data-drop-target'));
+            // console.log('DragPreview: Target changed from', 
+            //   lastHighlightedElement.current?.getAttribute('data-drop-target'), 
+            //   'to', 
+            //   currentElement?.getAttribute('data-drop-target'));
             
             // Clear all highlights first
             clearAllDropTargetHighlights();
