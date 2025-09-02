@@ -67,6 +67,7 @@ export function Card({
       }}
       onDragEnd={onDragEnd}
       draggable={isPlayable}
+      data-drop-target={true}
     >
       <div className="w-full h-full flex flex-col justify-between">
         {/* Top rank and suit */}

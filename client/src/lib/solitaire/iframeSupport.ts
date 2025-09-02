@@ -13,13 +13,78 @@ export function supportsPointerEvents(): boolean {
   return 'PointerEvent' in window;
 }
 
+// Alternative drag implementation using mouse events for iframe compatibility
+export function setupAlternativeDrag() {
+  console.log('🔄 Setting up alternative drag for iframe compatibility');
+  
+  let isDragging = false;
+  let draggedElement: HTMLElement | null = null;
+  let startPos = { x: 0, y: 0 };
+  let currentPos = { x: 0, y: 0 };
+  
+  // Override drag start with mouse events
+  document.addEventListener('mousedown', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.getAttribute('draggable') === 'true') {
+      e.preventDefault();
+      isDragging = true;
+      draggedElement = target;
+      startPos = { x: e.clientX, y: e.clientY };
+      currentPos = startPos;
+      
+      // Trigger custom drag start
+      const dragStartEvent = new CustomEvent('alt-dragstart', {
+        detail: { element: target, startPos }
+      });
+      target.dispatchEvent(dragStartEvent);
+    }
+  }, { passive: false });
+  
+  document.addEventListener('mousemove', (e) => {
+    if (isDragging && draggedElement) {
+      e.preventDefault();
+      currentPos = { x: e.clientX, y: e.clientY };
+      
+      // Trigger custom drag move
+      const dragMoveEvent = new CustomEvent('alt-dragmove', {
+        detail: { element: draggedElement, currentPos, startPos }
+      });
+      draggedElement.dispatchEvent(dragMoveEvent);
+    }
+  }, { passive: false });
+  
+  document.addEventListener('mouseup', (e) => {
+    if (isDragging && draggedElement) {
+      e.preventDefault();
+      
+      // Find drop target
+      const elementsBelow = document.elementsFromPoint(e.clientX, e.clientY);
+      const dropTarget = elementsBelow.find(el => el !== draggedElement && el.getAttribute('data-drop-target'));
+      
+      // Trigger custom drag end
+      const dragEndEvent = new CustomEvent('alt-dragend', {
+        detail: { element: draggedElement, dropTarget, endPos: { x: e.clientX, y: e.clientY } }
+      });
+      draggedElement.dispatchEvent(dragEndEvent);
+      
+      isDragging = false;
+      draggedElement = null;
+    }
+  }, { passive: false });
+}
+
 // Fix for drag and drop in iframe
 export function setupIframeSupport() {
-  if (!isInIframe()) {
-    return;
+  const inIframe = isInIframe();
+  
+  if (inIframe) {
+    console.log('🖼️ Running in iframe, applying compatibility fixes');
+  } else {
+    console.log('🖥️ Running standalone, applying basic setup');
   }
-
-  console.log('🖼️ Running in iframe, applying compatibility fixes');
+  
+  // Always setup alternative drag for better compatibility
+  setupAlternativeDrag();
 
   // More aggressive drag and drop fixes for cross-origin iframe
   document.addEventListener('dragover', (e) => {
