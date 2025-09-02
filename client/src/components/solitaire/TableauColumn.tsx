@@ -27,7 +27,6 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   } = useSolitaire();
   
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
@@ -47,34 +46,11 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       }
     }
     
-    // Get movable cards for visual feedback
-    const movableCards = getMovableCardsFromTableau(columnIndex);
-    const cardPosition = cards.length - movableCards.length;
-    
-    if (cardIndex >= cardPosition) {
-      const cardsToMove = movableCards.slice(cardIndex - cardPosition);
-      startDrag(cardsToMove, 'tableau', columnIndex);
-      
-      // Clear drag state after a short delay if no actual drag happens
-      if (clickTimeoutRef.current) {
-        clearTimeout(clickTimeoutRef.current);
-      }
-      clickTimeoutRef.current = setTimeout(() => {
-        const state = useSolitaire.getState();
-        if (state.isDragging && state.sourceType === 'tableau' && state.sourceIndex === columnIndex) {
-          state.endDrag();
-        }
-      }, 150);
-    }
+    // For clicks without drag, don't start drag state
+    // Just check for auto-move, don't make cards transparent
   };
 
   const handleDragStart = (e: React.DragEvent, cardIndex: number) => {
-    // Clear the click timeout since we're actually dragging
-    if (clickTimeoutRef.current) {
-      clearTimeout(clickTimeoutRef.current);
-      clickTimeoutRef.current = null;
-    }
-    
     // Mark as actually dragging
     setIsActuallyDragging(true);
     
