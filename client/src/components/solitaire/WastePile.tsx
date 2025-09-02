@@ -165,7 +165,7 @@ export function WastePile({ cards }: WastePileProps) {
     <div className="relative">
       {/* Invisible expanded drop zone */}
       <div 
-        className="absolute -inset-5 z-0"
+        className="absolute -inset-8 z-0"
         onDragOver={(e) => { 
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
