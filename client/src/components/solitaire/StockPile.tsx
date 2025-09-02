@@ -16,6 +16,11 @@ export function StockPile({ cards }: StockPileProps) {
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
   
   const handleClick = () => {
+    console.log('StockPile: Click, drawing card', { 
+      stockCount: cards.length,
+      wasteCount: waste.length,
+      timestamp: Date.now()
+    });
     drawCard();
   };
 

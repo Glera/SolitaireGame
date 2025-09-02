@@ -35,19 +35,37 @@ export function WastePile({ cards }: WastePileProps) {
   const [showPreviousCard, setShowPreviousCard] = useState(false);
   const previousCardCountRef = useRef<number>(cards.length);
   const [newCardId, setNewCardId] = useState<string | null>(null);
+  const wasJustRecycledRef = useRef<boolean>(false);
   
   // Detect when a NEW card appears from stock pile (count increases)
   useEffect(() => {
     const currentCount = cards.length;
     const previousCount = previousCardCountRef.current;
     
+    console.log('WastePile: Card count changed', {
+      previousCount,
+      currentCount,
+      topCardId: topCard?.id,
+      secondCardId: secondCard?.id,
+      timestamp: Date.now()
+    });
+    
     // Only animate if this is a NEW card from stock pile (count increased)
     if (topCard && currentCount > previousCount) {
-      // Skip animation if waste pile was empty (first card)
-      if (previousCount === 0) {
+      // Skip animation ONLY for the very first card at game start, not after recycling
+      if (previousCount === 0 && !wasJustRecycledRef.current) {
+        console.log('WastePile: First card at game start, skipping animation');
         previousCardCountRef.current = currentCount;
         return;
       }
+      
+      // Reset recycled flag after first card
+      wasJustRecycledRef.current = false;
+      
+      console.log('WastePile: Starting slide animation', {
+        newCardId: topCard.id,
+        hasSecondCard: !!secondCard
+      });
       
       // Show previous card during animation
       if (secondCard) {
@@ -60,6 +78,7 @@ export function WastePile({ cards }: WastePileProps) {
       
       // End animation after transition completes
       const timer = setTimeout(() => {
+        console.log('WastePile: Animation complete');
         setAnimateCard(false);
         setShowPreviousCard(false);
         setNewCardId(null);
@@ -74,8 +93,15 @@ export function WastePile({ cards }: WastePileProps) {
       
       // If card was removed, ensure animation is off
       if (currentCount < previousCount) {
+        console.log('WastePile: Card removed, clearing animation');
         setAnimateCard(false);
         setNewCardId(null);
+        
+        // If waste pile is now empty, it means cards were recycled back to stock
+        if (currentCount === 0) {
+          console.log('WastePile: Cards recycled back to stock');
+          wasJustRecycledRef.current = true;
+        }
       }
     }
   }, [topCard, secondCard, cards.length]);
