@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSolitaire } from '../lib/stores/useSolitaire';
 
 export interface DebugInfo {
   event: string;
@@ -33,6 +34,8 @@ interface DebugPopupProps {
 }
 
 export function DebugPopup({ info, onClose }: DebugPopupProps) {
+  const { collisionHighlightEnabled, setCollisionHighlight } = useSolitaire();
+  
   const copyToClipboard = async () => {
     if (!info) return;
     
@@ -137,6 +140,18 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
               📋 Copy
             </button>
           )}
+        </div>
+        
+        <div className="mb-3 pb-3 border-b border-gray-600">
+          <label className="flex items-center gap-2 cursor-pointer text-white">
+            <input 
+              type="checkbox" 
+              checked={collisionHighlightEnabled}
+              onChange={(e) => setCollisionHighlight(e.target.checked)}
+              className="cursor-pointer"
+            />
+            <span className="text-sm">Enable collision highlights</span>
+          </label>
         </div>
         {info ? (
           <>

@@ -30,6 +30,10 @@ interface SolitaireStore extends GameState, DragState {
   dragOffset: { x: number; y: number } | null;
   setShowDragPreview: (show: boolean, position?: { x: number; y: number }, offset?: { x: number; y: number }) => void;
   
+  // Debug settings
+  collisionHighlightEnabled: boolean;
+  setCollisionHighlight: (enabled: boolean) => void;
+  
   // Utility functions
   getMovableCardsFromTableau: (columnIndex: number) => Card[];
   canAutoMoveToFoundation: (card: Card) => Suit | null;
@@ -55,6 +59,13 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   showDragPreview: false,
   dragPreviewPosition: null,
   dragOffset: null,
+  
+  // Debug settings
+  collisionHighlightEnabled: false,
+  
+  setCollisionHighlight: (enabled) => {
+    set({ collisionHighlightEnabled: enabled });
+  },
   
   newGame: () => {
     const newGameState = initializeGame();
