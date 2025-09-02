@@ -80,7 +80,7 @@ export function WastePile({ cards }: WastePileProps) {
         setAnimateCard(false);
         setShowPreviousCard(false);
         setNewCardId(null);
-      }, 125);
+      }, 50);
       
       previousCardCountRef.current = currentCount;
       
