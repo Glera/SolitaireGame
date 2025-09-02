@@ -1,8 +1,9 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Card } from './Card';
 import { Pile } from './Pile';
 import { Card as CardType } from '../../lib/solitaire/types';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
+import { registerDropTarget, unregisterDropTarget, getCurrentBestTarget } from '../../lib/solitaire/dropTargets';
 
 interface TableauColumnProps {
   cards: CardType[];
@@ -10,6 +11,8 @@ interface TableauColumnProps {
 }
 
 export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
+  const columnRef = useRef<HTMLDivElement>(null);
+  
   const { 
     startDrag, 
     dropCards, 
@@ -30,6 +33,21 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
+  
+  // Register this column as a drop target
+  useEffect(() => {
+    if (columnRef.current) {
+      registerDropTarget({
+        type: 'tableau',
+        index: columnIndex,
+        element: columnRef.current
+      });
+    }
+    
+    return () => {
+      unregisterDropTarget('tableau', columnIndex);
+    };
+  }, [columnIndex]);
 
   const handleCardClick = (cardIndex: number) => {
     const card = cards[cardIndex];
@@ -95,19 +113,25 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   const handleDrop = (e: React.DragEvent) => {
-    // DEBUG: Show popup with drop info
-    import('../DebugPopup').then(({ showDebugInfo }) => {
-      showDebugInfo(
-        'Drop on Tableau',
-        { x: e.clientX, y: e.clientY },
-        `Column ${columnIndex}`,
-        { 
-          cardsInColumn: cards.length,
-          targetCard: cards.length > 0 ? `${cards[cards.length-1].rank}${cards[cards.length-1].suit}` : 'empty'
-        }
-      );
-    });
-    dropCards('tableau', columnIndex);
+    e.preventDefault();
+    
+    // Use collision-based target if available
+    const bestTarget = getCurrentBestTarget();
+    
+    if (bestTarget && bestTarget.type === 'tableau' && bestTarget.index === columnIndex) {
+      // This is the best target based on collision detection
+      dropCards('tableau', columnIndex);
+    } else if (bestTarget) {
+      // There's a better target, drop there instead
+      if (bestTarget.type === 'tableau') {
+        dropCards('tableau', bestTarget.index);
+      } else if (bestTarget.type === 'foundation' && bestTarget.suit) {
+        dropCards('foundation', undefined, bestTarget.suit);
+      }
+    } else {
+      // No collision detected, use traditional drop
+      dropCards('tableau', columnIndex);
+    }
   };
 
   const movableCards = getMovableCardsFromTableau(columnIndex);
@@ -136,7 +160,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   return (
-    <div className="relative" data-tableau-column={columnIndex}>
+    <div className="relative" ref={columnRef} data-tableau-column={columnIndex} data-drop-target="tableau">
       {/* Invisible expanded drop zone - doesn't block clicks */}
       <div 
         className="absolute -inset-8 z-0 pointer-events-none"
@@ -172,20 +196,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
               e.preventDefault();
               // Simplified drop zone logic - accept drops on any tableau card area
               e.dataTransfer.dropEffect = 'move';
-              // Visual feedback for drop zone
-              e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.2)';
-              e.currentTarget.style.border = '2px dashed rgb(34, 197, 94)';
-            }}
-            onDragLeave={(e) => {
-              // Remove visual feedback
-              e.currentTarget.style.backgroundColor = '';
-              e.currentTarget.style.border = '';
             }}
             onDrop={(e) => { 
               e.preventDefault();
-              // Remove visual feedback
-              e.currentTarget.style.backgroundColor = '';
-              e.currentTarget.style.border = '';
               // Use simplified coordinate-free drop handling
               handleDrop(e); 
             }}

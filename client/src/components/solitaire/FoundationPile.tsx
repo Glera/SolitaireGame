@@ -1,9 +1,10 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Card } from './Card';
 import { Pile } from './Pile';
 import { Card as CardType, Suit } from '../../lib/solitaire/types';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { getSuitSymbol } from '../../lib/solitaire/cardUtils';
+import { registerDropTarget, unregisterDropTarget, getCurrentBestTarget } from '../../lib/solitaire/dropTargets';
 
 interface FoundationPileProps {
   cards: CardType[];
@@ -27,25 +28,47 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   } = useSolitaire();
   
   const cardRef = useRef<HTMLDivElement>(null);
+  const foundationRef = useRef<HTMLDivElement>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
+  
+  // Register this foundation as a drop target
+  useEffect(() => {
+    if (foundationRef.current) {
+      registerDropTarget({
+        type: 'foundation',
+        suit: suit,
+        element: foundationRef.current
+      });
+    }
+    
+    return () => {
+      unregisterDropTarget('foundation', undefined, suit);
+    };
+  }, [suit]);
 
   const handleDrop = (e: React.DragEvent) => {
-    // DEBUG: Show popup with foundation drop info
-    import('../DebugPopup').then(({ showDebugInfo }) => {
-      showDebugInfo(
-        'Drop on Foundation',
-        { x: e.clientX, y: e.clientY },
-        `${suit.toUpperCase()} foundation`,
-        { 
-          cardsInFoundation: cards.length,
-          topCard: cards.length > 0 ? `${cards[cards.length-1].rank}${cards[cards.length-1].suit}` : 'empty'
-        }
-      );
-    });
-    dropCards('foundation', undefined, suit);
+    e.preventDefault();
+    
+    // Use collision-based target if available
+    const bestTarget = getCurrentBestTarget();
+    
+    if (bestTarget && bestTarget.type === 'foundation' && bestTarget.suit === suit) {
+      // This is the best target based on collision detection
+      dropCards('foundation', undefined, suit);
+    } else if (bestTarget) {
+      // There's a better target, drop there instead
+      if (bestTarget.type === 'tableau') {
+        dropCards('tableau', bestTarget.index);
+      } else if (bestTarget.type === 'foundation' && bestTarget.suit) {
+        dropCards('foundation', undefined, bestTarget.suit);
+      }
+    } else {
+      // No collision detected, use traditional drop
+      dropCards('foundation', undefined, suit);
+    }
   };
 
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
@@ -125,7 +148,7 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   };
 
   return (
-    <div id={id} className="relative">
+    <div id={id} className="relative" ref={foundationRef} data-drop-target="foundation">
       {/* Invisible expanded drop zone - doesn't block clicks */}
       <div 
         className="absolute -inset-8 z-0 pointer-events-none"
@@ -133,20 +156,9 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
         onDragOver={(e) => { 
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
-          // Visual feedback for foundation drop zone
-          e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
-          e.currentTarget.style.border = '2px dashed rgb(34, 197, 94)';
-        }}
-        onDragLeave={(e) => {
-          // Remove visual feedback
-          e.currentTarget.style.backgroundColor = '';
-          e.currentTarget.style.border = '';
         }}
         onDrop={(e) => { 
           e.preventDefault();
-          // Remove visual feedback
-          e.currentTarget.style.backgroundColor = '';
-          e.currentTarget.style.border = ''; 
           handleDrop(e); 
         }}
       />

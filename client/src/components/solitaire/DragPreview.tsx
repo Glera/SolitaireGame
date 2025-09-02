@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Card as CardType } from '../../lib/solitaire/types';
 import { Card } from './Card';
 import { createPortal } from 'react-dom';
+import { findBestDropTarget, DropTarget, setCurrentBestTarget } from '../../lib/solitaire/dropTargets';
+import { useSolitaire } from '../../lib/stores/useSolitaire';
 
 interface DragPreviewProps {
   cards: CardType[];
@@ -14,17 +16,53 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
     x: startPosition.x,
     y: startPosition.y
   });
+  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
+  const [highlightedTarget, setHighlightedTarget] = useState<DropTarget | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const { sourceType, sourceIndex, sourceFoundation, draggedCards } = useSolitaire();
   
   useEffect(() => {
     // During drag operations, use dragover event instead of mousemove
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault(); // Important for drag operations
       
-      // Position the preview maintaining the same offset from cursor
-      setPosition({
+      const newPos = {
         x: e.clientX - offset.x,
         y: e.clientY - offset.y
-      });
+      };
+      
+      setPosition(newPos);
+      setCursorPos({ x: e.clientX, y: e.clientY });
+      
+      // Check for drop targets based on collision
+      if (previewRef.current) {
+        const bounds = previewRef.current.getBoundingClientRect();
+        const gameState = useSolitaire.getState();
+        
+        const target = findBestDropTarget(
+          bounds,
+          { x: e.clientX, y: e.clientY },
+          draggedCards,
+          gameState,
+          sourceType,
+          sourceIndex,
+          sourceFoundation
+        );
+        
+        setHighlightedTarget(target);
+        setCurrentBestTarget(target); // Store globally for drop handling
+        
+        // Update visual feedback on all targets
+        document.querySelectorAll('[data-drop-target]').forEach(el => {
+          (el as HTMLElement).style.backgroundColor = '';
+          (el as HTMLElement).style.borderColor = '';
+        });
+        
+        if (target?.element) {
+          target.element.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
+          target.element.style.borderColor = 'rgb(34, 197, 94)';
+        }
+      }
     };
     
     // Listen to dragover which fires during drag operations
@@ -32,19 +70,27 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
     
     return () => {
       window.removeEventListener('dragover', handleDragOver as any);
+      // Clean up visual feedback and target
+      setCurrentBestTarget(null);
+      document.querySelectorAll('[data-drop-target]').forEach(el => {
+        (el as HTMLElement).style.backgroundColor = '';
+        (el as HTMLElement).style.borderColor = '';
+      });
     };
-  }, [offset]);
+  }, [offset, draggedCards, sourceType, sourceIndex, sourceFoundation]);
   
   if (cards.length === 0) return null;
   
   return createPortal(
     <div 
+      ref={previewRef}
       style={{
         position: 'fixed',
         left: `${position.x}px`,
         top: `${position.y}px`,
         zIndex: 99999,
-        pointerEvents: 'none'
+        pointerEvents: 'none',
+        transition: highlightedTarget ? 'all 100ms ease-out' : 'none'
       }}
     >
       <div className="relative" style={{ 
