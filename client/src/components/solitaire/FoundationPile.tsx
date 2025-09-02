@@ -142,9 +142,8 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
         </div>
       ) : (
         <div className="w-full h-full p-1">
-          {/* Top rank and suit - like real card */}
-          <div className="text-xs font-bold leading-none text-amber-50 opacity-30">
-            <div>A</div>
+          {/* Only suit symbol - like real card */}
+          <div className="text-xs font-bold leading-none text-amber-50 opacity-30 select-none">
             <div className="text-xs">{suitSymbol}</div>
           </div>
         </div>
