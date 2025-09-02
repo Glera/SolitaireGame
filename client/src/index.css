@@ -18,9 +18,9 @@
   animation: slideIn 200ms ease-out;
 }
 
-/* New card slide-in with delay after stock pile click */
+/* New card slide-in without delay */
 .card-slide-in {
-  animation: cardSlideIn 250ms ease-out 100ms forwards;
+  animation: cardSlideIn 250ms ease-out forwards;
 }
 
 @keyframes cardSlideIn {

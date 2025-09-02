@@ -10,18 +10,11 @@ interface StockPileProps {
 
 export function StockPile({ cards }: StockPileProps) {
   const { drawCard } = useSolitaire();
-  const [isClicked, setIsClicked] = useState(false);
 
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
   
   const handleClick = () => {
-    setIsClicked(true);
     drawCard();
-    
-    // Reset animation after 100ms
-    setTimeout(() => {
-      setIsClicked(false);
-    }, 100);
   };
 
   return (
@@ -32,9 +25,7 @@ export function StockPile({ cards }: StockPileProps) {
       data-stock-pile
     >
       {topCard ? (
-        <div className={isClicked ? 'animate-click' : ''} style={{ transition: 'transform 100ms ease-out' }}>
-          <Card card={topCard} />
-        </div>
+        <Card card={topCard} />
       ) : (
         <div className="flex items-center justify-center h-full">
           <div className="text-lg">🔄</div>

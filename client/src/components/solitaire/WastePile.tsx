@@ -53,27 +53,20 @@ export function WastePile({ cards }: WastePileProps) {
         setShowPreviousCard(true);
       }
       
-      // Track the new card and start animation after stock pile animation completes
+      // Track the new card and start animation immediately
       setNewCardId(topCard.id);
+      setAnimateCard(true);
       
-      // Delay the card appearance and animation by 100ms (after stock pile click animation)
-      const showTimer = setTimeout(() => {
-        setAnimateCard(true);
-      }, 100);
-      
-      // End animation after transition completes (100ms delay + 250ms animation)
-      const endTimer = setTimeout(() => {
+      // End animation after transition completes
+      const timer = setTimeout(() => {
         setAnimateCard(false);
         setShowPreviousCard(false);
         setNewCardId(null);
-      }, 350);
+      }, 250);
       
       previousCardCountRef.current = currentCount;
       
-      return () => {
-        clearTimeout(showTimer);
-        clearTimeout(endTimer);
-      };
+      return () => clearTimeout(timer);
     } else {
       // Update refs without animation for other cases
       previousCardCountRef.current = currentCount;
@@ -169,8 +162,8 @@ export function WastePile({ cards }: WastePileProps) {
         </div>
       )}
       
-      {/* Show top card only if it's not animating in from stock pile OR animation has started */}
-      {topCard && (newCardId !== topCard.id || animateCard) ? (
+      {/* Show top card */}
+      {topCard ? (
         <div 
           key={topCard.id}
           ref={cardRef} 
