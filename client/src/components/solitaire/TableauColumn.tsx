@@ -205,7 +205,22 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   return (
-    <div className="relative" ref={columnRef} data-tableau-column={columnIndex} data-drop-target="tableau">
+    <div 
+      className="relative" 
+      ref={columnRef} 
+      data-tableau-column={columnIndex} 
+      data-drop-target={`tableau-${columnIndex}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }}
+      onDrop={(e) => {
+        console.log('💧 Drop on main container', columnIndex);
+        e.preventDefault();
+        e.stopPropagation();
+        handleDrop(e);
+      }}
+    >
       {/* Invisible expanded drop zone - doesn't block clicks */}
       <div 
         className="absolute -inset-8 z-0 pointer-events-none"
@@ -228,7 +243,16 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
         }}
       />
       <Pile
-        onDrop={handleDrop}
+        onDrop={(e) => {
+          console.log('💧 Drop on Pile', columnIndex);
+          e.preventDefault();
+          e.stopPropagation();
+          handleDrop(e);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        }}
         isEmpty={cards.length === 0 || (isDragging && sourceType === 'tableau' && sourceIndex === columnIndex && draggedCards.length === cards.length)}
         label="K"
         className="mb-2 relative z-10"
