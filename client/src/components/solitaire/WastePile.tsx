@@ -159,8 +159,8 @@ export function WastePile({ cards }: WastePileProps) {
         className="bg-teal-600/10 relative z-10"
         data-waste-pile
       >
-      {/* Show second card if top card is being dragged OR during animation */}
-      {secondCard && (isTopCardBeingDragged() || showPreviousCard) && (
+      {/* Show second card if top card is being dragged OR animating to foundation OR during slide animation */}
+      {secondCard && (isTopCardBeingDragged() || isTopCardAnimating() || showPreviousCard) && (
         <div style={{ position: 'absolute', top: 0, left: 0 }}>
           <Card 
             card={secondCard} 
