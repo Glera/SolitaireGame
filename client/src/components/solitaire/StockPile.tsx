@@ -53,7 +53,7 @@ export function StockPile({ cards }: StockPileProps) {
         </div>
       ) : (
         <div className="flex items-center justify-center h-full">
-          <div className="text-lg">🔄</div>
+          <div className="text-lg select-none">🔄</div>
         </div>
       )}
     </Pile>

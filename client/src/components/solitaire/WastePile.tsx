@@ -31,6 +31,9 @@ export function WastePile({ cards }: WastePileProps) {
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   
+  // Track if a new card just appeared (for animation)
+  const [isNewCard, setIsNewCard] = useState(false);
+  
   // Track card count changes
   const previousCardCountRef = useRef<number>(cards.length);
   const wasJustRecycledRef = useRef<boolean>(false);
@@ -53,6 +56,10 @@ export function WastePile({ cards }: WastePileProps) {
       console.log('WastePile: New card appeared instantly');
       previousCardCountRef.current = currentCount;
       wasJustRecycledRef.current = false;
+      
+      // Trigger animation
+      setIsNewCard(true);
+      setTimeout(() => setIsNewCard(false), 50);
       return;
     } else {
       // Update refs without animation for other cases
@@ -182,7 +189,9 @@ export function WastePile({ cards }: WastePileProps) {
           ref={cardRef}
           style={{ 
             position: 'relative', 
-            zIndex: 1
+            zIndex: 1,
+            transform: isNewCard ? 'scale(1.05)' : 'scale(1)',
+            transition: 'transform 50ms ease-out'
           }}
         >
           <Card 
