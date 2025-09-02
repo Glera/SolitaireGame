@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { Card } from '../../lib/types/solitaire';
 import { Card as PlayingCard } from './Card';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
-import { findBestDropTarget, DropTarget, clearAllDropTargetHighlights, applyDropTargetHighlight, setCurrentBestTarget, getCurrentBestTarget } from '../../lib/solitaire/dropTargets';
+import { findBestDropTarget, DropTarget, setCurrentBestTarget, getCurrentBestTarget } from '../../lib/solitaire/dropTargets';
+import { clearAllDropTargetHighlights, applyDropTargetHighlight } from '../../lib/solitaire/styleManager';
 import type { Suit } from '../../lib/types/solitaire';
 
 interface DragPreviewProps {
