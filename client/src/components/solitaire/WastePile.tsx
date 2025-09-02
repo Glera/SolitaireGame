@@ -30,11 +30,8 @@ export function WastePile({ cards }: WastePileProps) {
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   
-  // Track card animation state for flip effect
-  const [animateCard, setAnimateCard] = useState(false);
-  const [showPreviousCard, setShowPreviousCard] = useState(false);
+  // Track card count changes
   const previousCardCountRef = useRef<number>(cards.length);
-  const [newCardId, setNewCardId] = useState<string | null>(null);
   const wasJustRecycledRef = useRef<boolean>(false);
   
   // Detect when a NEW card appears from stock pile (count increases)
@@ -50,50 +47,19 @@ export function WastePile({ cards }: WastePileProps) {
       timestamp: Date.now()
     });
     
-    // Only animate if this is a NEW card from stock pile (count increased)
+    // Track if this is a NEW card from stock pile (count increased)
     if (topCard && currentCount > previousCount) {
-      // Skip animation for first card at game start OR after recycling
-      if (previousCount === 0) {
-        console.log('WastePile: First card (game start or after recycle), skipping animation');
-        previousCardCountRef.current = currentCount;
-        wasJustRecycledRef.current = false;
-        return;
-      }
-      
-      console.log('WastePile: Starting slide animation', {
-        newCardId: topCard.id,
-        hasSecondCard: !!secondCard
-      });
-      
-      // Show previous card during animation
-      if (secondCard) {
-        setShowPreviousCard(true);
-      }
-      
-      // Track the new card and start animation immediately
-      setNewCardId(topCard.id);
-      setAnimateCard(true);
-      
-      // End animation after transition completes
-      const timer = setTimeout(() => {
-        console.log('WastePile: Animation complete');
-        setAnimateCard(false);
-        setShowPreviousCard(false);
-        setNewCardId(null);
-      }, 125);
-      
+      console.log('WastePile: New card appeared instantly');
       previousCardCountRef.current = currentCount;
-      
-      return () => clearTimeout(timer);
+      wasJustRecycledRef.current = false;
+      return;
     } else {
       // Update refs without animation for other cases
       previousCardCountRef.current = currentCount;
       
-      // If card was removed, ensure animation is off
+      // If card was removed
       if (currentCount < previousCount) {
-        console.log('WastePile: Card removed, clearing animation');
-        setAnimateCard(false);
-        setNewCardId(null);
+        console.log('WastePile: Card removed');
         
         // If waste pile is now empty, it means cards were recycled back to stock
         if (currentCount === 0) {
@@ -191,8 +157,8 @@ export function WastePile({ cards }: WastePileProps) {
       className="bg-teal-600/10"
       data-waste-pile
     >
-      {/* Show second card if top card is being dragged OR animating to foundation OR during slide animation */}
-      {secondCard && (isTopCardBeingDragged() || isTopCardAnimating() || showPreviousCard) && (
+      {/* Show second card if top card is being dragged OR animating to foundation */}
+      {secondCard && (isTopCardBeingDragged() || isTopCardAnimating()) && (
         <div style={{ position: 'absolute', top: 0, left: 0 }}>
           <Card 
             card={secondCard} 
@@ -207,16 +173,10 @@ export function WastePile({ cards }: WastePileProps) {
       {topCard ? (
         <div 
           key={topCard.id}
-          ref={cardRef} 
-          className={animateCard && newCardId === topCard.id ? 'card-slide-in' : ''}
+          ref={cardRef}
           style={{ 
             position: 'relative', 
-            zIndex: 1,
-            // Ensure initial state is correct when animating
-            ...(animateCard && newCardId === topCard.id ? {
-              transform: 'translateX(-33%)',
-              opacity: 0.5
-            } : {})
+            zIndex: 1
           }}
         >
           <Card 
