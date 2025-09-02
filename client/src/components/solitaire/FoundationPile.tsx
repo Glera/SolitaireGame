@@ -127,7 +127,7 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
       )}
       
       {/* Show top card */}
-      {topCard && !isTopCardBeingDragged() && !isTopCardAnimating() ? (
+      {topCard ? (
         <div ref={cardRef} style={{ position: 'relative', zIndex: 1 }}>
           <Card 
             card={topCard} 
@@ -140,9 +140,11 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
             isAnimating={isTopCardAnimating()}
           />
         </div>
-      ) : (
-        <div className="w-full h-full p-1">
-          {/* Only ace symbol - show when empty OR when top card is being dragged/animated */}
+      ) : null}
+      
+      {/* Show ace symbol when empty OR when top card is being dragged */}
+      {(!topCard || isTopCardBeingDragged() || isTopCardAnimating()) && (
+        <div className="w-full h-full p-1 absolute top-0 left-0" style={{ zIndex: 0 }}>
           <div className="text-xs font-bold leading-none text-amber-50 opacity-30 select-none">
             <div className="text-xs">A</div>
           </div>
