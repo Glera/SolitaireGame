@@ -127,7 +127,7 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
       )}
       
       {/* Show top card */}
-      {topCard ? (
+      {topCard && !isTopCardBeingDragged() && !isTopCardAnimating() ? (
         <div ref={cardRef} style={{ position: 'relative', zIndex: 1 }}>
           <Card 
             card={topCard} 
@@ -142,7 +142,7 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
         </div>
       ) : (
         <div className="w-full h-full p-1">
-          {/* Only suit symbol - like real card */}
+          {/* Only suit symbol - show when empty OR when top card is being dragged/animated */}
           <div className="text-xs font-bold leading-none text-amber-50 opacity-30 select-none">
             <div className="text-xs">{suitSymbol}</div>
           </div>
