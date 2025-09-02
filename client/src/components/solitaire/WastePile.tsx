@@ -26,7 +26,7 @@ export function WastePile({ cards }: WastePileProps) {
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
   const secondCard = cards.length > 1 ? cards[cards.length - 2] : null;
 
-  // Check if the top card is being dragged
+  // Check if the top card is being dragged (only for real drag, not click)
   const isTopCardBeingDragged = () => {
     if (!topCard) return false;
     
@@ -34,7 +34,13 @@ export function WastePile({ cards }: WastePileProps) {
     if (!isDragging || sourceType !== 'waste') {
       return false;
     }
-    return draggedCards.some(draggedCard => draggedCard.id === topCard.id);
+    
+    // Only return true if we have an actual drag preview showing
+    // This prevents the temporary click-based drag state from hiding the card
+    const { showDragPreview } = useSolitaire.getState();
+    const isInDraggedCards = draggedCards.some(draggedCard => draggedCard.id === topCard.id);
+    
+    return isInDraggedCards && showDragPreview;
   };
   
   // Check if the top card is animating to foundation
@@ -55,30 +61,21 @@ export function WastePile({ cards }: WastePileProps) {
       return;
     }
 
-    // Start drag temporarily for visual feedback
-    startDrag([topCard], 'waste');
-    
-    // Clear drag state after a short delay if no actual drag happens
-    if (clickTimeoutRef.current) {
-      clearTimeout(clickTimeoutRef.current);
-    }
-    clickTimeoutRef.current = setTimeout(() => {
-      const state = useSolitaire.getState();
-      if (state.isDragging && state.sourceType === 'waste') {
-        state.endDrag();
-      }
-    }, 150);
+    // For clicks without drag, don't start drag state
+    // Just provide visual feedback without affecting card visibility
   };
 
   const handleDragStart = (e: React.DragEvent) => {
     if (!topCard) return;
     
-    // Clear the click timeout since we're actually dragging
+    // Clear any click timeout since we're actually dragging
     if (clickTimeoutRef.current) {
       clearTimeout(clickTimeoutRef.current);
       clickTimeoutRef.current = null;
     }
     
+    // For waste pile, use standard browser drag behavior (no custom preview)
+    // This allows cards to be properly hidden during drag
     startDrag([topCard], 'waste');
     e.dataTransfer.effectAllowed = 'move';
   };
