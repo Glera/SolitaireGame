@@ -22,6 +22,9 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
   const { sourceType, sourceIndex, sourceFoundation, draggedCards } = useSolitaire();
   
   useEffect(() => {
+    let animationFrameId: number;
+    let lastCursorPos = { x: startPosition.x + offset.x, y: startPosition.y + offset.y };
+    
     // During drag operations, use dragover event instead of mousemove
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault(); // Important for drag operations
@@ -33,15 +36,18 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
       
       setPosition(newPos);
       setCursorPos({ x: e.clientX, y: e.clientY });
-      
-      // Check for drop targets based on collision
+      lastCursorPos = { x: e.clientX, y: e.clientY };
+    };
+    
+    // Continuously check collisions using requestAnimationFrame
+    const checkCollisions = () => {
       if (previewRef.current) {
         const bounds = previewRef.current.getBoundingClientRect();
         const gameState = useSolitaire.getState();
         
         const target = findBestDropTarget(
           bounds,
-          { x: e.clientX, y: e.clientY },
+          lastCursorPos,
           draggedCards,
           gameState,
           sourceType,
@@ -55,21 +61,27 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
         // Update visual feedback on all targets
         document.querySelectorAll('[data-drop-target]').forEach(el => {
           (el as HTMLElement).style.backgroundColor = '';
-          (el as HTMLElement).style.borderColor = '';
+          (el as HTMLElement).style.border = '';
         });
         
         if (target?.element) {
           target.element.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
-          target.element.style.borderColor = 'rgb(34, 197, 94)';
+          target.element.style.border = '2px solid rgb(34, 197, 94)';
         }
       }
+      
+      animationFrameId = requestAnimationFrame(checkCollisions);
     };
+    
+    // Start continuous collision checking
+    checkCollisions();
     
     // Listen to dragover which fires during drag operations
     window.addEventListener('dragover', handleDragOver as any);
     
     return () => {
       window.removeEventListener('dragover', handleDragOver as any);
+      cancelAnimationFrame(animationFrameId);
       // Clean up visual feedback and target
       setCurrentBestTarget(null);
       document.querySelectorAll('[data-drop-target]').forEach(el => {
@@ -77,7 +89,7 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
         (el as HTMLElement).style.borderColor = '';
       });
     };
-  }, [offset, draggedCards, sourceType, sourceIndex, sourceFoundation]);
+  }, [offset, draggedCards, sourceType, sourceIndex, sourceFoundation, startPosition]);
   
   if (cards.length === 0) return null;
   
@@ -96,7 +108,9 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
       <div className="relative" style={{ 
         width: '64px', 
         height: `${96 + (cards.length - 1) * 18}px`, // 96px base card height + 18px per additional card
-        minHeight: '96px' // Ensure at least one card height
+        minHeight: '96px', // Ensure at least one card height
+        border: '1px dashed red', // Debug: show card preview bounds
+        boxSizing: 'border-box'
       }}>
         {cards.map((card, index) => (
           <div

@@ -148,7 +148,7 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   };
 
   return (
-    <div id={id} className="relative" ref={foundationRef} data-drop-target="foundation">
+    <div id={id} className="relative" ref={foundationRef} data-drop-target="foundation" style={{ outline: isDragging ? '1px dotted purple' : 'none' }}>
       {/* Invisible expanded drop zone - doesn't block clicks */}
       <div 
         className="absolute -inset-8 z-0 pointer-events-none"
@@ -156,20 +156,9 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
         onDragOver={(e) => { 
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
-          // Visual feedback for foundation drop zone
-          e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
-          e.currentTarget.style.border = '2px dashed rgb(34, 197, 94)';
-        }}
-        onDragLeave={(e) => {
-          // Remove visual feedback
-          e.currentTarget.style.backgroundColor = '';
-          e.currentTarget.style.border = '';
         }}
         onDrop={(e) => { 
           e.preventDefault();
-          // Remove visual feedback
-          e.currentTarget.style.backgroundColor = '';
-          e.currentTarget.style.border = '';
           handleDrop(e); 
         }}
       />

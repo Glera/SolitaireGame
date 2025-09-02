@@ -160,7 +160,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   return (
-    <div className="relative" ref={columnRef} data-tableau-column={columnIndex} data-drop-target="tableau">
+    <div className="relative" ref={columnRef} data-tableau-column={columnIndex} data-drop-target="tableau" style={{ outline: isDragging ? '1px dotted blue' : 'none' }}>
       {/* Invisible expanded drop zone - doesn't block clicks */}
       <div 
         className="absolute -inset-8 z-0 pointer-events-none"
@@ -168,20 +168,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
         onDragOver={(e) => { 
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
-          // Visual feedback for tableau drop zone
-          e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
-          e.currentTarget.style.border = '2px dashed rgb(34, 197, 94)';
-        }}
-        onDragLeave={(e) => {
-          // Remove visual feedback
-          e.currentTarget.style.backgroundColor = '';
-          e.currentTarget.style.border = '';
         }}
         onDrop={(e) => { 
           e.preventDefault();
-          // Remove visual feedback
-          e.currentTarget.style.backgroundColor = '';
-          e.currentTarget.style.border = '';
           handleDrop(e); 
         }}
       />
@@ -206,20 +195,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
             onDragOver={(e) => { 
               e.preventDefault();
               e.dataTransfer.dropEffect = 'move';
-              // Visual feedback when dragging over a card
-              e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
-              e.currentTarget.style.outline = '2px dashed rgb(34, 197, 94)';
-            }}
-            onDragLeave={(e) => {
-              // Remove visual feedback
-              e.currentTarget.style.backgroundColor = '';
-              e.currentTarget.style.outline = '';
             }}
             onDrop={(e) => { 
               e.preventDefault();
-              // Remove visual feedback
-              e.currentTarget.style.backgroundColor = '';
-              e.currentTarget.style.outline = '';
               handleDrop(e); 
             }}
           >
