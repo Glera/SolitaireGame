@@ -95,14 +95,14 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
 
   // Calculate positioning based on game field
   const getPositioning = () => {
-    // Try to find game field bounds
-    const gameField = document.querySelector('[data-game-board]') as HTMLElement;
+    // Try to find actual game field (with cards), not the whole screen
+    const gameField = document.querySelector('[data-game-field]') as HTMLElement;
     if (gameField) {
       const bounds = gameField.getBoundingClientRect();
       // Position to the right of game field with small gap
-      if (bounds.right + 320 < window.innerWidth) {
+      if (bounds.right + 340 < window.innerWidth) {
         return {
-          top: '16px',
+          top: `${bounds.top}px`,
           left: `${bounds.right + 16}px`,
           right: 'auto'
         };

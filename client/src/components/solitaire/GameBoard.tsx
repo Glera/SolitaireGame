@@ -54,7 +54,7 @@ export function GameBoard() {
       <div className="max-w-fit mx-auto">
         <GameControls onDebugClick={() => setShowDebugPanel(true)} />
         
-        <div className="inline-block space-y-3">
+        <div className="inline-block space-y-3" data-game-field>
           {/* Top row: Stock, Waste, and Foundation piles - aligned with 7 columns */}
           <div className="flex gap-2 items-start">
             <StockPile cards={stock} />
