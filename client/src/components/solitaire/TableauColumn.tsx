@@ -78,25 +78,25 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     if (cardIndex >= cardPosition) {
       const cardsToMove = movableCards.slice(cardIndex - cardPosition);
       
-      // TEMPORARY TEST: Use standard browser drag behavior like WastePile
-      // Comment out custom drag preview logic
-      /*
-      // Calculate offset from the click position to the card position
-      const rect = e.currentTarget.getBoundingClientRect();
-      const offsetX = e.clientX - rect.left;
-      const offsetY = e.clientY - rect.top;
-      
-      // Set preview position with the card position and the offset from the click
-      setShowDragPreview(true, 
-        { x: rect.left, y: rect.top },
-        { x: offsetX, y: offsetY }
-      );
-      
-      // Hide the default drag image for all cards
-      const img = new Image();
-      img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-      e.dataTransfer.setDragImage(img, 0, 0);
-      */
+      // Use custom drag preview for multi-card stacks
+      if (cardsToMove.length > 1) {
+        // Calculate offset from the click position to the card position
+        const rect = e.currentTarget.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const offsetY = e.clientY - rect.top;
+        
+        // Set preview position with the card position and the offset from the click
+        setShowDragPreview(true, 
+          { x: rect.left, y: rect.top },
+          { x: offsetX, y: offsetY }
+        );
+        
+        // Hide the default drag image for multi-card stacks
+        const img = new Image();
+        img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+        e.dataTransfer.setDragImage(img, 0, 0);
+      }
+      // For single cards, use standard browser behavior
       
       // Start drag with standard browser behavior
       startDrag(cardsToMove, 'tableau', columnIndex);
