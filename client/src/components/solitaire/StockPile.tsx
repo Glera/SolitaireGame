@@ -29,7 +29,7 @@ export function StockPile({ cards }: StockPileProps) {
       data-stock-pile
     >
       {topCard ? (
-        <div onClick={handleClick} className="w-full h-full">
+        <div className="w-full h-full">
           <Card card={topCard} />
         </div>
       ) : (

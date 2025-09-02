@@ -46,20 +46,6 @@ export function drawFromStock(gameState: GameState): GameState {
     
     // Reset stock from waste pile
     const newStock = [...gameState.waste].reverse().map(card => ({ ...card, faceUp: false }));
-    
-    // Now draw one card from the new stock
-    if (newStock.length > 0) {
-      const drawnCard = { ...newStock[newStock.length - 1], faceUp: true };
-      const finalStock = newStock.slice(0, -1);
-      
-      return {
-        ...gameState,
-        stock: finalStock,
-        waste: [drawnCard],
-        moves: gameState.moves + 1
-      };
-    }
-    
     return {
       ...gameState,
       stock: newStock,
