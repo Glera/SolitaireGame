@@ -114,13 +114,12 @@
             type="url" 
             id="gameUrl" 
             placeholder="https://your-replit-app.replit.app"
-            value="https://solitaire-quest-glerateam.replit.app"
+            value=""
         />
         <div class="url-display" id="currentUrl">
             Текущий URL: не задан
         </div>
         <button onclick="loadGame()">Загрузить игру</button>
-        <button onclick="loadWithEmbed()">Загрузить с ?embed=true</button>
         <button onclick="reloadGame()">Перезагрузить</button>
         <button onclick="loadLocal()">Загрузить локально</button>
     </div>
@@ -195,26 +194,6 @@
             } else {
                 alert('Сначала загрузите игру');
             }
-        }
-        
-        function loadWithEmbed() {
-            const urlInput = document.getElementById('gameUrl');
-            const gameFrame = document.getElementById('gameFrame');
-            const currentUrlDisplay = document.getElementById('currentUrl');
-            
-            let url = urlInput.value.trim();
-            if (!url) {
-                alert('Пожалуйста, введите URL игры');
-                return;
-            }
-            
-            // Add embed parameter
-            url += (url.includes('?') ? '&' : '?') + 'embed=true';
-            
-            gameFrame.src = url;
-            currentUrlDisplay.textContent = `Текущий URL: ${url} (с embed)`;
-            
-            console.log('Loading game with embed:', url);
         }
         
         function loadLocal() {
