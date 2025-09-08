@@ -3,7 +3,7 @@ import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 
-const GAME_VERSION = '1.2.1';
+const GAME_VERSION = '1.2.0';
 
 interface GameControlsProps {
   onDebugClick?: () => void;
