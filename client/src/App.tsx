@@ -4,7 +4,6 @@ import { useAudio } from './lib/stores/useAudio';
 import { useSolitaire } from './lib/stores/useSolitaire';
 import { DeviceTestPanel } from './components/DeviceTestPanel';
 import { GameViewport } from './components/GameViewport';
-import { setupIframeSupport } from './lib/solitaire/iframeSupport';
 import "@fontsource/inter";
 
 function App() {
@@ -15,11 +14,8 @@ function App() {
   const [isTestMode, setIsTestMode] = useState(false);
   const [gameKey, setGameKey] = useState(0);
 
-  // Initialize audio and iframe support on component mount
+  // Initialize audio on component mount
   useEffect(() => {
-    // Setup iframe support
-    setupIframeSupport();
-    
     // Create audio elements
     const hitAudio = new Audio('/sounds/hit.mp3');
     const successAudio = new Audio('/sounds/success.mp3');
