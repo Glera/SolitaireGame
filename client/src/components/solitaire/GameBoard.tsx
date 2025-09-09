@@ -162,16 +162,23 @@ export function GameBoard() {
       
       {/* Floating scores */}
       {floatingScores.length > 0 && console.log(`🎯 GameBoard: Rendering ${floatingScores.length} floating scores`)}
-      {floatingScores.map(score => (
-        <FloatingScore
-          key={score.id}
-          score={score.score}
-          x={score.x}
-          y={score.y}
-          breakdown={score.breakdown}
-          onComplete={() => removeFloatingScore(score.id)}
-        />
-      ))}
+      {floatingScores.map(score => {
+        const handleComplete = () => {
+          console.log(`🎯 GameBoard: Removing floating score ${score.id}`);
+          removeFloatingScore(score.id);
+        };
+        
+        return (
+          <FloatingScore
+            key={score.id}
+            score={score.score}
+            x={score.x}
+            y={score.y}
+            breakdown={score.breakdown}
+            onComplete={handleComplete}
+          />
+        );
+      })}
       
       {/* Debug popup */}
       {showDebugPanel && (

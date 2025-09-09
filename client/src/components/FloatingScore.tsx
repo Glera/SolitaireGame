@@ -14,20 +14,34 @@ interface FloatingScoreProps {
 
 export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingScoreProps) {
   const [isVisible, setIsVisible] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     console.log(`🎯 FloatingScore: Component mounted with score ${score} at (${x}, ${y})`);
+    setMounted(true);
+    
     const timer = setTimeout(() => {
-      console.log(`🎯 FloatingScore: Hiding score ${score}`);
+      console.log(`🎯 FloatingScore: Hiding score ${score} after 1900ms`);
       setIsVisible(false);
-      setTimeout(onComplete, 100); // Allow fade out to complete
+      setTimeout(() => {
+        console.log(`🎯 FloatingScore: Calling onComplete for score ${score}`);
+        onComplete();
+      }, 100); // Allow fade out to complete
     }, 1900);
 
-    return () => clearTimeout(timer);
+    return () => {
+      console.log(`🎯 FloatingScore: Cleanup for score ${score}`);
+      clearTimeout(timer);
+    };
   }, []); // Empty dependency array to prevent re-creation
 
+  if (!mounted) {
+    console.log(`🎯 FloatingScore: Not mounted yet for score ${score}`);
+    return null;
+  }
+
   if (!isVisible || score == null || score === undefined) {
-    console.log(`🎯 FloatingScore: Not rendering - isVisible: ${isVisible}, score: ${score}`);
+    console.log(`🎯 FloatingScore: Not rendering - isVisible: ${isVisible}, score: ${score}, mounted: ${mounted}`);
     return null;
   }
 
