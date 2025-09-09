@@ -94,7 +94,7 @@ styleSheet.textContent = `
       opacity: 1;
     }
     100% {
-      transform: translateX(-50%) translateY(-100px);
+      transform: translateX(-50%) translateY(-60px);
       opacity: 0;
     }
   }
