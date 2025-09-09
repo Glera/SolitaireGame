@@ -21,13 +21,13 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
     setMounted(true);
     
     const timer = setTimeout(() => {
-      // console.log(`🎯 FloatingScore: Hiding score ${score} after 2000ms`);
+      // console.log(`🎯 FloatingScore: Hiding score ${score} after 1000ms`);
       setIsVisible(false);
       setTimeout(() => {
         // console.log(`🎯 FloatingScore: Calling onComplete for score ${score}`);
         onComplete();
       }, 100); // Allow fade out to complete
-    }, 2000); // Reduced to 2000ms for less intrusive effect
+    }, 1000); // Match the animation duration
 
     return () => {
       // console.log(`🎯 FloatingScore: Cleanup for score ${score}`);
@@ -90,17 +90,17 @@ const styleSheet = document.createElement('style');
 styleSheet.textContent = `
   @keyframes float-up {
     0% {
-      transform: translateX(-50%) translateY(0px) translateZ(0);
+      transform: translateX(-50%) translateY(0);
       opacity: 1;
     }
     100% {
-      transform: translateX(-50%) translateY(-80px) translateZ(0);
+      transform: translateX(-50%) translateY(-100px);
       opacity: 0;
     }
   }
   
   .animate-float-up {
-    animation: float-up 2s ease-out forwards;
+    animation: float-up 1s ease-out forwards;
   }
   
   .text-shadow-glow {
