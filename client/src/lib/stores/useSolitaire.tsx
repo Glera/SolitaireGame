@@ -294,6 +294,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   },
   
   addFloatingScore: (points: number, x: number, y: number, cardRank: string) => {
-    addFloatingScore(points, x, y, cardRank);
+    import('../solitaire/floatingScoreManager').then(({ addFloatingScore }) => {
+      addFloatingScore(points, x, y, cardRank);
+    });
   }
 }));
