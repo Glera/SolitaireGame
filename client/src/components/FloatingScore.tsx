@@ -64,23 +64,30 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
       }}
     >
       <div 
-        className="text-cyan-300 text-5xl font-bold text-shadow-glow"
         style={{
-          transform: 'translate3d(0,0,0)', // GPU layer
-          backfaceVisibility: 'hidden',
+          color: '#22d3ee', // cyan-300 color
           fontSize: '3rem',
           fontWeight: 'bold',
+          textShadow: '0 0 5px #22d3ee, 0 0 10px #22d3ee, 0 0 15px #22d3ee, 0 0 20px #22d3ee',
+          transform: 'translate3d(0,0,0)',
+          backfaceVisibility: 'hidden',
+          whiteSpace: 'nowrap',
+          zIndex: 1000,
         }}
       >
         +{(score ?? 0).toLocaleString()}
       </div>
       {breakdown && (
         <div 
-          className="text-cyan-200 text-sm font-medium text-shadow-glow"
           style={{
+            color: '#a5f3fc', // cyan-200 color
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            textShadow: '0 0 3px #a5f3fc, 0 0 6px #a5f3fc',
             transform: 'translate3d(0,0,0)',
             backfaceVisibility: 'hidden',
             marginTop: '2px',
+            whiteSpace: 'nowrap',
           }}
         >
           {breakdown.cardRank}
