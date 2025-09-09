@@ -53,31 +53,33 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
 
   return createPortal(
     <div
+      className="fixed pointer-events-none z-50 animate-float-up"
       style={{
+        left: `${x}px`,
+        top: `${y}px`,
+        transform: 'translateX(-50%)',
+        willChange: 'transform, opacity',
+        isolation: 'isolate',
+        contain: 'size layout style paint',
         position: 'fixed',
-        left: '50%',
-        top: '50%',
-        transform: 'translate(-50%, -50%)',
-        zIndex: 9999,
-        pointerEvents: 'none',
       }}
     >
       <div 
         style={{
-          color: '#00ffff', // Bright cyan
-          fontSize: '4rem', // Larger text
+          color: '#22d3ee', // Beautiful cyan
+          fontSize: '3rem',
           fontWeight: 'bold',
-          textShadow: '0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff, 0 0 40px #00ffff',
+          textShadow: '0 0 5px #22d3ee, 0 0 10px #22d3ee, 0 0 15px #22d3ee, 0 0 20px #22d3ee',
           transform: 'translate3d(0,0,0)',
           backfaceVisibility: 'hidden',
           whiteSpace: 'nowrap',
           zIndex: 1000,
           fontFamily: 'Arial, sans-serif',
           lineHeight: '1',
-          backgroundColor: 'rgba(255, 0, 0, 0.8)', // Bright red background for debugging
-          padding: '20px 40px',
-          borderRadius: '10px',
-          border: '5px solid #ffff00', // Yellow border for debugging
+          backgroundColor: 'rgba(0, 0, 0, 0.7)', // Semi-transparent dark background
+          padding: '8px 16px',
+          borderRadius: '8px',
+          border: '2px solid #22d3ee'
         }}
       >
         +{(score ?? 0).toLocaleString()}
