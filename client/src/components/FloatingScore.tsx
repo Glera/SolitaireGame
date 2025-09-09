@@ -53,15 +53,13 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
 
   return createPortal(
     <div
-      className="fixed pointer-events-none z-50 animate-float-up"
       style={{
-        left: `${x}px`,
-        top: `${y}px`,
-        transform: 'translateX(-50%)',
-        willChange: 'transform, opacity',
-        isolation: 'isolate',
-        contain: 'size layout style paint',
         position: 'fixed',
+        left: '50%',
+        top: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 9999,
+        pointerEvents: 'none',
       }}
     >
       <div 
@@ -76,10 +74,10 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
           zIndex: 1000,
           fontFamily: 'Arial, sans-serif',
           lineHeight: '1',
-          backgroundColor: 'rgba(0, 0, 0, 0.5)', // Dark background for contrast
-          padding: '10px 20px',
+          backgroundColor: 'rgba(255, 0, 0, 0.8)', // Bright red background for debugging
+          padding: '20px 40px',
           borderRadius: '10px',
-          border: '2px solid #00ffff',
+          border: '5px solid #ffff00', // Yellow border for debugging
         }}
       >
         +{(score ?? 0).toLocaleString()}
