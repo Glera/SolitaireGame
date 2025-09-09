@@ -3,15 +3,16 @@ import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { useAudio } from '../../lib/stores/useAudio';
 import { useProgressGift } from '../../hooks/useProgressGift';
 import { useFloatingScores } from '../../hooks/useFloatingScores';
-import { FloatingScore } from '../FloatingScore';
 import { TableauColumn } from './TableauColumn';
 import { FoundationPile } from './FoundationPile';
 import { StockPile } from './StockPile';
 import { WastePile } from './WastePile';
-import { GameControls } from './GameControls';
+import { GameControls, GAME_VERSION } from './GameControls';
 import { CardAnimation } from './CardAnimation';
 import { DragPreview } from './DragPreview';
 import { DebugPopup, setDebugCallback, type DebugInfo } from '../DebugPopup';
+import { FloatingScore } from '../FloatingScore';
+import { RoomInfo } from './RoomInfo';
 import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 import { setAddPointsFunction } from '../../lib/solitaire/progressManager';
 import { setAddFloatingScoreFunction } from '../../lib/solitaire/floatingScoreManager';
@@ -32,7 +33,8 @@ export function GameBoard() {
     dragOffset,
     isDragging,
     onGiftEarned,
-    newGame
+    newGame,
+    roomType
   } = useSolitaire();
   
   const { playSuccess } = useAudio();
@@ -40,7 +42,7 @@ export function GameBoard() {
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   
   // Progress bar integration
-  const { containerRef, addPoints, reinitialize } = useProgressGift(onGiftEarned);
+  const { containerRef, addPoints, reinitialize } = useProgressGift(onGiftEarned, roomType);
   
   // Floating scores integration
   const { floatingScores, addFloatingScore, removeFloatingScore } = useFloatingScores();
@@ -116,7 +118,10 @@ export function GameBoard() {
         </div>
         
         <div style={{ position: 'relative', zIndex: 2, marginTop: '35px' }}>
-          <GameControls onDebugClick={() => setShowDebugPanel(true)} />
+          <div className="flex justify-between items-center mb-2">
+            <RoomInfo roomType={roomType} gameVersion={GAME_VERSION} />
+            <GameControls onDebugClick={() => setShowDebugPanel(true)} />
+          </div>
         </div>
         
         <div className="inline-block space-y-3" data-game-field style={{ position: 'relative', zIndex: 2, marginTop: '20px' }}>

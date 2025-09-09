@@ -1,9 +1,11 @@
 import { GameState, Card, Suit } from './types';
 import { createDeck, shuffleDeck, canPlaceOnTableau, canPlaceOnFoundation } from './cardUtils';
 import { calculateCardPoints, calculateCardPointsWithBreakdown } from './scoring';
+import { getRoomFromURL, getPointsMultiplier } from '../roomUtils';
 
 export function initializeGame(): GameState {
   const deck = shuffleDeck(createDeck());
+  const roomType = getRoomFromURL();
   
   // Deal cards to tableau (7 columns, 1-7 cards each)
   const tableau: Card[][] = Array(7).fill(null).map(() => []);
@@ -35,7 +37,8 @@ export function initializeGame(): GameState {
     isWon: false,
     moves: 0,
     startTime: new Date(),
-    totalGifts: 0
+    totalGifts: 0,
+    roomType
   };
 }
 
@@ -124,13 +127,17 @@ export function moveCards(
     
     // Calculate points for cards moved to foundation
     if (onPointsEarned) {
+      const multiplier = getPointsMultiplier(gameState.roomType);
       let totalPoints = 0;
+      
       for (const card of cards) {
         const result = calculateCardPointsWithBreakdown(card);
-        totalPoints += result.points;
+        const basePoints = result.points;
+        const multipliedPoints = basePoints * multiplier;
+        totalPoints += multipliedPoints;
         
-        // Show floating score for each card
-        if (result.points > 0 && onFloatingScore && result.breakdown) {
+        // Show floating score for each card (display multiplied points)
+        if (basePoints > 0 && onFloatingScore && result.breakdown) {
           // Use card start position if available, otherwise fallback to center
           let scoreX = window.innerWidth / 2;
           let scoreY = 200;
@@ -140,8 +147,8 @@ export function moveCards(
             scoreY = cardStartPosition.y;
           }
           
-          // console.log(`🎯 Triggering floating score: +${result.points} for ${result.breakdown.cardRank} at (${scoreX}, ${scoreY})`);
-          onFloatingScore(result.points, scoreX, scoreY, result.breakdown.cardRank);
+          // console.log(`🎯 Triggering floating score: +${multipliedPoints} for ${result.breakdown.cardRank} at (${scoreX}, ${scoreY}) (base: ${basePoints}, multiplier: x${multiplier})`);
+          onFloatingScore(multipliedPoints, scoreX, scoreY, result.breakdown.cardRank);
         }
       }
       if (totalPoints > 0) {

@@ -1,3 +1,5 @@
+import { RoomType } from '../roomUtils';
+
 export type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades';
 export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K';
 export type Color = 'red' | 'black';
@@ -30,6 +32,8 @@ export interface GameState {
   startTime: Date | null;
   // Progress bar state
   totalGifts: number;
+  // Room configuration
+  roomType: RoomType;
 }
 
 export interface DragState {
