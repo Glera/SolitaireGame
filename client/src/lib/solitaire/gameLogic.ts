@@ -79,7 +79,8 @@ export function moveCards(
   targetIndex: number | undefined,
   targetFoundation: Suit | undefined,
   onPointsEarned?: (points: number) => void,
-  onFloatingScore?: (points: number, x: number, y: number, cardRank: string) => void
+  onFloatingScore?: (points: number, x: number, y: number, cardRank: string) => void,
+  cardStartPosition?: { x: number; y: number } | null
 ): GameState | null {
   console.log('🎲 moveCards validation:', {
     cards: cards.map(c => `${c.suit}-${c.rank}`),
@@ -130,21 +131,17 @@ export function moveCards(
         
         // Show floating score for each card
         if (result.points > 0 && onFloatingScore && result.breakdown) {
-          // Calculate position for floating score - safe positioning in upper area
-          let foundationX = window.innerWidth / 2; // Center horizontally
-          let foundationY = 150; // Safe distance from top
+          // Use card start position if available, otherwise fallback to center
+          let scoreX = window.innerWidth / 2;
+          let scoreY = 200;
           
-          // Try to position near the foundation pile if element exists
-          const foundationElement = document.getElementById(`foundation-${targetFoundation}`);
-          if (foundationElement) {
-            const rect = foundationElement.getBoundingClientRect();
-            // Ensure we're not too close to edges
-            foundationX = Math.max(100, Math.min(window.innerWidth - 100, rect.left + rect.width / 2));
-            foundationY = Math.max(100, rect.top - 30); // Above the foundation pile but not too high
+          if (cardStartPosition) {
+            scoreX = cardStartPosition.x;
+            scoreY = cardStartPosition.y;
           }
           
-          // console.log(`🎯 Triggering floating score: +${result.points} for ${result.breakdown.cardRank} at (${foundationX}, ${foundationY})`);
-          onFloatingScore(result.points, foundationX, foundationY, result.breakdown.cardRank);
+          // console.log(`🎯 Triggering floating score: +${result.points} for ${result.breakdown.cardRank} at (${scoreX}, ${scoreY})`);
+          onFloatingScore(result.points, scoreX, scoreY, result.breakdown.cardRank);
         }
       }
       if (totalPoints > 0) {

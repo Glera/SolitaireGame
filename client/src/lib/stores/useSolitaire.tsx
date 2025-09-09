@@ -11,6 +11,7 @@ interface AnimatingCard {
   startPosition: { x: number; y: number };
   endPosition: { x: number; y: number };
   targetSuit: Suit;
+  cardStartPosition?: { x: number; y: number } | null;
 }
 
 interface SolitaireStore extends GameState, DragState {
@@ -41,7 +42,7 @@ interface SolitaireStore extends GameState, DragState {
   getMovableCardsFromTableau: (columnIndex: number) => Card[];
   canAutoMoveToFoundation: (card: Card) => Suit | null;
   autoMoveToFoundation: (card: Card, suit: Suit, startElement?: HTMLElement, endElement?: HTMLElement) => void;
-  completeCardAnimation: (card: Card, suit: Suit) => void;
+  completeCardAnimation: (card: Card, suit: Suit, cardStartPosition?: { x: number; y: number } | null) => void;
   
   // Progress bar functions
   addPointsToProgress: (points: number) => void;
@@ -165,7 +166,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       targetIndex,
       targetFoundation,
       get().addPointsToProgress,
-      get().addFloatingScore
+      get().addFloatingScore,
+      null // No specific card position for drag operations
     );
     
     if (newGameState) {
@@ -227,6 +229,13 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   autoMoveToFoundation: (card, suit, startElement, endElement) => {
     // console.log(`🚀 autoMoveToFoundation: moving ${card.suit}-${card.rank} to foundation ${suit}`);
     
+    // Store start position for floating score
+    let cardStartPosition = null;
+    if (startElement) {
+      const startRect = startElement.getBoundingClientRect();
+      cardStartPosition = { x: startRect.left + startRect.width / 2, y: startRect.top };
+    }
+    
     // If we have DOM elements, trigger animation
     if (startElement && endElement) {
       const startRect = startElement.getBoundingClientRect();
@@ -237,16 +246,17 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           card,
           startPosition: { x: startRect.left, y: startRect.top },
           endPosition: { x: endRect.left, y: endRect.top },
-          targetSuit: suit
+          targetSuit: suit,
+          cardStartPosition // Add card start position for floating score
         }
       });
     } else {
       // No animation, move immediately
-      get().completeCardAnimation(card, suit);
+      get().completeCardAnimation(card, suit, cardStartPosition);
     }
   },
   
-  completeCardAnimation: (card, suit) => {
+  completeCardAnimation: (card, suit, cardStartPosition = null) => {
     const state = get();
     
     // Find the source of the card
@@ -279,7 +289,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       undefined,
       suit,
       get().addPointsToProgress,
-      get().addFloatingScore
+      get().addFloatingScore,
+      cardStartPosition
     );
     
     if (newGameState) {

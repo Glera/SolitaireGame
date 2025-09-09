@@ -149,7 +149,7 @@ export function GameBoard() {
             card={animatingCard.card}
             startPosition={animatingCard.startPosition}
             endPosition={animatingCard.endPosition}
-            onComplete={() => completeCardAnimation(animatingCard.card, animatingCard.targetSuit)}
+            onComplete={() => completeCardAnimation(animatingCard.card, animatingCard.targetSuit, animatingCard.cardStartPosition)}
           />
         </div>
       )}

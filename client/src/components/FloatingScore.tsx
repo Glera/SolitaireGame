@@ -67,39 +67,19 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
       <div 
         style={{
           color: '#22d3ee', // Beautiful cyan
-          fontSize: '3rem',
+          fontSize: '2.5rem',
           fontWeight: 'bold',
-          textShadow: '0 0 5px #22d3ee, 0 0 10px #22d3ee, 0 0 15px #22d3ee, 0 0 20px #22d3ee',
+          textShadow: '0 0 8px #22d3ee, 0 0 16px #22d3ee, 0 0 24px #22d3ee',
           transform: 'translate3d(0,0,0)',
           backfaceVisibility: 'hidden',
           whiteSpace: 'nowrap',
           zIndex: 1000,
           fontFamily: 'Arial, sans-serif',
           lineHeight: '1',
-          backgroundColor: 'rgba(0, 0, 0, 0.8)', // Semi-transparent dark background
-          padding: '8px 16px',
-          borderRadius: '8px',
-          border: '2px solid #22d3ee' // Beautiful cyan border
         }}
       >
         +{(score ?? 0).toLocaleString()}
       </div>
-      {breakdown && (
-        <div 
-          style={{
-            color: '#a5f3fc', // cyan-200 color
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            textShadow: '0 0 3px #a5f3fc, 0 0 6px #a5f3fc',
-            transform: 'translate3d(0,0,0)',
-            backfaceVisibility: 'hidden',
-            marginTop: '2px',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {breakdown.cardRank}
-        </div>
-      )}
     </div>,
     document.body
   );
