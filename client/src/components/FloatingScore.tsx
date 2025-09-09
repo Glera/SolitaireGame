@@ -66,10 +66,10 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
     >
       <div 
         style={{
-          color: '#22d3ee', // Beautiful cyan
-          fontSize: '1.5rem', // Smaller, less intrusive
+          color: '#0891b2', // Darker cyan for better readability
+          fontSize: '1.25rem', // Even smaller
           fontWeight: 'bold',
-          textShadow: '0 0 3px #22d3ee, 0 0 6px #22d3ee', // Reduced glow
+          textShadow: '0 0 2px #0891b2', // Minimal glow for readability
           transform: 'translate3d(0,0,0)',
           backfaceVisibility: 'hidden',
           whiteSpace: 'nowrap',
