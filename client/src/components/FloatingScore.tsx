@@ -66,10 +66,10 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
     >
       <div 
         style={{
-          color: '#0f172a', // Very dark, almost black
+          color: '#f8fafc', // Almost white
           fontSize: '1.25rem',
           fontWeight: 'bold',
-          textShadow: '0 0 1px #ffffff, 0 0 2px #ffffff', // Thin white outline
+          textShadow: '0 0 1px #0f172a', // Thin black outline
           transform: 'translate3d(0,0,0)',
           backfaceVisibility: 'hidden',
           whiteSpace: 'nowrap',
