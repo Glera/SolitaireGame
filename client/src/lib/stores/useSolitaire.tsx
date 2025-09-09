@@ -360,5 +360,26 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     import('../solitaire/floatingScoreManager').then(({ addFloatingScore }) => {
       addFloatingScore(points, x, y, cardRank);
     });
+  },
+  
+  getCurrentResults: () => {
+    const state = get();
+    
+    // Calculate current score based on cards in foundations
+    let currentScore = 0;
+    Object.values(state.foundations).forEach(foundation => {
+      foundation.forEach(card => {
+        currentScore += calculateCardPoints(card);
+      });
+    });
+    
+    // Apply room multiplier to current score
+    const multiplier = getPointsMultiplier(state.roomType);
+    const finalScore = currentScore * multiplier;
+    
+    return {
+      score: finalScore,
+      giftsEarned: state.totalGifts
+    };
   }
 }));

@@ -9,7 +9,7 @@ import "@fontsource/inter";
 
 function App() {
   const { setHitSound, setSuccessSound } = useAudio();
-  const { newGame } = useSolitaire();
+  const { newGame, getCurrentResults } = useSolitaire();
   const [testPanelVisible, setTestPanelVisible] = useState(false);
   const [testViewport, setTestViewport] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [isTestMode, setIsTestMode] = useState(false);
@@ -30,8 +30,11 @@ function App() {
     setSuccessSound(successAudio);
     
     // Initialize game integration with lobby
-    GameIntegration.getInstance();
-  }, [setHitSound, setSuccessSound]);
+    const gameIntegration = GameIntegration.getInstance();
+    
+    // Register callback for current results requests from lobby
+    gameIntegration.setGetCurrentResultsCallback(getCurrentResults);
+  }, [setHitSound, setSuccessSound, getCurrentResults]);
 
   const handleSizeChange = (width: number, height: number) => {
     setTestViewport({ width, height });

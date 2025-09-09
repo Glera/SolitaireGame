@@ -1,8 +1,12 @@
 // Integration with game lobby system
 class GameIntegration {
+  private getCurrentResultsCallback?: () => { score: number; giftsEarned: number } | null;
+
   constructor() {
     // Уведомляем лобби что игра готова
     this.notifyReady();
+    // Слушаем сообщения от лобби
+    this.setupMessageListener();
   }
   
   notifyReady() {
@@ -10,6 +14,35 @@ class GameIntegration {
       type: 'GAME_READY'
     }, '*');
     console.log('🎮 Game ready notification sent to lobby');
+  }
+  
+  setupMessageListener() {
+    window.addEventListener('message', (event) => {
+      if (event.data.type === 'REQUEST_CURRENT_RESULTS') {
+        console.log('📊 Lobby requested current results');
+        
+        if (this.getCurrentResultsCallback) {
+          const results = this.getCurrentResultsCallback();
+          if (results) {
+            window.parent.postMessage({
+              type: 'CURRENT_RESULTS',
+              score: results.score,
+              giftsEarned: results.giftsEarned
+            }, '*');
+            
+            console.log('📤 Current results sent to lobby:', results);
+          } else {
+            console.log('⚠️ No current results available');
+          }
+        } else {
+          console.log('⚠️ No callback set for current results');
+        }
+      }
+    });
+  }
+  
+  setGetCurrentResultsCallback(callback: () => { score: number; giftsEarned: number } | null) {
+    this.getCurrentResultsCallback = callback;
   }
   
   // Вызывается когда игра закончена
