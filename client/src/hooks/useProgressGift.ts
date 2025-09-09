@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { RoomType, getPointsMultiplier } from '../lib/roomUtils';
+import { RoomType } from '../lib/roomUtils';
 
 // Import external library with any type (no TypeScript definitions available)
 // @ts-ignore - no type definitions available
@@ -16,11 +16,9 @@ export function useProgressGift(onGiftEarned: (gifts: number) => void, roomType:
     const initProgressGift = () => {
       if (ProgressGiftLib?.ProgressGift && containerRef.current) {
         try {
-          // Calculate max points based on room multiplier
           // Base game has 1512 points total, so we use that as baseline
-          const baseMaxPoints = 1500;
-          const multiplier = getPointsMultiplier(roomType);
-          const maxPoints = baseMaxPoints * multiplier;
+          // Points sent to progress bar are already multiplied by room multiplier
+          const maxPoints = 1500;
           
           // Create new ProgressGift instance
           progressGiftRef.current = new ProgressGiftLib.ProgressGift({

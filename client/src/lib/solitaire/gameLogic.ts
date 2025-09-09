@@ -128,13 +128,13 @@ export function moveCards(
     // Calculate points for cards moved to foundation
     if (onPointsEarned) {
       const multiplier = getPointsMultiplier(gameState.roomType);
-      let basePointsTotal = 0;
+      let totalPoints = 0;
       
       for (const card of cards) {
         const result = calculateCardPointsWithBreakdown(card);
         const basePoints = result.points;
         const multipliedPoints = basePoints * multiplier;
-        basePointsTotal += basePoints; // For progress bar (base points only)
+        totalPoints += multipliedPoints;
         
         // Show floating score for each card (display multiplied points)
         if (basePoints > 0 && onFloatingScore && result.breakdown) {
@@ -151,9 +151,8 @@ export function moveCards(
           onFloatingScore(multipliedPoints, scoreX, scoreY, result.breakdown.cardRank);
         }
       }
-      if (basePointsTotal > 0) {
-        // Pass base points to progress bar - multiplier is already handled in useProgressGift
-        onPointsEarned(basePointsTotal);
+      if (totalPoints > 0) {
+        onPointsEarned(totalPoints);
       }
     }
   }
