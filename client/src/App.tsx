@@ -4,6 +4,7 @@ import { useAudio } from './lib/stores/useAudio';
 import { useSolitaire } from './lib/stores/useSolitaire';
 import { DeviceTestPanel } from './components/DeviceTestPanel';
 import { GameViewport } from './components/GameViewport';
+import GameIntegration from './lib/gameIntegration';
 import "@fontsource/inter";
 
 function App() {
@@ -14,7 +15,7 @@ function App() {
   const [isTestMode, setIsTestMode] = useState(false);
   const [gameKey, setGameKey] = useState(0);
 
-  // Initialize audio on component mount
+  // Initialize audio and game integration on component mount
   useEffect(() => {
     // Create audio elements
     const hitAudio = new Audio('/sounds/hit.mp3');
@@ -27,6 +28,9 @@ function App() {
     // Store in audio store
     setHitSound(hitAudio);
     setSuccessSound(successAudio);
+    
+    // Initialize game integration with lobby
+    GameIntegration.getInstance();
   }, [setHitSound, setSuccessSound]);
 
   const handleSizeChange = (width: number, height: number) => {

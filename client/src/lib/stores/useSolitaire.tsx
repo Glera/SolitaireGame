@@ -5,6 +5,8 @@ import { clearAllDropTargetHighlights } from '../solitaire/styleManager';
 import { calculateCardPoints, resetScoredCards } from '../solitaire/scoring';
 import { addPointsToProgress } from '../solitaire/progressManager';
 import { addFloatingScore } from '../solitaire/floatingScoreManager';
+import GameIntegration from '../gameIntegration';
+import { getPointsMultiplier } from '../roomUtils';
 
 interface AnimatingCard {
   card: Card;
@@ -182,6 +184,27 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         showDragPreview: false,
         dragPreviewPosition: null
       });
+      
+      // Check if game is won and notify lobby
+      if (newGameState.isWon && !get().isWon) {
+        const gameTime = newGameState.startTime ? 
+          Math.floor((Date.now() - newGameState.startTime.getTime()) / 1000) : 0;
+        
+        // Calculate total score based on cards in foundations
+        let totalScore = 0;
+        Object.values(newGameState.foundations).forEach(foundation => {
+          foundation.forEach(card => {
+            totalScore += calculateCardPoints(card);
+          });
+        });
+        
+        // Apply room multiplier to total score
+        const multiplier = getPointsMultiplier(newGameState.roomType);
+        const finalScore = totalScore * multiplier;
+        
+        console.log('🎉 Game won! Notifying lobby with score:', finalScore);
+        GameIntegration.getInstance().onGameEnd(finalScore, gameTime, newGameState.totalGifts);
+      }
     } else {
       console.log('❌ Move failed, invalid move attempted');
       get().endDrag();
@@ -298,6 +321,27 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     
     if (newGameState) {
       set({ ...newGameState, animatingCard: null });
+      
+      // Check if game is won and notify lobby
+      if (newGameState.isWon && !get().isWon) {
+        const gameTime = newGameState.startTime ? 
+          Math.floor((Date.now() - newGameState.startTime.getTime()) / 1000) : 0;
+        
+        // Calculate total score based on cards in foundations
+        let totalScore = 0;
+        Object.values(newGameState.foundations).forEach(foundation => {
+          foundation.forEach(card => {
+            totalScore += calculateCardPoints(card);
+          });
+        });
+        
+        // Apply room multiplier to total score
+        const multiplier = getPointsMultiplier(newGameState.roomType);
+        const finalScore = totalScore * multiplier;
+        
+        console.log('🎉 Game won! Notifying lobby with score:', finalScore);
+        GameIntegration.getInstance().onGameEnd(finalScore, gameTime, newGameState.totalGifts);
+      }
     } else {
       set({ animatingCard: null });
     }
