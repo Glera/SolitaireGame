@@ -66,6 +66,12 @@ export function GameBoard() {
   // Reset progress bar on component mount
   useEffect(() => {
     reinitialize();
+    
+    // Test floating score after 2 seconds
+    setTimeout(() => {
+      console.log('🧪 Testing floating score...');
+      addFloatingScore(100, window.innerWidth / 2, window.innerHeight / 2, 'TEST');
+    }, 2000);
   }, []); // Empty dependency array - only run on mount
 
   // Set up debug callback

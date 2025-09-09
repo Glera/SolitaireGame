@@ -17,31 +17,31 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    console.log(`🎯 FloatingScore: Component mounted with score ${score} at (${x}, ${y})`);
+    // console.log(`🎯 FloatingScore: Component mounted with score ${score} at (${x}, ${y})`);
     setMounted(true);
     
     const timer = setTimeout(() => {
-      console.log(`🎯 FloatingScore: Hiding score ${score} after 1900ms`);
+      // console.log(`🎯 FloatingScore: Hiding score ${score} after 1900ms`);
       setIsVisible(false);
       setTimeout(() => {
-        console.log(`🎯 FloatingScore: Calling onComplete for score ${score}`);
+        // console.log(`🎯 FloatingScore: Calling onComplete for score ${score}`);
         onComplete();
       }, 100); // Allow fade out to complete
     }, 1900);
 
     return () => {
-      console.log(`🎯 FloatingScore: Cleanup for score ${score}`);
+      // console.log(`🎯 FloatingScore: Cleanup for score ${score}`);
       clearTimeout(timer);
     };
   }, []); // Empty dependency array to prevent re-creation
 
   if (!mounted) {
-    console.log(`🎯 FloatingScore: Not mounted yet for score ${score}`);
+    // console.log(`🎯 FloatingScore: Not mounted yet for score ${score}`);
     return null;
   }
 
   if (!isVisible || score == null || score === undefined) {
-    console.log(`🎯 FloatingScore: Not rendering - isVisible: ${isVisible}, score: ${score}, mounted: ${mounted}`);
+    // console.log(`🎯 FloatingScore: Not rendering - isVisible: ${isVisible}, score: ${score}, mounted: ${mounted}`);
     return null;
   }
 
@@ -58,6 +58,9 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
         isolation: 'isolate',
         contain: 'size layout style paint', // Full containment
         position: 'fixed', // Ensure it's truly out of document flow
+        backgroundColor: 'rgba(255, 0, 0, 0.3)', // Temporary red background for debugging
+        border: '2px solid red', // Temporary red border for debugging
+        padding: '10px',
       }}
     >
       <div 
