@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 // Import external library with any type (no TypeScript definitions available)
 // @ts-ignore - no type definitions available
@@ -7,6 +7,9 @@ import * as ProgressGiftLib from '@gleb.askerko/componentkit-js';
 export function useProgressGift(onGiftEarned: (gifts: number) => void) {
   const progressGiftRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Memoize the callback to prevent unnecessary re-renders
+  const memoizedOnGiftEarned = useCallback(onGiftEarned, []);
 
   useEffect(() => {
     const initProgressGift = () => {
@@ -15,7 +18,7 @@ export function useProgressGift(onGiftEarned: (gifts: number) => void) {
           // Create new ProgressGift instance with 1500 points as max
           progressGiftRef.current = new ProgressGiftLib.ProgressGift({
             maxPoints: 1500,
-            onGiftEarned: onGiftEarned
+            onGiftEarned: memoizedOnGiftEarned
           } as any);
           
           // Clear container and render
@@ -41,7 +44,7 @@ export function useProgressGift(onGiftEarned: (gifts: number) => void) {
       }
       progressGiftRef.current = null;
     };
-  }, [onGiftEarned]);
+  }, [memoizedOnGiftEarned]);
 
   const addPoints = (points: number) => {
     if (progressGiftRef.current) {

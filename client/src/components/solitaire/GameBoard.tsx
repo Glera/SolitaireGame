@@ -47,10 +47,10 @@ export function GameBoard() {
     };
   }, [addPoints]);
   
-  // Reset progress bar when new game starts
+  // Reset progress bar on component mount
   useEffect(() => {
     reinitialize();
-  }, [newGame, reinitialize]);
+  }, []); // Empty dependency array - only run on mount
 
   // Set up debug callback
   useEffect(() => {
@@ -85,19 +85,19 @@ export function GameBoard() {
         {/* Progress Bar Container */}
         <div style={{
           position: 'relative',
-          top: '0px',
-          left: '0px',
-          right: '0px',
           height: '65px',
-          zIndex: 10,
-          marginBottom: '10px'
+          zIndex: 1,
+          marginBottom: '10px',
+          pointerEvents: 'none'
         }}>
-          <div ref={containerRef} className="w-full h-full" />
+          <div ref={containerRef} className="w-full h-full" style={{ pointerEvents: 'none' }} />
         </div>
         
-        <GameControls onDebugClick={() => setShowDebugPanel(true)} />
+        <div style={{ position: 'relative', zIndex: 2 }}>
+          <GameControls onDebugClick={() => setShowDebugPanel(true)} />
+        </div>
         
-        <div className="inline-block space-y-3" data-game-field>
+        <div className="inline-block space-y-3" data-game-field style={{ position: 'relative', zIndex: 2 }}>
           {/* Top row: Stock, Waste, and Foundation piles - aligned with 7 columns */}
           <div className="flex gap-2 items-start">
             <StockPile cards={stock} />
@@ -122,30 +122,36 @@ export function GameBoard() {
       
       {/* Render animating card */}
       {animatingCard && (
-        <CardAnimation
-          card={animatingCard.card}
-          startPosition={animatingCard.startPosition}
-          endPosition={animatingCard.endPosition}
-          onComplete={() => completeCardAnimation(animatingCard.card, animatingCard.targetSuit)}
-        />
+        <div style={{ position: 'fixed', zIndex: 1000, pointerEvents: 'none' }}>
+          <CardAnimation
+            card={animatingCard.card}
+            startPosition={animatingCard.startPosition}
+            endPosition={animatingCard.endPosition}
+            onComplete={() => completeCardAnimation(animatingCard.card, animatingCard.targetSuit)}
+          />
+        </div>
       )}
       
       {/* Render drag preview for dragged cards */}
       {showDragPreview && draggedCards.length > 0 && dragPreviewPosition && (
-        <DragPreview
-          cards={draggedCards}
-          startPosition={dragPreviewPosition}
-          offset={dragOffset || { x: 32, y: 48 }}
-        />
+        <div style={{ position: 'fixed', zIndex: 1000, pointerEvents: 'none' }}>
+          <DragPreview
+            cards={draggedCards}
+            startPosition={dragPreviewPosition}
+            offset={dragOffset || { x: 32, y: 48 }}
+          />
+        </div>
       )}
       
       
       {/* Debug popup */}
       {showDebugPanel && (
-        <DebugPopup 
-          info={debugInfo}
-          onClose={() => setShowDebugPanel(false)}
-        />
+        <div style={{ position: 'fixed', zIndex: 1001 }}>
+          <DebugPopup 
+            info={debugInfo}
+            onClose={() => setShowDebugPanel(false)}
+          />
+        </div>
       )}
     </div>
   );
