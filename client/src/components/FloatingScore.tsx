@@ -21,13 +21,13 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
     setMounted(true);
     
     const timer = setTimeout(() => {
-      // console.log(`🎯 FloatingScore: Hiding score ${score} after 1000ms`);
+      // console.log(`🎯 FloatingScore: Hiding score ${score} after 1200ms`);
       setIsVisible(false);
       setTimeout(() => {
         // console.log(`🎯 FloatingScore: Calling onComplete for score ${score}`);
         onComplete();
       }, 100); // Allow fade out to complete
-    }, 1000); // Match the animation duration
+    }, 1200); // Match the animation duration (1.2s)
 
     return () => {
       // console.log(`🎯 FloatingScore: Cleanup for score ${score}`);
@@ -66,7 +66,7 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
     >
       <div 
         style={{
-          color: '#166534', // Dark green, darker than card back
+          color: '#0f172a', // Very dark, almost black
           fontSize: '1.25rem',
           fontWeight: 'bold',
           textShadow: '0 0 1px #ffffff, 0 0 2px #ffffff', // Thin white outline
@@ -100,7 +100,7 @@ styleSheet.textContent = `
   }
   
   .animate-float-up {
-    animation: float-up 1s ease-out forwards;
+    animation: float-up 1.2s ease-out forwards;
   }
   
   .text-shadow-glow {
