@@ -76,10 +76,10 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
           zIndex: 1000,
           fontFamily: 'Arial, sans-serif',
           lineHeight: '1',
-          backgroundColor: 'rgba(255, 0, 0, 0.8)', // Temporary red background for debugging
-          padding: '12px 24px',
+          backgroundColor: 'rgba(0, 0, 0, 0.8)', // Semi-transparent dark background
+          padding: '8px 16px',
           borderRadius: '8px',
-          border: '3px solid #ffff00' // Temporary yellow border for debugging
+          border: '2px solid #22d3ee' // Beautiful cyan border
         }}
       >
         +{(score ?? 0).toLocaleString()}

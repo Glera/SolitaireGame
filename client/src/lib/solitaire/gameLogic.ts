@@ -143,7 +143,7 @@ export function moveCards(
             foundationY = Math.max(100, rect.top - 30); // Above the foundation pile but not too high
           }
           
-          console.log(`🎯 Triggering floating score: +${result.points} for ${result.breakdown.cardRank} at (${foundationX}, ${foundationY})`);
+          // console.log(`🎯 Triggering floating score: +${result.points} for ${result.breakdown.cardRank} at (${foundationX}, ${foundationY})`);
           onFloatingScore(result.points, foundationX, foundationY, result.breakdown.cardRank);
         }
       }
