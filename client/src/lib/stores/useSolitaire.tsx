@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { GameState, DragState, Card, Suit } from '../solitaire/types';
 import { initializeGame, drawFromStock, moveCards, getMovableCards } from '../solitaire/gameLogic';
 import { clearAllDropTargetHighlights } from '../solitaire/styleManager';
+import { calculateCardPoints, resetScoredCards } from '../solitaire/scoring';
+import { addPointsToProgress } from '../solitaire/progressManager';
 
 interface AnimatingCard {
   card: Card;
@@ -39,6 +41,10 @@ interface SolitaireStore extends GameState, DragState {
   canAutoMoveToFoundation: (card: Card) => Suit | null;
   autoMoveToFoundation: (card: Card, suit: Suit, startElement?: HTMLElement, endElement?: HTMLElement) => void;
   completeCardAnimation: (card: Card, suit: Suit) => void;
+  
+  // Progress bar functions
+  addPointsToProgress: (points: number) => void;
+  onGiftEarned: (gifts: number) => void;
 }
 
 export const useSolitaire = create<SolitaireStore>((set, get) => ({
@@ -69,6 +75,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   
   newGame: () => {
     const newGameState = initializeGame();
+    resetScoredCards(); // Reset scored cards for new game
     set({
       ...newGameState,
       isDragging: false,
@@ -152,7 +159,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       state.sourceFoundation,
       targetType,
       targetIndex,
-      targetFoundation
+      targetFoundation,
+      get().addPointsToProgress
     );
     
     if (newGameState) {
@@ -259,7 +267,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       sourceFoundation,
       'foundation',
       undefined,
-      suit
+      suit,
+      get().addPointsToProgress
     );
     
     if (newGameState) {
@@ -267,5 +276,14 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     } else {
       set({ animatingCard: null });
     }
+  },
+  
+  addPointsToProgress: (points: number) => {
+    addPointsToProgress(points);
+  },
+  
+  onGiftEarned: (gifts: number) => {
+    set({ totalGifts: gifts });
+    console.log(`🎁 Gift earned! Total gifts: ${gifts}`);
   }
 }));

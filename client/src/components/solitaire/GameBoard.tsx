@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { useAudio } from '../../lib/stores/useAudio';
+import { useProgressGift } from '../../hooks/useProgressGift';
 import { TableauColumn } from './TableauColumn';
 import { FoundationPile } from './FoundationPile';
 import { StockPile } from './StockPile';
@@ -10,6 +11,7 @@ import { CardAnimation } from './CardAnimation';
 import { DragPreview } from './DragPreview';
 import { DebugPopup, setDebugCallback, type DebugInfo } from '../DebugPopup';
 import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
+import { setAddPointsFunction } from '../../lib/solitaire/progressManager';
 
 export function GameBoard() {
   const { 
@@ -25,12 +27,30 @@ export function GameBoard() {
     draggedCards,
     dragPreviewPosition,
     dragOffset,
-    isDragging
+    isDragging,
+    onGiftEarned,
+    newGame
   } = useSolitaire();
   
   const { playSuccess } = useAudio();
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  
+  // Progress bar integration
+  const { containerRef, addPoints, reinitialize } = useProgressGift(onGiftEarned);
+  
+  // Register addPoints function with progress manager
+  useEffect(() => {
+    setAddPointsFunction(addPoints);
+    return () => {
+      setAddPointsFunction(() => {});
+    };
+  }, [addPoints]);
+  
+  // Reset progress bar when new game starts
+  useEffect(() => {
+    reinitialize();
+  }, [newGame, reinitialize]);
 
   // Set up debug callback
   useEffect(() => {
@@ -62,6 +82,19 @@ export function GameBoard() {
   return (
     <div className="min-h-screen bg-green-800 p-3" data-game-board>
       <div className="max-w-fit mx-auto">
+        {/* Progress Bar Container */}
+        <div style={{
+          position: 'relative',
+          top: '0px',
+          left: '0px',
+          right: '0px',
+          height: '65px',
+          zIndex: 10,
+          marginBottom: '10px'
+        }}>
+          <div ref={containerRef} className="w-full h-full" />
+        </div>
+        
         <GameControls onDebugClick={() => setShowDebugPanel(true)} />
         
         <div className="inline-block space-y-3" data-game-field>

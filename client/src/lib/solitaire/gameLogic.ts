@@ -1,5 +1,6 @@
 import { GameState, Card, Suit } from './types';
 import { createDeck, shuffleDeck, canPlaceOnTableau, canPlaceOnFoundation } from './cardUtils';
+import { calculateCardPoints } from './scoring';
 
 export function initializeGame(): GameState {
   const deck = shuffleDeck(createDeck());
@@ -33,7 +34,8 @@ export function initializeGame(): GameState {
     waste: [],
     isWon: false,
     moves: 0,
-    startTime: new Date()
+    startTime: new Date(),
+    totalGifts: 0
   };
 }
 
@@ -75,7 +77,8 @@ export function moveCards(
   sourceFoundation: Suit | undefined,
   targetType: 'tableau' | 'foundation',
   targetIndex: number | undefined,
-  targetFoundation: Suit | undefined
+  targetFoundation: Suit | undefined,
+  onPointsEarned?: (points: number) => void
 ): GameState | null {
   console.log('🎲 moveCards validation:', {
     cards: cards.map(c => `${c.suit}-${c.rank}`),
@@ -116,6 +119,18 @@ export function moveCards(
     newState.tableau[targetIndex] = [...newState.tableau[targetIndex], ...cards];
   } else if (targetType === 'foundation' && targetFoundation) {
     newState.foundations[targetFoundation] = [...newState.foundations[targetFoundation], ...cards];
+    
+    // Calculate points for cards moved to foundation
+    if (onPointsEarned) {
+      let totalPoints = 0;
+      for (const card of cards) {
+        const points = calculateCardPoints(card);
+        totalPoints += points;
+      }
+      if (totalPoints > 0) {
+        onPointsEarned(totalPoints);
+      }
+    }
   }
   
   newState.moves += 1;

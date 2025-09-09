@@ -28,6 +28,8 @@ export interface GameState {
   isWon: boolean;
   moves: number;
   startTime: Date | null;
+  // Progress bar state
+  totalGifts: number;
 }
 
 export interface DragState {
