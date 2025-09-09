@@ -67,13 +67,11 @@ export function GameBoard() {
   useEffect(() => {
     reinitialize();
     
-    // Test floating score after 2 seconds
-    setTimeout(() => {
-      console.log('🧪 Testing floating score...');
-      console.log('🧪 addFloatingScore function:', addFloatingScore);
-      console.log('🧪 Window dimensions:', window.innerWidth, window.innerHeight);
-      addFloatingScore(100, window.innerWidth / 2, window.innerHeight / 2, 'TEST');
-    }, 2000);
+    // Test floating score after 2 seconds (disabled for production)
+    // setTimeout(() => {
+    //   console.log('🧪 Testing floating score...');
+    //   addFloatingScore(100, window.innerWidth / 2, window.innerHeight / 2, 'TEST');
+    // }, 2000);
   }, []); // Empty dependency array - only run on mount
 
   // Set up debug callback

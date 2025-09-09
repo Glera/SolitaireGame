@@ -48,43 +48,34 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
   console.log(`🎯 FloatingScore: Rendering score ${score} at (${x}, ${y})`);
 
   // Simple test - render text directly
-  const testText = `+${score} POINTS`;
-  console.log(`🎯 FloatingScore: Test text: "${testText}"`);
+  // const testText = `+${score} POINTS`;
+  // console.log(`🎯 FloatingScore: Test text: "${testText}"`);
 
-  // Try rendering without portal first
-  return (
+  return createPortal(
     <div
+      className="fixed pointer-events-none z-50 animate-float-up"
       style={{
-        position: 'fixed',
         left: `${x}px`,
         top: `${y}px`,
         transform: 'translateX(-50%)',
-        zIndex: 1000,
-        pointerEvents: 'none',
-        backgroundColor: 'rgba(255, 0, 0, 0.3)',
-        border: '2px solid red',
-        padding: '10px',
-        color: '#ff0000',
-        fontSize: '24px',
-        fontWeight: 'bold',
+        willChange: 'transform, opacity',
+        isolation: 'isolate',
+        contain: 'size layout style paint',
+        position: 'fixed',
       }}
     >
-      {/* Simple test text */}
-      <div>TEST TEXT: +{score}</div>
-      
       <div 
         style={{
-          color: '#ff0000',
-          fontSize: '48px',
+          color: '#22d3ee', // cyan-300 color
+          fontSize: '3rem',
           fontWeight: 'bold',
-          textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+          textShadow: '0 0 5px #22d3ee, 0 0 10px #22d3ee, 0 0 15px #22d3ee, 0 0 20px #22d3ee',
+          transform: 'translate3d(0,0,0)',
+          backfaceVisibility: 'hidden',
+          whiteSpace: 'nowrap',
+          zIndex: 1000,
           fontFamily: 'Arial, sans-serif',
           lineHeight: '1',
-          display: 'block',
-          width: 'auto',
-          height: 'auto',
-          minWidth: '50px',
-          minHeight: '50px',
         }}
       >
         +{(score ?? 0).toLocaleString()}
@@ -92,10 +83,12 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
       {breakdown && (
         <div 
           style={{
-            color: '#a5f3fc',
+            color: '#a5f3fc', // cyan-200 color
             fontSize: '0.875rem',
             fontWeight: '500',
             textShadow: '0 0 3px #a5f3fc, 0 0 6px #a5f3fc',
+            transform: 'translate3d(0,0,0)',
+            backfaceVisibility: 'hidden',
             marginTop: '2px',
             whiteSpace: 'nowrap',
           }}
@@ -103,7 +96,8 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
           {breakdown.cardRank}
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
 
