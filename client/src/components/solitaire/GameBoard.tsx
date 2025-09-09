@@ -70,6 +70,8 @@ export function GameBoard() {
     // Test floating score after 2 seconds
     setTimeout(() => {
       console.log('🧪 Testing floating score...');
+      console.log('🧪 addFloatingScore function:', addFloatingScore);
+      console.log('🧪 Window dimensions:', window.innerWidth, window.innerHeight);
       addFloatingScore(100, window.innerWidth / 2, window.innerHeight / 2, 'TEST');
     }, 2000);
   }, []); // Empty dependency array - only run on mount
