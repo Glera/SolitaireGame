@@ -16,6 +16,7 @@ export function useFloatingScores() {
   const floatingScoreId = useRef(0);
 
   const addFloatingScore = (score: number, x: number, y: number, cardRank?: string) => {
+    console.log(`🎯 useFloatingScores: addFloatingScore called with ${score} points for ${cardRank} at (${x}, ${y})`);
     const newScore: FloatingScoreData = {
       id: ++floatingScoreId.current,
       score,
@@ -27,7 +28,12 @@ export function useFloatingScores() {
       } : undefined
     };
 
-    setFloatingScores(prev => [...prev, newScore]);
+    console.log(`✅ useFloatingScores: Adding new floating score with id ${newScore.id}`);
+    setFloatingScores(prev => {
+      const newScores = [...prev, newScore];
+      console.log(`📊 useFloatingScores: Total floating scores now: ${newScores.length}`);
+      return newScores;
+    });
   };
 
   const removeFloatingScore = (id: number) => {

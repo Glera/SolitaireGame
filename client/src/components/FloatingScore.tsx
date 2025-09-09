@@ -16,15 +16,22 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
+    console.log(`🎯 FloatingScore: Component mounted with score ${score} at (${x}, ${y})`);
     const timer = setTimeout(() => {
+      console.log(`🎯 FloatingScore: Hiding score ${score}`);
       setIsVisible(false);
       setTimeout(onComplete, 100); // Allow fade out to complete
     }, 1900);
 
     return () => clearTimeout(timer);
-  }, [onComplete]);
+  }, [onComplete, score, x, y]);
 
-  if (!isVisible || score == null || score === undefined) return null;
+  if (!isVisible || score == null || score === undefined) {
+    console.log(`🎯 FloatingScore: Not rendering - isVisible: ${isVisible}, score: ${score}`);
+    return null;
+  }
+
+  console.log(`🎯 FloatingScore: Rendering score ${score} at (${x}, ${y})`);
 
   return createPortal(
     <div

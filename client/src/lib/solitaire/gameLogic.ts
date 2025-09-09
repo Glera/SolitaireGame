@@ -133,6 +133,7 @@ export function moveCards(
           // Calculate position for floating score (center of foundation area)
           const foundationX = 400; // Approximate center of foundation area
           const foundationY = 100; // Approximate Y position of foundation piles
+          console.log(`🎯 Triggering floating score: +${result.points} for ${result.breakdown.cardRank} at (${foundationX}, ${foundationY})`);
           onFloatingScore(result.points, foundationX, foundationY, result.breakdown.cardRank);
         }
       }

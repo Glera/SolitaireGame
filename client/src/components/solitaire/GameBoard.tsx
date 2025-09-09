@@ -55,8 +55,10 @@ export function GameBoard() {
   
   // Register addFloatingScore function with floating score manager
   useEffect(() => {
+    console.log(`🎯 GameBoard: Registering addFloatingScore function`);
     setAddFloatingScoreFunction(addFloatingScore);
     return () => {
+      console.log(`🎯 GameBoard: Unregistering addFloatingScore function`);
       setAddFloatingScoreFunction(() => {});
     };
   }, [addFloatingScore]);
@@ -159,6 +161,7 @@ export function GameBoard() {
       
       
       {/* Floating scores */}
+      {floatingScores.length > 0 && console.log(`🎯 GameBoard: Rendering ${floatingScores.length} floating scores`)}
       {floatingScores.map(score => (
         <FloatingScore
           key={score.id}
