@@ -21,13 +21,13 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
     setMounted(true);
     
     const timer = setTimeout(() => {
-      // console.log(`🎯 FloatingScore: Hiding score ${score} after 1900ms`);
+      // console.log(`🎯 FloatingScore: Hiding score ${score} after 3000ms`);
       setIsVisible(false);
       setTimeout(() => {
         // console.log(`🎯 FloatingScore: Calling onComplete for score ${score}`);
         onComplete();
       }, 100); // Allow fade out to complete
-    }, 1900);
+    }, 3000); // Increased from 1900ms to 3000ms
 
     return () => {
       // console.log(`🎯 FloatingScore: Cleanup for score ${score}`);
@@ -45,7 +45,7 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
     return null;
   }
 
-  console.log(`🎯 FloatingScore: Rendering score ${score} at (${x}, ${y})`);
+  // console.log(`🎯 FloatingScore: Rendering score ${score} at (${x}, ${y})`);
 
   // Simple test - render text directly
   // const testText = `+${score} POINTS`;
@@ -66,16 +66,20 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
     >
       <div 
         style={{
-          color: '#22d3ee', // cyan-300 color
-          fontSize: '3rem',
+          color: '#00ffff', // Bright cyan
+          fontSize: '4rem', // Larger text
           fontWeight: 'bold',
-          textShadow: '0 0 5px #22d3ee, 0 0 10px #22d3ee, 0 0 15px #22d3ee, 0 0 20px #22d3ee',
+          textShadow: '0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff, 0 0 40px #00ffff',
           transform: 'translate3d(0,0,0)',
           backfaceVisibility: 'hidden',
           whiteSpace: 'nowrap',
           zIndex: 1000,
           fontFamily: 'Arial, sans-serif',
           lineHeight: '1',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', // Dark background for contrast
+          padding: '10px 20px',
+          borderRadius: '10px',
+          border: '2px solid #00ffff',
         }}
       >
         +{(score ?? 0).toLocaleString()}
