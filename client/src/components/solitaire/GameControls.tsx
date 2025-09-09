@@ -14,11 +14,6 @@ export function GameControls({ onDebugClick }: GameControlsProps = {}) {
 
   return (
     <div className="relative mb-4 h-12 flex items-center">
-      {/* Version on the left */}
-      <div className="absolute left-0 text-white text-lg font-semibold">
-        version: {GAME_VERSION}
-      </div>
-      
       {/* New Game and Debug buttons in center */}
       <div className="flex-1 flex justify-center gap-3">
         <Button 
