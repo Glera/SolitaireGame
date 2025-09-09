@@ -133,7 +133,7 @@ export function moveCards(
           // Calculate position for floating score (center of screen for visibility)
           const foundationX = window.innerWidth / 2; // Center of screen
           const foundationY = window.innerHeight / 2; // Center of screen
-          // console.log(`🎯 Triggering floating score: +${result.points} for ${result.breakdown.cardRank} at (${foundationX}, ${foundationY})`);
+          console.log(`🎯 Triggering floating score: +${result.points} for ${result.breakdown.cardRank} at (${foundationX}, ${foundationY})`);
           onFloatingScore(result.points, foundationX, foundationY, result.breakdown.cardRank);
         }
       }
