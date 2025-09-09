@@ -1,6 +1,6 @@
 import { GameState, Card, Suit } from './types';
 import { createDeck, shuffleDeck, canPlaceOnTableau, canPlaceOnFoundation } from './cardUtils';
-import { calculateCardPoints } from './scoring';
+import { calculateCardPoints, calculateCardPointsWithBreakdown } from './scoring';
 
 export function initializeGame(): GameState {
   const deck = shuffleDeck(createDeck());
@@ -78,7 +78,8 @@ export function moveCards(
   targetType: 'tableau' | 'foundation',
   targetIndex: number | undefined,
   targetFoundation: Suit | undefined,
-  onPointsEarned?: (points: number) => void
+  onPointsEarned?: (points: number) => void,
+  onFloatingScore?: (points: number, x: number, y: number, cardRank: string) => void
 ): GameState | null {
   console.log('🎲 moveCards validation:', {
     cards: cards.map(c => `${c.suit}-${c.rank}`),
@@ -124,8 +125,16 @@ export function moveCards(
     if (onPointsEarned) {
       let totalPoints = 0;
       for (const card of cards) {
-        const points = calculateCardPoints(card);
-        totalPoints += points;
+        const result = calculateCardPointsWithBreakdown(card);
+        totalPoints += result.points;
+        
+        // Show floating score for each card
+        if (result.points > 0 && onFloatingScore && result.breakdown) {
+          // Calculate position for floating score (center of foundation area)
+          const foundationX = 400; // Approximate center of foundation area
+          const foundationY = 100; // Approximate Y position of foundation piles
+          onFloatingScore(result.points, foundationX, foundationY, result.breakdown.cardRank);
+        }
       }
       if (totalPoints > 0) {
         onPointsEarned(totalPoints);

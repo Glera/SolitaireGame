@@ -4,6 +4,7 @@ import { initializeGame, drawFromStock, moveCards, getMovableCards } from '../so
 import { clearAllDropTargetHighlights } from '../solitaire/styleManager';
 import { calculateCardPoints, resetScoredCards } from '../solitaire/scoring';
 import { addPointsToProgress } from '../solitaire/progressManager';
+import { addFloatingScore } from '../solitaire/floatingScoreManager';
 
 interface AnimatingCard {
   card: Card;
@@ -45,6 +46,9 @@ interface SolitaireStore extends GameState, DragState {
   // Progress bar functions
   addPointsToProgress: (points: number) => void;
   onGiftEarned: (gifts: number) => void;
+  
+  // Floating scores functions
+  addFloatingScore: (points: number, x: number, y: number, cardRank: string) => void;
 }
 
 export const useSolitaire = create<SolitaireStore>((set, get) => ({
@@ -160,7 +164,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       targetType,
       targetIndex,
       targetFoundation,
-      get().addPointsToProgress
+      get().addPointsToProgress,
+      get().addFloatingScore
     );
     
     if (newGameState) {
@@ -268,7 +273,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       'foundation',
       undefined,
       suit,
-      get().addPointsToProgress
+      get().addPointsToProgress,
+      get().addFloatingScore
     );
     
     if (newGameState) {
@@ -285,5 +291,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   onGiftEarned: (gifts: number) => {
     set({ totalGifts: gifts });
     console.log(`🎁 Gift earned! Total gifts: ${gifts}`);
+  },
+  
+  addFloatingScore: (points: number, x: number, y: number, cardRank: string) => {
+    addFloatingScore(points, x, y, cardRank);
   }
 }));

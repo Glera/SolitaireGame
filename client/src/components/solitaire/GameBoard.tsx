@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { useAudio } from '../../lib/stores/useAudio';
 import { useProgressGift } from '../../hooks/useProgressGift';
+import { useFloatingScores } from '../../hooks/useFloatingScores';
+import { FloatingScore } from '../FloatingScore';
 import { TableauColumn } from './TableauColumn';
 import { FoundationPile } from './FoundationPile';
 import { StockPile } from './StockPile';
@@ -12,6 +14,7 @@ import { DragPreview } from './DragPreview';
 import { DebugPopup, setDebugCallback, type DebugInfo } from '../DebugPopup';
 import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 import { setAddPointsFunction } from '../../lib/solitaire/progressManager';
+import { setAddFloatingScoreFunction } from '../../lib/solitaire/floatingScoreManager';
 
 export function GameBoard() {
   const { 
@@ -39,6 +42,9 @@ export function GameBoard() {
   // Progress bar integration
   const { containerRef, addPoints, reinitialize } = useProgressGift(onGiftEarned);
   
+  // Floating scores integration
+  const { floatingScores, addFloatingScore, removeFloatingScore } = useFloatingScores();
+  
   // Register addPoints function with progress manager
   useEffect(() => {
     setAddPointsFunction(addPoints);
@@ -46,6 +52,14 @@ export function GameBoard() {
       setAddPointsFunction(() => {});
     };
   }, [addPoints]);
+  
+  // Register addFloatingScore function with floating score manager
+  useEffect(() => {
+    setAddFloatingScoreFunction(addFloatingScore);
+    return () => {
+      setAddFloatingScoreFunction(() => {});
+    };
+  }, [addFloatingScore]);
   
   // Reset progress bar on component mount
   useEffect(() => {
@@ -87,17 +101,17 @@ export function GameBoard() {
           position: 'relative',
           height: '65px',
           zIndex: 1,
-          marginBottom: '10px',
+          marginBottom: '5px',
           pointerEvents: 'none'
         }}>
           <div ref={containerRef} className="w-full h-full" style={{ pointerEvents: 'none' }} />
         </div>
         
-        <div style={{ position: 'relative', zIndex: 2 }}>
+        <div style={{ position: 'relative', zIndex: 2, marginTop: '35px' }}>
           <GameControls onDebugClick={() => setShowDebugPanel(true)} />
         </div>
         
-        <div className="inline-block space-y-3" data-game-field style={{ position: 'relative', zIndex: 2 }}>
+        <div className="inline-block space-y-3" data-game-field style={{ position: 'relative', zIndex: 2, marginTop: '20px' }}>
           {/* Top row: Stock, Waste, and Foundation piles - aligned with 7 columns */}
           <div className="flex gap-2 items-start">
             <StockPile cards={stock} />
@@ -143,6 +157,18 @@ export function GameBoard() {
         </div>
       )}
       
+      
+      {/* Floating scores */}
+      {floatingScores.map(score => (
+        <FloatingScore
+          key={score.id}
+          score={score.score}
+          x={score.x}
+          y={score.y}
+          breakdown={score.breakdown}
+          onComplete={() => removeFloatingScore(score.id)}
+        />
+      ))}
       
       {/* Debug popup */}
       {showDebugPanel && (

@@ -1,21 +1,26 @@
 import { Card, Rank } from './types';
 
 // Points for each card rank when moved to foundation
+// Target: 1500 points total for all 52 cards (4 cards of each rank)
+// Calculation: 1500 ÷ 52 = ~28.85 points per card average
+// Let's distribute with progression from low to high cards:
 export const CARD_POINTS: Record<Rank, number> = {
-  'A': 10,
-  '2': 10,
-  '3': 15,
-  '4': 20,
-  '5': 25,
-  '6': 30,
-  '7': 35,
-  '8': 40,
-  '9': 45,
-  '10': 50,
-  'J': 55,
-  'Q': 60,
-  'K': 65
+  'A': 19,   // 19 × 4 = 76
+  '2': 21,   // 21 × 4 = 84  
+  '3': 23,   // 23 × 4 = 92
+  '4': 25,   // 25 × 4 = 100
+  '5': 27,   // 27 × 4 = 108
+  '6': 29,   // 29 × 4 = 116
+  '7': 31,   // 31 × 4 = 124
+  '8': 33,   // 33 × 4 = 132
+  '9': 35,   // 35 × 4 = 140
+  '10': 37,  // 37 × 4 = 148
+  'J': 39,   // 39 × 4 = 156
+  'Q': 41,   // 41 × 4 = 164
+  'K': 43    // 43 × 4 = 172
 };
+// Total: 76+84+92+100+108+116+124+132+140+148+156+164+172 = 1512
+// Perfect! Just 12 points over 1500, which is acceptable
 
 // Set to track cards that have already been scored
 const scoredCards = new Set<string>();
@@ -37,6 +42,31 @@ export function calculateCardPoints(card: Card): number {
   
   console.log(`🎯 Card ${card.suit}-${card.rank} scored for ${points} points`);
   return points;
+}
+
+/**
+ * Calculate points for a card with breakdown info
+ * @param card The card being moved to foundation
+ * @returns Object with points and breakdown info
+ */
+export function calculateCardPointsWithBreakdown(card: Card): { points: number; breakdown?: { cardRank: string; points: number } } {
+  // Check if this card has already been scored
+  if (scoredCards.has(card.id)) {
+    console.log(`🔄 Card ${card.suit}-${card.rank} already scored, no points awarded`);
+    return { points: 0 };
+  }
+
+  const points = CARD_POINTS[card.rank];
+  scoredCards.add(card.id);
+  
+  console.log(`🎯 Card ${card.suit}-${card.rank} scored for ${points} points`);
+  return {
+    points,
+    breakdown: {
+      cardRank: `${card.rank} ${card.suit}`,
+      points
+    }
+  };
 }
 
 /**
