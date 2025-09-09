@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { GameState, DragState, Card, Suit } from '../solitaire/types';
 import { initializeGame, drawFromStock, moveCards, getMovableCards } from '../solitaire/gameLogic';
 import { clearAllDropTargetHighlights } from '../solitaire/styleManager';
-import { calculateCardPoints, resetScoredCards } from '../solitaire/scoring';
+import { calculateCardPoints, calculateCardPointsRaw, resetScoredCards } from '../solitaire/scoring';
 import { addPointsToProgress } from '../solitaire/progressManager';
 import { addFloatingScore } from '../solitaire/floatingScoreManager';
 import GameIntegration from '../gameIntegration';
@@ -365,17 +365,24 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   getCurrentResults: () => {
     const state = get();
     
-    // Calculate current score based on cards in foundations
+    // Calculate current score based on cards in foundations (without tracking)
     let currentScore = 0;
     Object.values(state.foundations).forEach(foundation => {
       foundation.forEach(card => {
-        currentScore += calculateCardPoints(card);
+        currentScore += calculateCardPointsRaw(card);
       });
     });
     
     // Apply room multiplier to current score
     const multiplier = getPointsMultiplier(state.roomType);
     const finalScore = currentScore * multiplier;
+    
+    console.log('📊 Current results calculated:', {
+      baseScore: currentScore,
+      multiplier,
+      finalScore,
+      giftsEarned: state.totalGifts
+    });
     
     return {
       score: finalScore,

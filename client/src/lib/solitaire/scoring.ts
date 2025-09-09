@@ -70,6 +70,15 @@ export function calculateCardPointsWithBreakdown(card: Card): { points: number; 
 }
 
 /**
+ * Calculate points for a card without tracking (for current results calculation)
+ * @param card The card to calculate points for
+ * @returns Points for this card (always returns points, ignores scoring history)
+ */
+export function calculateCardPointsRaw(card: Card): number {
+  return CARD_POINTS[card.rank];
+}
+
+/**
  * Reset the scored cards set (called when starting a new game)
  */
 export function resetScoredCards(): void {
