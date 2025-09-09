@@ -6,9 +6,9 @@ export function setAddFloatingScoreFunction(fn: (points: number, x: number, y: n
 }
 
 export function addFloatingScore(points: number, x: number, y: number, cardRank: string) {
-  // console.log(`🎯 FloatingScoreManager: addFloatingScore called with ${points} points for ${cardRank} at (${x}, ${y})`);
+  console.log(`🎯 FloatingScoreManager: addFloatingScore called with ${points} points for ${cardRank} at (${x}, ${y})`);
   if (addFloatingScoreFunction) {
-    // console.log(`✅ FloatingScoreManager: Function exists, calling it`);
+    console.log(`✅ FloatingScoreManager: Function exists, calling it`);
     addFloatingScoreFunction(points, x, y, cardRank);
   } else {
     console.warn('⚠️ Floating score manager not initialized yet');
