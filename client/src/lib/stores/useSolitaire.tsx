@@ -229,11 +229,14 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   autoMoveToFoundation: (card, suit, startElement, endElement) => {
     // console.log(`🚀 autoMoveToFoundation: moving ${card.suit}-${card.rank} to foundation ${suit}`);
     
-    // Store start position for floating score
+    // Store start position for floating score (positioned to the left of the card)
     let cardStartPosition = null;
     if (startElement) {
       const startRect = startElement.getBoundingClientRect();
-      cardStartPosition = { x: startRect.left + startRect.width / 2, y: startRect.top };
+      cardStartPosition = { 
+        x: startRect.left - 20, // 20px to the left of the card
+        y: startRect.top + startRect.height / 2 // Middle of the card vertically
+      };
     }
     
     // If we have DOM elements, trigger animation

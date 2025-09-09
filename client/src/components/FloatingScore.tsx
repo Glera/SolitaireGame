@@ -21,13 +21,13 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
     setMounted(true);
     
     const timer = setTimeout(() => {
-      // console.log(`🎯 FloatingScore: Hiding score ${score} after 3000ms`);
+      // console.log(`🎯 FloatingScore: Hiding score ${score} after 2000ms`);
       setIsVisible(false);
       setTimeout(() => {
         // console.log(`🎯 FloatingScore: Calling onComplete for score ${score}`);
         onComplete();
       }, 100); // Allow fade out to complete
-    }, 3000); // Increased from 1900ms to 3000ms
+    }, 2000); // Reduced to 2000ms for less intrusive effect
 
     return () => {
       // console.log(`🎯 FloatingScore: Cleanup for score ${score}`);
@@ -67,9 +67,9 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
       <div 
         style={{
           color: '#22d3ee', // Beautiful cyan
-          fontSize: '2.5rem',
+          fontSize: '1.5rem', // Smaller, less intrusive
           fontWeight: 'bold',
-          textShadow: '0 0 8px #22d3ee, 0 0 16px #22d3ee, 0 0 24px #22d3ee',
+          textShadow: '0 0 3px #22d3ee, 0 0 6px #22d3ee', // Reduced glow
           transform: 'translate3d(0,0,0)',
           backfaceVisibility: 'hidden',
           whiteSpace: 'nowrap',
