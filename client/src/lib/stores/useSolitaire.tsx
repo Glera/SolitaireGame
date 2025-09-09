@@ -196,7 +196,10 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     const suit = card.suit;
     const foundationCards = state.foundations[suit];
     
+    console.log(`🔍 canAutoMoveToFoundation: checking ${card.suit}-${card.rank}, foundation length: ${foundationCards.length}`);
+    
     if (foundationCards.length === 0 && card.rank === 'A') {
+      console.log(`✅ canAutoMoveToFoundation: A can be moved to empty foundation ${suit}`);
       return suit;
     }
     
@@ -222,6 +225,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   },
   
   autoMoveToFoundation: (card, suit, startElement, endElement) => {
+    console.log(`🚀 autoMoveToFoundation: moving ${card.suit}-${card.rank} to foundation ${suit}`);
+    
     // If we have DOM elements, trigger animation
     if (startElement && endElement) {
       const startRect = startElement.getBoundingClientRect();
