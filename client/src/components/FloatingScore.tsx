@@ -24,7 +24,7 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
     }, 1900);
 
     return () => clearTimeout(timer);
-  }, [onComplete, score, x, y]);
+  }, []); // Empty dependency array to prevent re-creation
 
   if (!isVisible || score == null || score === undefined) {
     console.log(`🎯 FloatingScore: Not rendering - isVisible: ${isVisible}, score: ${score}`);
@@ -47,10 +47,12 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
       }}
     >
       <div 
-        className="text-cyan-300 text-3xl font-bold text-shadow-glow"
+        className="text-cyan-300 text-5xl font-bold text-shadow-glow"
         style={{
           transform: 'translate3d(0,0,0)', // GPU layer
           backfaceVisibility: 'hidden',
+          fontSize: '3rem',
+          fontWeight: 'bold',
         }}
       >
         +{(score ?? 0).toLocaleString()}
@@ -77,11 +79,15 @@ const styleSheet = document.createElement('style');
 styleSheet.textContent = `
   @keyframes float-up {
     0% {
-      transform: translateX(-50%) translateY(0px) translateZ(0);
+      transform: translateX(-50%) translateY(0px) translateZ(0) scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: translateX(-50%) translateY(-40px) translateZ(0) scale(1.2);
       opacity: 1;
     }
     100% {
-      transform: translateX(-50%) translateY(-80px) translateZ(0);
+      transform: translateX(-50%) translateY(-120px) translateZ(0) scale(0.8);
       opacity: 0;
     }
   }

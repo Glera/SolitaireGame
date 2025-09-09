@@ -130,9 +130,9 @@ export function moveCards(
         
         // Show floating score for each card
         if (result.points > 0 && onFloatingScore && result.breakdown) {
-          // Calculate position for floating score (center of foundation area)
-          const foundationX = 400; // Approximate center of foundation area
-          const foundationY = 100; // Approximate Y position of foundation piles
+          // Calculate position for floating score (center of screen for visibility)
+          const foundationX = window.innerWidth / 2; // Center of screen
+          const foundationY = window.innerHeight / 2; // Center of screen
           console.log(`🎯 Triggering floating score: +${result.points} for ${result.breakdown.cardRank} at (${foundationX}, ${foundationY})`);
           onFloatingScore(result.points, foundationX, foundationY, result.breakdown.cardRank);
         }
