@@ -4,6 +4,7 @@ import { useAudio } from './lib/stores/useAudio';
 import { useSolitaire } from './lib/stores/useSolitaire';
 import { DeviceTestPanel } from './components/DeviceTestPanel';
 import { GameViewport } from './components/GameViewport';
+import { GameScaleProvider } from './contexts/GameScaleContext';
 import GameIntegration from './lib/gameIntegration';
 import "@fontsource/inter";
 
@@ -63,31 +64,33 @@ function App() {
   };
 
   return (
-    <div className="w-full h-full relative">
-      <GameViewport 
-        width={testViewport.width} 
-        height={testViewport.height}
-        isTestMode={isTestMode}
-      >
-        <div 
-          key={gameKey}
-          style={{
-            width: isTestMode ? `${testViewport.width}px` : '100%',
-            height: isTestMode ? `${testViewport.height}px` : '100%',
-            overflow: 'hidden'
-          }}
+    <GameScaleProvider>
+      <div className="w-full h-screen relative overflow-hidden">
+        <GameViewport 
+          width={testViewport.width} 
+          height={testViewport.height}
+          isTestMode={isTestMode}
         >
-          <GameBoard />
-        </div>
-      </GameViewport>
-      
+          <div 
+            key={gameKey}
+            style={{
+              width: isTestMode ? `${testViewport.width}px` : '100vw',
+              height: isTestMode ? `${testViewport.height}px` : '100vh',
+              overflow: 'hidden'
+            }}
+          >
+            <GameBoard />
+          </div>
+        </GameViewport>
+        
 {/* DeviceTestPanel temporarily hidden */}
-      {/* <DeviceTestPanel
-        onSizeChange={handleSizeChange}
-        isVisible={testPanelVisible}
-        onToggle={handleTogglePanel}
-      /> */}
-    </div>
+        {/* <DeviceTestPanel
+          onSizeChange={handleSizeChange}
+          isVisible={testPanelVisible}
+          onToggle={handleTogglePanel}
+        /> */}
+      </div>
+    </GameScaleProvider>
   );
 }
 

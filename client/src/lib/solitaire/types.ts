@@ -10,6 +10,7 @@ export interface Card {
   rank: Rank;
   color: Color;
   faceUp: boolean;
+  isPremium?: boolean; // Premium cards give 10x points
 }
 
 export interface GameState {

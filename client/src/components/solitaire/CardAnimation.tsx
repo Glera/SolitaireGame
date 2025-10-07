@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Card as CardType } from '../../lib/solitaire/types';
 import { Card } from './Card';
 import { createPortal } from 'react-dom';
+import { useGameScaleContext } from '../../contexts/GameScaleContext';
 
 interface CardAnimationProps {
   card: CardType;
@@ -21,6 +22,7 @@ export function CardAnimation({
   const [position, setPosition] = useState(startPosition);
   const animationRef = useRef<number>();
   const startTimeRef = useRef<number>();
+  const { scale } = useGameScaleContext();
   
   useEffect(() => {
     // Calculate distance and duration
@@ -71,7 +73,9 @@ export function CardAnimation({
         left: `${position.x}px`,
         top: `${position.y}px`,
         zIndex: 9999,
-        pointerEvents: 'none'
+        pointerEvents: 'none',
+        transform: `scale(${scale})`,
+        transformOrigin: 'top left'
       }}
     >
       <Card card={card} />

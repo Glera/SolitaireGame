@@ -6,13 +6,14 @@ interface FloatingScoreProps {
   x: number;
   y: number;
   onComplete: () => void;
+  isPremium?: boolean;
   breakdown?: {
     cardRank: string;
     points: number;
   };
 }
 
-export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingScoreProps) {
+export function FloatingScore({ score, x, y, onComplete, isPremium = false, breakdown }: FloatingScoreProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [mounted, setMounted] = useState(false);
 
@@ -66,8 +67,8 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
     >
       <div 
         style={{
-          color: '#f8fafc', // Almost white
-          fontSize: '1.25rem',
+          color: isPremium ? 'rgb(59, 130, 246)' : '#f8fafc', // Blue for premium, white for normal
+          fontSize: isPremium ? '1.75rem' : '1.25rem', // Larger for premium
           fontWeight: 'bold',
           textShadow: '0.5px 0 0 #000000, -0.5px 0 0 #000000, 0 0.5px 0 #000000, 0 -0.5px 0 #000000', // Ultra-thin pure black outline
           transform: 'translate3d(0,0,0)',
@@ -90,11 +91,15 @@ const styleSheet = document.createElement('style');
 styleSheet.textContent = `
   @keyframes float-up {
     0% {
-      transform: translateX(-50%) translateY(0);
+      transform: translateX(-50%) translateY(0) scale(0.1);
+      opacity: 1;
+    }
+    4.78% {
+      transform: translateX(-50%) translateY(-2.87px) scale(1);
       opacity: 1;
     }
     100% {
-      transform: translateX(-50%) translateY(-60px);
+      transform: translateX(-50%) translateY(-60px) scale(1);
       opacity: 0;
     }
   }

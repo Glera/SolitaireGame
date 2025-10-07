@@ -37,10 +37,17 @@ export function calculateCardPoints(card: Card): number {
     return 0;
   }
 
-  const points = CARD_POINTS[card.rank];
-  scoredCards.add(card.id);
+  let points = CARD_POINTS[card.rank];
   
-  console.log(`🎯 Card ${card.suit}-${card.rank} scored for ${points} points`);
+  // Premium cards give 10x points
+  if (card.isPremium) {
+    points *= 10;
+    console.log(`⭐ Premium card ${card.suit}-${card.rank} scored for ${points} points (10x multiplier)`);
+  } else {
+    console.log(`🎯 Card ${card.suit}-${card.rank} scored for ${points} points`);
+  }
+  
+  scoredCards.add(card.id);
   return points;
 }
 
@@ -56,14 +63,22 @@ export function calculateCardPointsWithBreakdown(card: Card): { points: number; 
     return { points: 0 };
   }
 
-  const points = CARD_POINTS[card.rank];
+  let points = CARD_POINTS[card.rank];
+  
+  // Premium cards give 10x points
+  if (card.isPremium) {
+    points *= 10;
+    console.log(`⭐ Premium card ${card.suit}-${card.rank} scored for ${points} points (10x multiplier)`);
+  } else {
+    console.log(`🎯 Card ${card.suit}-${card.rank} scored for ${points} points`);
+  }
+  
   scoredCards.add(card.id);
   
-  console.log(`🎯 Card ${card.suit}-${card.rank} scored for ${points} points`);
   return {
     points,
     breakdown: {
-      cardRank: `${card.rank} ${card.suit}`,
+      cardRank: `${card.rank} ${card.suit}${card.isPremium ? ' ⭐' : ''}`,
       points
     }
   };
@@ -75,7 +90,12 @@ export function calculateCardPointsWithBreakdown(card: Card): { points: number; 
  * @returns Points for this card (always returns points, ignores scoring history)
  */
 export function calculateCardPointsRaw(card: Card): number {
-  return CARD_POINTS[card.rank];
+  let points = CARD_POINTS[card.rank];
+  // Premium cards give 10x points
+  if (card.isPremium) {
+    points *= 10;
+  }
+  return points;
 }
 
 /**

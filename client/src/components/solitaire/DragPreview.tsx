@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Card } from '../../lib/types/solitaire';
 import { Card as PlayingCard } from './Card';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
+import { useGameScaleContext } from '../../contexts/GameScaleContext';
 import { findBestDropTarget, DropTarget, setCurrentBestTarget, getCurrentBestTarget } from '../../lib/solitaire/dropTargets';
 import { clearAllDropTargetHighlights, applyDropTargetHighlight } from '../../lib/solitaire/styleManager';
 import { perfMonitor } from '../../lib/solitaire/performanceMonitor';
@@ -25,6 +26,7 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
   const lastHighlightedElement = useRef<HTMLElement | null>(null);
   const lastCursorPosRef = useRef({ x: startPosition.x + offset.x, y: startPosition.y + offset.y });
   const { sourceType, sourceIndex, sourceFoundation, draggedCards, collisionHighlightEnabled } = useSolitaire();
+  const { scale } = useGameScaleContext();
   
   useEffect(() => {
     let collisionCheckTimer: number;
@@ -154,7 +156,9 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
         top: `${position.y}px`,
         zIndex: 99999,
         pointerEvents: 'none',
-        transition: highlightedTarget ? 'all 100ms ease-out' : 'none'
+        transition: highlightedTarget ? 'all 100ms ease-out' : 'none',
+        transform: `scale(${scale})`,
+        transformOrigin: 'top left'
       }}
     >
       <div className="relative" style={{ 

@@ -43,9 +43,9 @@ export function RoomInfo({ roomType, gameVersion }: RoomInfoProps) {
           {roomConfig.description}
         </span>
         <div className="flex flex-col gap-0.5">
-          {roomConfig.multiplier > 1 && (
-            <span className="text-xs text-gray-400">
-              Множитель очков: x{roomConfig.multiplier}
+          {roomConfig.premiumCardsCount > 0 && (
+            <span className="text-xs text-yellow-400">
+              ⭐ {roomConfig.premiumCardsCount} премиальн{roomConfig.premiumCardsCount === 1 ? 'ая карта' : roomConfig.premiumCardsCount < 5 ? 'ые карты' : 'ых карт'}
             </span>
           )}
           {gameVersion && (

@@ -5,6 +5,7 @@ interface FloatingScoreData {
   score: number;
   x: number;
   y: number;
+  isPremium?: boolean;
   breakdown?: {
     cardRank: string;
     points: number;
@@ -15,13 +16,14 @@ export function useFloatingScores() {
   const [floatingScores, setFloatingScores] = useState<FloatingScoreData[]>([]);
   const floatingScoreId = useRef(0);
 
-  const addFloatingScore = (score: number, x: number, y: number, cardRank?: string) => {
+  const addFloatingScore = (score: number, x: number, y: number, cardRank?: string, isPremium?: boolean) => {
     // console.log(`🎯 useFloatingScores: addFloatingScore called with ${score} points for ${cardRank} at (${x}, ${y})`);
     const newScore: FloatingScoreData = {
       id: ++floatingScoreId.current,
       score,
       x,
       y,
+      isPremium,
       breakdown: cardRank ? {
         cardRank,
         points: score

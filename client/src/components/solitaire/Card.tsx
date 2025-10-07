@@ -29,16 +29,24 @@ export function Card({
   if (!card.faceUp) {
     return (
       <div 
+        data-card-id={card.id}
+        data-premium-hidden={card.isPremium ? "true" : undefined}
+        data-is-premium={card.isPremium ? "true" : undefined}
         className={cn(
-          "w-16 h-24 bg-green-950 border border-green-900 flex items-center justify-center cursor-pointer select-none",
+          "w-16 h-24 bg-green-950 flex items-center justify-center cursor-pointer select-none",
           "shadow-md outline-none focus:outline-none",
           "rounded-lg",
+          // Always render with normal border - CSS will handle premium styling after animation
+          "border border-green-900",
           className
         )}
         style={{ borderRadius: '0.5rem' }}
         onClick={onClick}
       >
-        <div className="w-12 h-20 border border-green-700 rounded opacity-30" />
+        <div 
+          className="w-12 h-20 border border-green-700 rounded opacity-30"
+          data-inner-border="true"
+        />
       </div>
     );
   }
@@ -48,18 +56,21 @@ export function Card({
 
   return (
     <div
+      data-card-id={card.id}
+      data-premium-hidden={card.isPremium ? "true" : undefined}
+      data-is-premium={card.isPremium ? "true" : undefined}
       className={cn(
-        "w-16 h-24 bg-amber-50 border border-amber-700 p-1 cursor-pointer select-none shadow-md",
+        "w-16 h-24 bg-amber-50 p-1 cursor-pointer select-none shadow-md",
         "hover:shadow-lg transition-all duration-100",
         "outline-none focus:outline-none",
         "rounded-lg",
+        // Always render with normal border - CSS will handle premium styling after animation
+        "border border-amber-700",
         isDragging && "opacity-0",
         isAnimating && "opacity-0",
         className
       )}
-      style={{ 
-        borderRadius: '0.5rem'
-      }}
+      style={{ borderRadius: '0.5rem' }}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onDragStart={(e) => {

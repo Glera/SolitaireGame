@@ -6,7 +6,6 @@ import { calculateCardPoints, calculateCardPointsRaw, resetScoredCards } from '.
 import { addPointsToProgress } from '../solitaire/progressManager';
 import { addFloatingScore } from '../solitaire/floatingScoreManager';
 import GameIntegration from '../gameIntegration';
-import { getPointsMultiplier } from '../roomUtils';
 
 interface AnimatingCard {
   card: Card;
@@ -51,7 +50,10 @@ interface SolitaireStore extends GameState, DragState {
   onGiftEarned: (gifts: number) => void;
   
   // Floating scores functions
-  addFloatingScore: (points: number, x: number, y: number, cardRank: string) => void;
+  addFloatingScore: (points: number, x: number, y: number, cardRank: string, isPremium?: boolean) => void;
+  
+  // Lobby integration
+  getCurrentResults: () => { score: number; giftsEarned: number };
 }
 
 export const useSolitaire = create<SolitaireStore>((set, get) => ({
@@ -92,6 +94,17 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       sourceFoundation: undefined,
       animatingCard: null
     });
+    
+    // Trigger premium cards reveal animation immediately
+    setTimeout(async () => {
+      const { getPremiumCardsFromTableau, animatePremiumCardsReveal } = await import('../solitaire/premiumCardsAnimation');
+      const premiumCards = getPremiumCardsFromTableau(newGameState.tableau);
+      
+      if (premiumCards.length > 0) {
+        console.log(`🎮 Starting premium cards reveal for ${premiumCards.length} cards`);
+        await animatePremiumCardsReveal(premiumCards, 100);
+      }
+    }, 0); // Start animation immediately after game starts
   },
   
   setAnimatingCard: (card) => {
@@ -198,12 +211,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           });
         });
         
-        // Apply room multiplier to total score
-        const multiplier = getPointsMultiplier(newGameState.roomType);
-        const finalScore = totalScore * multiplier;
         
-        console.log('🎉 Game won! Notifying lobby with score:', finalScore);
-        GameIntegration.getInstance().onGameEnd(finalScore, gameTime, newGameState.totalGifts);
+        console.log('🎉 Game won! Notifying lobby with score:', totalScore);
+        GameIntegration.getInstance().onGameEnd(totalScore, gameTime, newGameState.totalGifts);
       }
     } else {
       console.log('❌ Move failed, invalid move attempted');
@@ -335,12 +345,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           });
         });
         
-        // Apply room multiplier to total score
-        const multiplier = getPointsMultiplier(newGameState.roomType);
-        const finalScore = totalScore * multiplier;
         
-        console.log('🎉 Game won! Notifying lobby with score:', finalScore);
-        GameIntegration.getInstance().onGameEnd(finalScore, gameTime, newGameState.totalGifts);
+        console.log('🎉 Game won! Notifying lobby with score:', totalScore);
+        GameIntegration.getInstance().onGameEnd(totalScore, gameTime, newGameState.totalGifts);
       }
     } else {
       set({ animatingCard: null });
@@ -356,9 +363,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     console.log(`🎁 Gift earned! Total gifts: ${gifts}`);
   },
   
-  addFloatingScore: (points: number, x: number, y: number, cardRank: string) => {
+  addFloatingScore: (points: number, x: number, y: number, cardRank: string, isPremium?: boolean) => {
     import('../solitaire/floatingScoreManager').then(({ addFloatingScore }) => {
-      addFloatingScore(points, x, y, cardRank);
+      addFloatingScore(points, x, y, cardRank, isPremium);
     });
   },
   
@@ -373,19 +380,13 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       });
     });
     
-    // Apply room multiplier to current score
-    const multiplier = getPointsMultiplier(state.roomType);
-    const finalScore = currentScore * multiplier;
-    
     console.log('📊 Current results calculated:', {
-      baseScore: currentScore,
-      multiplier,
-      finalScore,
+      score: currentScore,
       giftsEarned: state.totalGifts
     });
     
     return {
-      score: finalScore,
+      score: currentScore,
       giftsEarned: state.totalGifts
     };
   }

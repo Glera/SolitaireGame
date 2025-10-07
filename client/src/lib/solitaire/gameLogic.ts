@@ -1,7 +1,19 @@
 import { GameState, Card, Suit } from './types';
 import { createDeck, shuffleDeck, canPlaceOnTableau, canPlaceOnFoundation } from './cardUtils';
 import { calculateCardPoints, calculateCardPointsWithBreakdown } from './scoring';
-import { getRoomFromURL, getPointsMultiplier } from '../roomUtils';
+import { getRoomFromURL, getPremiumCardsCount } from '../roomUtils';
+
+// Select random cards to be premium
+function selectPremiumCards(allCards: Card[], count: number): Set<string> {
+  const premiumIds = new Set<string>();
+  const shuffled = [...allCards].sort(() => Math.random() - 0.5);
+  
+  for (let i = 0; i < Math.min(count, shuffled.length); i++) {
+    premiumIds.add(shuffled[i].id);
+  }
+  
+  return premiumIds;
+}
 
 export function initializeGame(): GameState {
   const deck = shuffleDeck(createDeck());
@@ -10,6 +22,7 @@ export function initializeGame(): GameState {
   // Deal cards to tableau (7 columns, 1-7 cards each)
   const tableau: Card[][] = Array(7).fill(null).map(() => []);
   let deckIndex = 0;
+  const tableauCards: Card[] = [];
   
   for (let col = 0; col < 7; col++) {
     for (let row = 0; row <= col; row++) {
@@ -17,12 +30,30 @@ export function initializeGame(): GameState {
       // Only the top card in each column is face up
       card.faceUp = row === col;
       tableau[col].push(card);
+      tableauCards.push(card);
       deckIndex++;
     }
   }
   
-  // Remaining cards go to stock pile
-  const stock = deck.slice(deckIndex).map(card => ({ ...card, faceUp: false }));
+  // Select premium cards ONLY from tableau cards (not from stock)
+  const premiumCount = getPremiumCardsCount(roomType);
+  const premiumCardIds = selectPremiumCards(tableauCards, premiumCount);
+  
+  // Mark premium cards in tableau
+  for (let col = 0; col < 7; col++) {
+    for (let row = 0; row <= col; row++) {
+      if (premiumCardIds.has(tableau[col][row].id)) {
+        tableau[col][row].isPremium = true;
+      }
+    }
+  }
+  
+  // Remaining cards go to stock pile (no premium cards here)
+  const stock = deck.slice(deckIndex).map(card => ({ 
+    ...card, 
+    faceUp: false,
+    isPremium: false // Stock cards are never premium
+  }));
   
   return {
     tableau,
@@ -82,7 +113,7 @@ export function moveCards(
   targetIndex: number | undefined,
   targetFoundation: Suit | undefined,
   onPointsEarned?: (points: number) => void,
-  onFloatingScore?: (points: number, x: number, y: number, cardRank: string) => void,
+  onFloatingScore?: (points: number, x: number, y: number, cardRank: string, isPremium?: boolean) => void,
   cardStartPosition?: { x: number; y: number } | null
 ): GameState | null {
   console.log('🎲 moveCards validation:', {
@@ -127,17 +158,15 @@ export function moveCards(
     
     // Calculate points for cards moved to foundation
     if (onPointsEarned) {
-      const multiplier = getPointsMultiplier(gameState.roomType);
       let totalPoints = 0;
       
       for (const card of cards) {
         const result = calculateCardPointsWithBreakdown(card);
-        const basePoints = result.points;
-        const multipliedPoints = basePoints * multiplier;
-        totalPoints += multipliedPoints;
+        const points = result.points;
+        totalPoints += points;
         
-        // Show floating score for each card (display multiplied points)
-        if (basePoints > 0 && onFloatingScore && result.breakdown) {
+        // Show floating score for each card
+        if (points > 0 && onFloatingScore && result.breakdown) {
           // Use card start position if available, otherwise fallback to center
           let scoreX = window.innerWidth / 2;
           let scoreY = 200;
@@ -147,8 +176,7 @@ export function moveCards(
             scoreY = cardStartPosition.y;
           }
           
-          // console.log(`🎯 Triggering floating score: +${multipliedPoints} for ${result.breakdown.cardRank} at (${scoreX}, ${scoreY}) (base: ${basePoints}, multiplier: x${multiplier})`);
-          onFloatingScore(multipliedPoints, scoreX, scoreY, result.breakdown.cardRank);
+          onFloatingScore(points, scoreX, scoreY, result.breakdown.cardRank, card.isPremium);
         }
       }
       if (totalPoints > 0) {

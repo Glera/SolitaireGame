@@ -98,19 +98,78 @@ export function updateDropTargetBounds(force = false) {
   perfMonitor.end('updateBounds');
 }
 
-function checkIntersection(rect1: DOMRect, rect2: DOMRect): boolean {
+function checkIntersection(rect1: DOMRect, rect2: DOMRect, isMultiCard: boolean = false): boolean {
+  let adjustedRect1 = rect1;
+  
+  // For multi-card drag, use even smaller area - just the top half of the card
+  // This prevents false positives when dragging stacks
+  if (isMultiCard && rect1.height > rect1.width * 1.5) {
+    const originalBottom = rect1.bottom;
+    adjustedRect1 = {
+      top: rect1.top,
+      bottom: rect1.top + (rect1.width * 0.75), // Use half the card height for stricter detection
+      left: rect1.left,
+      right: rect1.right,
+      width: rect1.width,
+      height: rect1.width * 0.75,
+      x: rect1.x,
+      y: rect1.y
+    } as DOMRect;
+    
+    // Debug logging
+    const intersects = !(
+      adjustedRect1.right < rect2.left ||
+      adjustedRect1.left > rect2.right ||
+      adjustedRect1.bottom < rect2.top ||
+      adjustedRect1.top > rect2.bottom
+    );
+    
+    if (intersects) {
+      console.log('🔍 Multi-card INTERSECTION DETECTED:', {
+        originalHeight: rect1.height,
+        adjustedHeight: adjustedRect1.bottom - adjustedRect1.top,
+        width: rect1.width,
+        rect1: { top: rect1.top, bottom: originalBottom, left: rect1.left, right: rect1.right },
+        adjusted: { top: adjustedRect1.top, bottom: adjustedRect1.bottom, left: adjustedRect1.left, right: adjustedRect1.right },
+        rect2: { top: rect2.top, bottom: rect2.bottom, left: rect2.left, right: rect2.right },
+        checks: {
+          rightCheck: `${adjustedRect1.right} < ${rect2.left} = ${adjustedRect1.right < rect2.left}`,
+          leftCheck: `${adjustedRect1.left} > ${rect2.right} = ${adjustedRect1.left > rect2.right}`,
+          bottomCheck: `${adjustedRect1.bottom} < ${rect2.top} = ${adjustedRect1.bottom < rect2.top}`,
+          topCheck: `${adjustedRect1.top} > ${rect2.bottom} = ${adjustedRect1.top > rect2.bottom}`
+        }
+      });
+    }
+  }
+  
   // Optimized intersection check without logging
   return !(
-    rect1.right < rect2.left ||
-    rect1.left > rect2.right ||
-    rect1.bottom < rect2.top ||
-    rect1.top > rect2.bottom
+    adjustedRect1.right < rect2.left ||
+    adjustedRect1.left > rect2.right ||
+    adjustedRect1.bottom < rect2.top ||
+    adjustedRect1.top > rect2.bottom
   );
 }
 
-function getIntersectionArea(rect1: DOMRect, rect2: DOMRect): number {
-  const xOverlap = Math.max(0, Math.min(rect1.right, rect2.right) - Math.max(rect1.left, rect2.left));
-  const yOverlap = Math.max(0, Math.min(rect1.bottom, rect2.bottom) - Math.max(rect1.top, rect2.top));
+function getIntersectionArea(rect1: DOMRect, rect2: DOMRect, isMultiCard: boolean = false): number {
+  let adjustedRect1 = rect1;
+  
+  // For multi-card drag, use same smaller area as collision detection
+  if (isMultiCard && rect1.height > rect1.width * 1.5) {
+    adjustedRect1 = {
+      top: rect1.top,
+      bottom: rect1.top + (rect1.width * 0.75), // Use half the card height for stricter detection
+      left: rect1.left,
+      right: rect1.right,
+      width: rect1.width,
+      height: rect1.width * 0.75,
+      x: rect1.x,
+      y: rect1.y
+    } as DOMRect;
+  }
+  
+  const xOverlap = Math.max(0, Math.min(adjustedRect1.right, rect2.right) - Math.max(adjustedRect1.left, rect2.left));
+  const yOverlap = Math.max(0, Math.min(adjustedRect1.bottom, rect2.bottom) - Math.max(adjustedRect1.top, rect2.top));
   return xOverlap * yOverlap;
 }
 
@@ -136,9 +195,27 @@ export function findBestDropTarget(
   // });
   
   // Find all intersecting targets using cached bounds
+  const isMultiCard = draggedCards.length > 1;
+  
+  // Debug: log drag info (commented out for performance)
+  // if (isMultiCard && Math.random() < 0.1) {
+  //   console.log('🎴 Dragging multiple cards:', {
+  //     count: draggedCards.length,
+  //     isMultiCard,
+  //     dragBounds: { 
+  //       top: dragBounds.top, 
+  //       bottom: dragBounds.bottom, 
+  //       left: dragBounds.left, 
+  //       right: dragBounds.right,
+  //       width: dragBounds.width,
+  //       height: dragBounds.height
+  //     }
+  //   });
+  // }
+  
   const intersectingTargets = dropTargets.filter(target => {
     // Use cached bounds for performance (updated periodically)
-    if (!target.bounds || !checkIntersection(dragBounds, target.bounds)) {
+    if (!target.bounds || !checkIntersection(dragBounds, target.bounds, isMultiCard)) {
       return false;
     }
     
@@ -213,7 +290,7 @@ export function findBestDropTarget(
     );
     
     // Also consider intersection area
-    const intersectionArea = getIntersectionArea(dragBounds, target.bounds);
+    const intersectionArea = getIntersectionArea(dragBounds, target.bounds, isMultiCard);
     
     return {
       target,

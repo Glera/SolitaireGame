@@ -219,27 +219,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
         handleDrop(e);
       }}
     >
-      {/* Invisible expanded drop zone - doesn't block clicks */}
-      <div 
-        className="absolute -inset-8 z-0 pointer-events-none"
-        style={{ pointerEvents: isDragging ? 'auto' : 'none' }}
-        onDragOver={(e) => { 
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-        }}
-        onDragEnter={(e) => {
-          e.preventDefault();
-          console.log('🔵 DragEnter on expanded zone', columnIndex);
-        }}
-        onDragLeave={(e) => {
-          console.log('🔴 DragLeave on expanded zone', columnIndex);
-        }}
-        onDrop={(e) => { 
-          console.log('💧 Drop on expanded zone', columnIndex);
-          e.preventDefault();
-          handleDrop(e); 
-        }}
-      />
+      {/* Removed expanded drop zone - using only actual card bounds for precise drag & drop */}
       <Pile
         onDrop={(e) => {
           console.log('💧 Drop on Pile', columnIndex);

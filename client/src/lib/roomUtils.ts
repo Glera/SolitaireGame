@@ -3,25 +3,25 @@ export type RoomType = 'standard' | 'premium' | 'luxury';
 
 export interface RoomConfig {
   type: RoomType;
-  multiplier: number;
+  premiumCardsCount: number; // Number of premium cards (give 10x points)
   description: string;
 }
 
 export const ROOM_CONFIGS: Record<RoomType, RoomConfig> = {
   standard: {
     type: 'standard',
-    multiplier: 1,
-    description: 'Обычная комната (очки x1)'
+    premiumCardsCount: 1,
+    description: 'Обычная комната (1 премиальная карта)'
   },
   premium: {
     type: 'premium', 
-    multiplier: 2,
-    description: 'Премиальная комната (очки x2)'
+    premiumCardsCount: 5,
+    description: 'Премиальная комната (5 премиальных карт)'
   },
   luxury: {
     type: 'luxury',
-    multiplier: 5,
-    description: 'Люкс комната (очки x5)'
+    premiumCardsCount: 10,
+    description: 'Люкс комната (10 премиальных карт)'
   }
 };
 
@@ -45,7 +45,7 @@ export function getRoomConfig(roomType?: RoomType): RoomConfig {
   return ROOM_CONFIGS[room];
 }
 
-// Get points multiplier for current room
-export function getPointsMultiplier(roomType?: RoomType): number {
-  return getRoomConfig(roomType).multiplier;
+// Get premium cards count for current room
+export function getPremiumCardsCount(roomType?: RoomType): number {
+  return getRoomConfig(roomType).premiumCardsCount;
 }
