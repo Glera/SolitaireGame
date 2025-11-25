@@ -22,13 +22,11 @@ export function FloatingScore({ score, x, y, onComplete, isPremium = false, brea
     setMounted(true);
     
     const timer = setTimeout(() => {
-      // console.log(`🎯 FloatingScore: Hiding score ${score} after 2090ms`);
       setIsVisible(false);
       setTimeout(() => {
-        // console.log(`🎯 FloatingScore: Calling onComplete for score ${score}`);
         onComplete();
       }, 100); // Allow fade out to complete
-    }, 2090); // Match the animation duration (2.09s)
+    }, 1500); // Match the animation duration (1.5s)
 
     return () => {
       // console.log(`🎯 FloatingScore: Cleanup for score ${score}`);
@@ -68,14 +66,13 @@ export function FloatingScore({ score, x, y, onComplete, isPremium = false, brea
       <div 
         style={{
           color: isPremium ? 'rgb(59, 130, 246)' : '#f8fafc', // Blue for premium, white for normal
-          fontSize: isPremium ? '1.75rem' : '1.25rem', // Larger for premium
-          fontWeight: 'bold',
-          textShadow: '0.5px 0 0 #000000, -0.5px 0 0 #000000, 0 0.5px 0 #000000, 0 -0.5px 0 #000000', // Ultra-thin pure black outline
+          fontSize: isPremium ? '2rem' : '1.5rem', // Larger size
+          fontWeight: 900, // font-black - same as cards
+          textShadow: '1px 0 0 #000000, -1px 0 0 #000000, 0 1px 0 #000000, 0 -1px 0 #000000', // Black outline
           transform: 'translate3d(0,0,0)',
           backfaceVisibility: 'hidden',
           whiteSpace: 'nowrap',
           zIndex: 1000,
-          fontFamily: 'Arial, sans-serif',
           lineHeight: '1',
         }}
       >
@@ -91,21 +88,17 @@ const styleSheet = document.createElement('style');
 styleSheet.textContent = `
   @keyframes float-up {
     0% {
-      transform: translateX(-50%) translateY(0) scale(0.1);
-      opacity: 1;
-    }
-    4.78% {
-      transform: translateX(-50%) translateY(-2.87px) scale(1);
+      transform: translateX(-50%) translateY(0);
       opacity: 1;
     }
     100% {
-      transform: translateX(-50%) translateY(-60px) scale(1);
+      transform: translateX(-50%) translateY(-60px);
       opacity: 0;
     }
   }
   
   .animate-float-up {
-    animation: float-up 2.09s ease-out forwards;
+    animation: float-up 1.5s ease-out forwards;
   }
   
   .text-shadow-glow {

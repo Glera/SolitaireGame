@@ -35,6 +35,8 @@ export interface GameState {
   totalGifts: number;
   // Room configuration
   roomType: RoomType;
+  // Game mode (random or guaranteed solvable)
+  gameMode?: 'random' | 'solvable' | 'unsolvable';
 }
 
 export interface DragState {

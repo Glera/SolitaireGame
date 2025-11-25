@@ -25,25 +25,60 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
   const previewRef = useRef<HTMLDivElement>(null);
   const lastHighlightedElement = useRef<HTMLElement | null>(null);
   const lastCursorPosRef = useRef({ x: startPosition.x + offset.x, y: startPosition.y + offset.y });
-  const { sourceType, sourceIndex, sourceFoundation, draggedCards, collisionHighlightEnabled } = useSolitaire();
+  const rafIdRef = useRef<number | null>(null);
+const { sourceType, sourceIndex, sourceFoundation, draggedCards, collisionHighlightEnabled } = useSolitaire();
   const { scale } = useGameScaleContext();
   
   useEffect(() => {
     let collisionCheckTimer: number;
     
-    // During drag operations, use dragover event instead of mousemove
+    // Check if collision highlighting should be disabled (mobile)
+    const disableCollisionHighlight = localStorage.getItem('disableCollisionHighlight') === 'true';
+    
+    // During drag operations, use both dragover and touchmove events
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault(); // Important for drag operations
       
-      // Update position immediately for smooth movement
-      const newPos = {
-        x: e.clientX - offset.x,
-        y: e.clientY - offset.y
-      };
+      // Update position using RAF for smooth movement
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
       
-      setPosition(newPos);
-      setCursorPos({ x: e.clientX, y: e.clientY });
-      lastCursorPosRef.current = { x: e.clientX, y: e.clientY };
+      rafIdRef.current = requestAnimationFrame(() => {
+        const newPos = {
+          x: e.clientX - offset.x,
+          y: e.clientY - offset.y
+        };
+        
+        setPosition(newPos);
+        setCursorPos({ x: e.clientX, y: e.clientY });
+        lastCursorPosRef.current = { x: e.clientX, y: e.clientY };
+        rafIdRef.current = null;
+      });
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      e.preventDefault();
+
+      // Update position using RAF for smooth movement
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+
+      rafIdRef.current = requestAnimationFrame(() => {
+        const newPos = {
+          x: touch.clientX - offset.x,
+          y: touch.clientY - offset.y
+        };
+
+        setPosition(newPos);
+        setCursorPos({ x: touch.clientX, y: touch.clientY });
+        lastCursorPosRef.current = { x: touch.clientX, y: touch.clientY };
+        rafIdRef.current = null;
+      });
     };
     
     // Global drop handler to catch missed drops
@@ -123,20 +158,31 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
       perfMonitor.end('checkCollisions');
     };
     
-    // Only check collisions continuously if highlights are enabled
-    // If disabled, we'll check only on drop for better performance
-    if (collisionHighlightEnabled) {
-      collisionCheckTimer = window.setInterval(checkCollisions, 50);
+    // Only check collisions continuously if highlights are enabled AND not disabled globally (mobile)
+    // Use longer interval on mobile for better performance
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (collisionHighlightEnabled && !disableCollisionHighlight) {
+      const collisionCheckInterval = isMobile ? 200 : 50; // 200ms on mobile (was 150ms), 50ms on desktop
+      collisionCheckTimer = window.setInterval(checkCollisions, collisionCheckInterval);
     }
     
-    // Listen to dragover which fires during drag operations
+    // Listen to both dragover and touchmove for cross-platform support
     window.addEventListener('dragover', handleDragOver as any);
+    window.addEventListener('touchmove', handleTouchMove as any, { passive: false });
     // Add global drop listener with capture to catch drops before they bubble
     window.addEventListener('drop', handleGlobalDrop as any, true);
     
     return () => {
       console.log('DragPreview: Cleaning up');
+      
+      // Cancel any pending RAF
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+      
       window.removeEventListener('dragover', handleDragOver as any);
+      window.removeEventListener('touchmove', handleTouchMove as any);
       window.removeEventListener('drop', handleGlobalDrop as any, true);
       window.clearInterval(collisionCheckTimer);
       clearAllDropTargetHighlights();
@@ -150,6 +196,7 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
   return createPortal(
     <div 
       ref={previewRef}
+      data-drag-preview="true"
       style={{
         position: 'fixed',
         left: `${position.x}px`,
@@ -157,13 +204,16 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
         zIndex: 99999,
         pointerEvents: 'none',
         transition: highlightedTarget ? 'all 100ms ease-out' : 'none',
-        transform: `scale(${scale})`,
-        transformOrigin: 'top left'
+        transform: `scale(${scale}) translate3d(0, 0, 0)`,
+        transformOrigin: 'top left',
+        willChange: 'transform',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden'
       }}
     >
       <div className="relative" style={{ 
         width: '64px', 
-        height: `${96 + (cards.length - 1) * 18}px`, // 96px base card height + 18px per additional card
+        height: `${96 + (cards.length - 1) * 48}px`, // 96px base card height + 48px per additional card (matches face-up spacing)
         minHeight: '96px' // Ensure at least one card height
       }}>
         {cards.map((card, index) => (
@@ -171,7 +221,7 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
             key={card.id}
             style={{ 
               position: 'absolute',
-              top: `${index * 18}px`,
+              top: `${index * 48}px`, // 48px vertical offset matches face-up cards in tableau
               left: 0,
               opacity: 0.95,
               filter: highlightedTarget ? 'brightness(1.1)' : 'none',

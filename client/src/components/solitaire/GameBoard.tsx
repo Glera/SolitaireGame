@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { useAudio } from '../../lib/stores/useAudio';
 import { useProgressGift } from '../../hooks/useProgressGift';
@@ -17,6 +17,7 @@ import { RoomInfo } from './RoomInfo';
 import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 import { setAddPointsFunction } from '../../lib/solitaire/progressManager';
 import { setAddFloatingScoreFunction } from '../../lib/solitaire/floatingScoreManager';
+import { Card as CardType, Suit } from '../../lib/solitaire/types';
 
 // Debug overlay component to show available space
 function DebugAreaOverlay({ containerHeight, availableHeight, scale }: { containerHeight: number; availableHeight: number; scale: number }) {
@@ -136,7 +137,9 @@ export function GameBoard() {
     isDragging,
     onGiftEarned,
     newGame,
-    roomType
+    roomType,
+    gameMode,
+    foundationSlotOrder
   } = useSolitaire();
   
   const { playSuccess } = useAudio();
@@ -145,13 +148,48 @@ export function GameBoard() {
   const [showAreaDebug, setShowAreaDebug] = useState(false); // Debug overlay disabled by default
   
   // Game scale for responsive layout
-  const { scale, containerHeight, availableHeight } = useGameScaleContext();
+  const { scale, containerHeight, availableHeight, containerWidth } = useGameScaleContext();
   
   // Progress bar integration
   const { containerRef, addPoints, reinitialize } = useProgressGift(onGiftEarned, roomType);
   
   // Floating scores integration
   const { floatingScores, addFloatingScore, removeFloatingScore } = useFloatingScores();
+  
+  // Show scale info in debug panel when opened
+  useEffect(() => {
+    if (showDebugPanel) {
+      const BASE_WIDTH = 600;
+      const BASE_HEIGHT = 812; // Updated to match useGameScale (13 cards)
+      const scaleX = containerWidth / BASE_WIDTH;
+      const scaleY = availableHeight / BASE_HEIGHT;
+      
+      setDebugInfo({
+        title: 'Game Scale Info',
+        position: { x: 10, y: 10 },
+        section: 'Scale',
+        data: {
+          'Container Size': `${containerWidth}x${containerHeight}`,
+          'Available Height': `${availableHeight}px`,
+          'Base Size': `${BASE_WIDTH}x${BASE_HEIGHT}`,
+          'Scale X': scaleX.toFixed(3),
+          'Scale Y': scaleY.toFixed(3),
+          'Final Scale': scale.toFixed(3),
+          'Game Size': `${Math.round(BASE_WIDTH * scale)}x${Math.round(BASE_HEIGHT * scale)}`,
+          'Limiting Factor': scaleX < scaleY ? 'Width' : 'Height'
+        }
+      });
+    }
+  }, [scale, containerWidth, containerHeight, availableHeight, showDebugPanel]);
+  
+  // Build foundation render order: reserved slots first (left to right), then remaining suits
+  const foundationRenderOrder = useMemo(() => {
+    const allSuits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
+    const remaining = allSuits.filter(suit => !foundationSlotOrder.includes(suit));
+    const result = [...foundationSlotOrder, ...remaining];
+    console.log(`🎨 Foundation render order: ${result.join(', ')}`);
+    return result;
+  }, [foundationSlotOrder]);
   
   // Register addPoints function with progress manager
   useEffect(() => {
@@ -180,12 +218,12 @@ export function GameBoard() {
     //   console.log('🧪 Testing floating score...');
     //   addFloatingScore(100, window.innerWidth / 2, window.innerHeight / 2, 'TEST');
     // }, 2000);
-  }, []); // Empty dependency array - only run on mount
+  }, []); // Only run on mount
 
   // Set up debug callback
   useEffect(() => {
     setDebugCallback((info: DebugInfo) => {
-      // Only show debug info if panel is open
+      // Only show debug info if panel is already open
       if (showDebugPanel) {
         setDebugInfo(info);
       }
@@ -227,7 +265,14 @@ export function GameBoard() {
           transition: 'transform 0.3s ease-out'
         }}
       >
-        <div className="max-w-fit mx-auto">
+        <div style={{ 
+          display: 'inline-block',
+          marginLeft: 'auto',
+          marginRight: 'auto',
+          position: 'relative',
+          left: '50%',
+          transform: 'translateX(-50%)'
+        }}>
           {/* Progress Bar Container */}
           <div style={{
             position: 'relative',
@@ -241,25 +286,29 @@ export function GameBoard() {
           
           <div style={{ position: 'relative', zIndex: 2, marginTop: '0px' }}>
             <div className="flex justify-between items-center mb-3">
-              <RoomInfo roomType={roomType} gameVersion={GAME_VERSION} />
+              <RoomInfo roomType={roomType} gameVersion={GAME_VERSION} gameMode={gameMode} />
               <GameControls onDebugClick={() => setShowDebugPanel(true)} />
             </div>
           </div>
           
           <div className="inline-block space-y-3" data-game-field style={{ position: 'relative', zIndex: 2, marginTop: '10px' }}>
-            {/* Top row: Stock, Waste, and Foundation piles - aligned with 7 columns */}
-            <div className="flex gap-2 items-start">
-              <StockPile cards={stock} />
+            {/* Top row: Foundation piles on LEFT, Stock and Waste on RIGHT - optimized for right-handed mobile users */}
+            <div className="flex gap-1 items-start">
+              {foundationRenderOrder.map((suit) => (
+                <FoundationPile 
+                  key={suit}
+                  cards={foundations[suit]} 
+                  suit={suit} 
+                  id={`foundation-${suit}`} 
+                />
+              ))}
+              <div className="w-20" /> {/* Empty space equivalent to 1 card */}
               <WastePile cards={waste} />
-              <div className="w-16" /> {/* Empty space equivalent to 1 card */}
-              <FoundationPile cards={foundations.hearts} suit="hearts" id="foundation-hearts" />
-              <FoundationPile cards={foundations.diamonds} suit="diamonds" id="foundation-diamonds" />
-              <FoundationPile cards={foundations.clubs} suit="clubs" id="foundation-clubs" />
-              <FoundationPile cards={foundations.spades} suit="spades" id="foundation-spades" />
+              <StockPile cards={stock} />
             </div>
             
             {/* Bottom row: Tableau columns */}
-            <div className="flex gap-2">
+            <div className="flex gap-1">
               {tableau.map((column, index) => (
                 <div key={index} className="min-h-32">
                   <TableauColumn cards={column} columnIndex={index} />
@@ -278,6 +327,7 @@ export function GameBoard() {
             startPosition={animatingCard.startPosition}
             endPosition={animatingCard.endPosition}
             onComplete={() => completeCardAnimation(animatingCard.card, animatingCard.targetSuit, animatingCard.cardStartPosition)}
+            stackCards={animatingCard.stackCards} // Pass stack cards for multi-card animation
           />
         </div>
       )}

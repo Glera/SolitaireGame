@@ -31,38 +31,39 @@ export function useGameScale(): GameDimensions {
       const containerHeight = window.innerHeight;
 
       // Reserved spaces (in pixels)
-      const AD_SPACE = 0;           // Bottom ad space (removed)
-      const PROGRESS_BAR = 95;      // Progress bar at top (with animations space)
-      const CONTROLS = 30;          // Room info + game controls
-      const PADDING = 15;           // Padding and spacing
+      const AD_SPACE = 60;          // Bottom ad space for banner
+      const PROGRESS_BAR = 70;      // Progress bar at top
+      const CONTROLS = 25;          // Room info + game controls
+      const PADDING = 10;           // Padding and spacing
       
       const reservedHeight = AD_SPACE + PROGRESS_BAR + CONTROLS + PADDING;
       const availableHeight = containerHeight - reservedHeight;
 
       // Base game dimensions (at scale 1)
-      // 7 columns × 64px (card width) + 6 gaps × 8px = 496px width
-      const BASE_WIDTH = 496 + 100;   // Add padding for centering
+      // 7 columns × 80px (card width w-20) + 6 gaps × 4px (gap-1) = 560 + 24 = 584px
+      // But we also need to account for actual game board width with proper margins
+      const BASE_WIDTH = 600;   // Slightly larger to better fill screen
       
       // Height calculation:
-      // - Top row (Stock/Waste/Foundations): 96px (card height) + 12px gap
-      // - Tableau: Maximum 18 cards stacked
-      //   - First card: 96px (full card)
-      //   - Remaining 17 cards: 17 × 18px = 306px (18px vertical offset per card)
-      //   Total: 96 + 306 = 402px
-      const CARD_HEIGHT = 96;
-      const CARD_VERTICAL_OFFSET = 18;  // Space between stacked cards (matches TableauColumn)
-      const MAX_TABLEAU_CARDS = 18;     // Maximum: 6 initial + 12 cards (K to 2)
-      const TOP_ROW_HEIGHT = CARD_HEIGHT + 12; // Top row + gap
-      const TABLEAU_HEIGHT = CARD_HEIGHT + ((MAX_TABLEAU_CARDS - 1) * CARD_VERTICAL_OFFSET);
-      const BASE_HEIGHT = TOP_ROW_HEIGHT + TABLEAU_HEIGHT; // ~510px total
+      // - Top row (Stock/Waste/Foundations): 112px (card height h-28) + 12px gap = 124px
+      // - Tableau: Optimize for typical case (not absolute maximum)
+      //   - First card: 112px (full card)
+      //   - Remaining cards: Assume typical 10 cards max visible
+      const isMobile = containerWidth <= 768;
+      const CARD_HEIGHT = 112;
+      const CARD_VERTICAL_OFFSET = isMobile ? 52 : 48;  // Mobile uses 52px, desktop 48px
+      const TYPICAL_MAX_CARDS = 10;     // Reduced from 13 to better fit screens
+      const TOP_ROW_HEIGHT = CARD_HEIGHT + 12; // Top row + gap = 124px
+      const TABLEAU_HEIGHT = CARD_HEIGHT + ((TYPICAL_MAX_CARDS - 1) * CARD_VERTICAL_OFFSET);
+      const BASE_HEIGHT = TOP_ROW_HEIGHT + TABLEAU_HEIGHT;
 
       // Calculate scale to fit
       const scaleX = containerWidth / BASE_WIDTH;
       const scaleY = availableHeight / BASE_HEIGHT;
       
       // Use the smaller scale to ensure everything fits
-      // Min scale 0.5, max scale 1.5 for reasonable limits
-      const scale = Math.max(0.5, Math.min(1.5, Math.min(scaleX, scaleY)));
+      // Removed max scale limit to allow better screen utilization
+      const scale = Math.max(0.5, Math.min(scaleX, scaleY));
 
       setDimensions({
         scale,
@@ -74,7 +75,11 @@ export function useGameScale(): GameDimensions {
       console.log('🎮 Game Scale:', {
         containerSize: `${containerWidth}x${containerHeight}`,
         availableHeight,
-        scale: scale.toFixed(2)
+        baseSize: `${BASE_WIDTH}x${BASE_HEIGHT}`,
+        scaleX: scaleX.toFixed(2),
+        scaleY: scaleY.toFixed(2),
+        finalScale: scale.toFixed(2),
+        gameSize: `${Math.round(BASE_WIDTH * scale)}x${Math.round(BASE_HEIGHT * scale)}`
       });
     };
 

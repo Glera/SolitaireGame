@@ -5,6 +5,9 @@ import { Card as CardType } from '../../lib/solitaire/types';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { registerDropTarget, unregisterDropTarget, getCurrentBestTarget, setCurrentBestTarget } from '../../lib/solitaire/dropTargets';
 import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
+import { useTouchDrag } from '../../hooks/useTouchDrag';
+import { calculateStackOffsets } from '../../lib/solitaire/stackCompression';
+import { useGameScaleContext } from '../../contexts/GameScaleContext';
 
 interface TableauColumnProps {
   cards: CardType[];
@@ -20,6 +23,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     getMovableCardsFromTableau,
     canAutoMoveToFoundation,
     autoMoveToFoundation,
+    findTableauPlacementForCard,
+    autoMoveToTableau,
+    autoMoveStackToTableau,
     isDragging,
     draggedCards,
     sourceType,
@@ -31,10 +37,27 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     animatingCard
   } = useSolitaire();
   
+  const { scale } = useGameScaleContext();
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
+  
+  // Track shaking cards for invalid moves (store array of card IDs)
+  const [shakingCardIds, setShakingCardIds] = useState<string[]>([]);
+  
+  // Touch drag handlers
+  const { handleTouchStart, handleTouchMove, handleTouchEnd } = useTouchDrag(
+    startDrag,
+    endDrag,
+    dropCards,
+    setShowDragPreview,
+    () => useSolitaire.getState(),
+    () => useSolitaire.getState().draggedCards,
+    () => useSolitaire.getState().sourceType,
+    () => useSolitaire.getState().sourceIndex,
+    () => useSolitaire.getState().sourceFoundation
+  );
   
   // Register this column as drop target
   useEffect(() => {
@@ -68,20 +91,74 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   const handleCardClick = (cardIndex: number) => {
     const card = cards[cardIndex];
     if (!card.faceUp) return;
+    
+    // Don't allow clicks during animation
+    // Temporarily disabled to debug
+    // if (animatingCard) {
+    //   console.log('⏸️ TableauColumn: Animation in progress, ignoring click');
+    //   return;
+    // }
 
-    // Check if this is the top card and can be auto-moved to foundation
-    if (cardIndex === cards.length - 1) {
+    // Get all cards from this index to the end (the stack we want to move)
+    const cardsToMove = cards.slice(cardIndex);
+    
+    console.log('🎯 TableauColumn: Card(s) clicked', {
+      clickedCard: card,
+      stackSize: cardsToMove.length,
+      isTopCard: cardIndex === cards.length - 1
+    });
+
+    // Only allow moving if it's a single card (for now, stacks to tableau need special logic)
+    if (cardsToMove.length === 1) {
+      // Priority 1: Try auto-move to foundation first
       const foundationSuit = canAutoMoveToFoundation(card);
       if (foundationSuit) {
+        console.log('✅ TableauColumn: Moving to foundation', foundationSuit);
         const startElement = cardRefs.current[cardIndex];
-        const endElement = document.getElementById(`foundation-${foundationSuit}`);
+        const endElement = document.querySelector(`[data-foundation-pile="${foundationSuit}"]`) as HTMLElement;
         autoMoveToFoundation(card, foundationSuit, startElement || undefined, endElement || undefined);
         return;
       }
+
+      // Priority 2: Try to find a place in tableau (excluding current column)
+      const tableauColumnIndex = findTableauPlacementForCard(card);
+      
+      console.log('🔍 TableauColumn: Tableau placement search result:', tableauColumnIndex);
+      
+      // Make sure we don't move to the same column
+      if (tableauColumnIndex !== null && tableauColumnIndex !== columnIndex) {
+        console.log('✅ TableauColumn: Moving to tableau column', tableauColumnIndex);
+        const startElement = cardRefs.current[cardIndex];
+        autoMoveToTableau(card, tableauColumnIndex, startElement || undefined);
+        return;
+      }
+      
+      // No valid moves found - shake the card and all cards above it
+      console.log(`⚠️ No valid moves for ${card.suit}-${card.rank}`);
+      const cardsToShake = cards.slice(cardIndex).map(c => c.id);
+      setShakingCardIds(cardsToShake);
+      setTimeout(() => setShakingCardIds([]), 400);
+    } else {
+      // For stacks, only try to move to tableau (foundation doesn't accept stacks)
+      console.log('🔍 TableauColumn: Trying to find placement for stack');
+      
+      // Find a column where we can place this stack
+      const tableauColumnIndex = findTableauPlacementForCard(card); // Check if bottom card of stack can be placed
+      
+      if (tableauColumnIndex !== null && tableauColumnIndex !== columnIndex) {
+        console.log('✅ TableauColumn: Moving stack to tableau column', tableauColumnIndex);
+        const startElement = cardRefs.current[cardIndex];
+        
+        // Use autoMoveStackToTableau to animate the whole stack
+        autoMoveStackToTableau(cardsToMove, columnIndex, tableauColumnIndex, startElement || undefined);
+      } else {
+        // No valid moves - shake the whole stack
+        console.log(`⚠️ No valid moves for stack starting with ${card.suit}-${card.rank}`);
+        const cardsToShake = cards.slice(cardIndex).map(c => c.id);
+        setShakingCardIds(cardsToShake);
+        setTimeout(() => setShakingCardIds([]), 400);
+      }
     }
-    
-    // For clicks without drag, don't start drag state
-    // Just check for auto-move, don't make cards transparent
   };
 
   const handleDragStart = (e: React.DragEvent, cardIndex: number) => {
@@ -196,10 +273,26 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     return isBeingDragged && card.faceUp && isActuallyDragging;
   };
   
-  // Check if card is animating to foundation
+  // Check if card is animating to foundation or tableau
   const isCardAnimating = (cardIndex: number) => {
     const card = cards[cardIndex];
-    return !!(animatingCard && animatingCard.card.id === card.id);
+    if (!animatingCard) return false;
+    
+    // Check if this card is part of the animation
+    const isThisCard = animatingCard.card.id === card.id;
+    const isInStack = animatingCard.stackCards && animatingCard.sourceTableauColumn === columnIndex &&
+                      animatingCard.stackCards.some(stackCard => stackCard.id === card.id);
+    
+    if (!isThisCard && !isInStack) return false;
+    
+    // For return animations, show cards when near complete (80%+) to avoid flicker
+    if (animatingCard.isReturnAnimation && animatingCard.isNearComplete) {
+      return false;
+    }
+    
+    // For normal moves, keep cards hidden until animation FULLY completes
+    // (cards will appear in the NEW location, not the old one)
+    return true;
   };
 
   return (
@@ -241,34 +334,78 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       </Pile>
       
       <div className="absolute top-0 left-0 z-10">
-        {cards.map((card, index) => (
-          <div
-            key={card.id}
-            ref={el => cardRefs.current[index] = el}
-            className="absolute"
-            style={{ top: `${index * 18}px` }}
-            onDragOver={(e) => { 
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'move';
-            }}
-            onDrop={(e) => { 
-              console.log('💧 Drop on card', card.id, 'in column', columnIndex);
-              e.preventDefault();
-              handleDrop(e); 
-            }}
-          >
+        {(() => {
+          // Calculate offsets once for all cards with dynamic compression
+          const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+          
+          // Get the actual position of this column on screen
+          const columnElement = columnRef.current;
+          let availableHeight = 500; // Default fallback
+          
+          if (columnElement) {
+            const columnRect = columnElement.getBoundingClientRect();
+            const columnTop = columnRect.top;
+            
+            // Available height = from column top to ad banner (60px from bottom)
+            const AD_BANNER_HEIGHT = 60;
+            const screenBottom = window.innerHeight - AD_BANNER_HEIGHT;
+            const screenAvailable = screenBottom - columnTop;
+            
+            // Convert to game coordinates (minimal padding to maximize card space)
+            availableHeight = (screenAvailable / scale) - 5;
+          }
+          
+          const offsets = calculateStackOffsets(cards, availableHeight, isMobile);
+          
+          return cards.map((card, index) => {
+            const cumulativeOffset = offsets[index];
+            
+            return (
+            <div
+              key={card.id}
+              ref={el => cardRefs.current[index] = el}
+              className={`absolute ${shakingCardIds.includes(card.id) ? 'animate-shake' : ''}`}
+              style={{ top: `${cumulativeOffset}px` }}
+              data-card-id={card.id}
+              data-card-is-top={index === cards.length - 1}
+              onDragOver={(e) => { 
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+              }}
+              onDrop={(e) => { 
+                console.log('💧 Drop on card', card.id, 'in column', columnIndex);
+                e.preventDefault();
+                handleDrop(e); 
+              }}
+            >
             <Card
               card={card}
               onClick={() => handleCardClick(index)}
               onDoubleClick={() => handleCardClick(index)}
               onDragStart={(e) => handleDragStart(e, index)}
               onDragEnd={handleDragEnd}
+              onTouchStart={(e) => {
+                const movableCards = getMovableCardsFromTableau(columnIndex);
+                const cardPosition = cards.length - movableCards.length;
+                if (index >= cardPosition) {
+                  const cardsToMove = movableCards.slice(index - cardPosition);
+                  handleTouchStart(e, cardsToMove, 'tableau', columnIndex);
+                  setIsActuallyDragging(true);
+                }
+              }}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={(e) => {
+                handleTouchEnd(e);
+                setIsActuallyDragging(false);
+              }}
               isPlayable={card.faceUp && index >= movableStartIndex}
               isDragging={isCardBeingDragged(index)}
               isAnimating={isCardAnimating(index)}
             />
           </div>
-        ))}
+          );
+        });
+        })()}
       </div>
     </div>
   );

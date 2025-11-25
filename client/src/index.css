@@ -2,6 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile drag and drop improvements */
+.dnd-poly-drag-image {
+  opacity: 0.9 !important;
+  transform: translate3d(0, 0, 0) !important;
+  will-change: transform;
+  transition: none !important;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+/* Improve touch scrolling performance */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
+/* Smooth transforms for all draggable elements */
+[draggable="true"] {
+  touch-action: none;
+  -webkit-user-drag: element;
+}
+
+/* Desktop: show desktop card, hide mobile card */
+.desktop-card {
+  display: flex;
+}
+
+.mobile-card {
+  display: none;
+}
+
+/* Mobile: hide desktop card, show mobile card */
+@media (max-width: 768px) {
+  .desktop-card {
+    display: none !important;
+  }
+  
+  .mobile-card {
+    display: flex !important;
+  }
+}
+
 /* Card flip animation */
 @keyframes slideIn {
   from {
@@ -102,7 +146,8 @@ canvas {
   touch-action: none;
 }
 
-/* Premium card reveal animation - single pulse */
+/* COMMENTED OUT: Premium card reveal animation - single pulse */
+/*
 @keyframes premiumReveal {
   0% {
     transform: scale(1);
@@ -120,24 +165,41 @@ canvas {
 
 .premium-card-reveal {
   animation: premiumReveal 500ms ease-in-out;
-  /* NO z-index change - stay under other cards */
 }
 
-/* Premium cards that are REVEALED (is premium but NOT hidden) */
-
-/* Face-down cards (рубашкой вверх) - thin blue border on outer only */
 [data-is-premium="true"]:not([data-premium-hidden]).bg-green-950 {
   border-width: 1px !important;
-  border-color: rgb(59, 130, 246) !important; /* blue-500 */
+  border-color: rgb(59, 130, 246) !important;
 }
 
-/* Face-up cards (рубашкой вниз) - thinner blue border only, no background */
 [data-is-premium="true"]:not([data-premium-hidden]).bg-amber-50 {
   border-width: 1px !important;
-  border-color: rgb(59, 130, 246) !important; /* blue-500 */
+  border-color: rgb(59, 130, 246) !important;
 }
 
-/* Premium cards that are HIDDEN (before animation) - keep normal border */
 [data-is-premium="true"][data-premium-hidden="true"] {
-  /* Normal border from Tailwind classes - no override needed */
+}
+*/
+
+/* Card shake animation for invalid moves */
+@keyframes cardShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  12.5% {
+    transform: translateX(-8px);
+  }
+  37.5% {
+    transform: translateX(8px);
+  }
+  62.5% {
+    transform: translateX(-8px);
+  }
+  87.5% {
+    transform: translateX(8px);
+  }
+}
+
+.animate-shake {
+  animation: cardShake 400ms ease-in-out; /* Increased from 200ms to 400ms for two oscillations */
 }

@@ -8,8 +8,8 @@ function selectPremiumCards(allCards: Card[], count: number): Set<string> {
   const premiumIds = new Set<string>();
   const shuffled = [...allCards].sort(() => Math.random() - 0.5);
   
-  for (let i = 0; i < Math.min(count, shuffled.length); i++) {
-    premiumIds.add(shuffled[i].id);
+for (let i = 0; i < Math.min(count, shuffled.length); i++) {
+premiumIds.add(shuffled[i].id);
   }
   
   return premiumIds;
@@ -36,6 +36,8 @@ export function initializeGame(): GameState {
   }
   
   // Select premium cards ONLY from tableau cards (not from stock)
+  // COMMENTED OUT: Premium cards logic disabled
+  /*
   const premiumCount = getPremiumCardsCount(roomType);
   const premiumCardIds = selectPremiumCards(tableauCards, premiumCount);
   
@@ -47,6 +49,7 @@ export function initializeGame(): GameState {
       }
     }
   }
+  */
   
   // Remaining cards go to stock pile (no premium cards here)
   const stock = deck.slice(deckIndex).map(card => ({ 
@@ -69,7 +72,8 @@ export function initializeGame(): GameState {
     moves: 0,
     startTime: new Date(),
     totalGifts: 0,
-    roomType
+    roomType,
+    gameMode: 'random'
   };
 }
 

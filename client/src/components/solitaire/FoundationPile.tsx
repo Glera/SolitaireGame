@@ -6,6 +6,7 @@ import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { getSuitSymbol } from '../../lib/solitaire/cardUtils';
 import { registerDropTarget, unregisterDropTarget, getCurrentBestTarget, setCurrentBestTarget } from '../../lib/solitaire/dropTargets';
 import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
+import { useTouchDrag } from '../../hooks/useTouchDrag';
 
 interface FoundationPileProps {
   cards: CardType[];
@@ -34,6 +35,19 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
+  
+  // Touch drag handlers
+  const { handleTouchStart, handleTouchMove, handleTouchEnd } = useTouchDrag(
+    startDrag,
+    endDrag,
+    dropCards,
+    setShowDragPreview,
+    () => useSolitaire.getState(),
+    () => useSolitaire.getState().draggedCards,
+    () => useSolitaire.getState().sourceType,
+    () => useSolitaire.getState().sourceIndex,
+    () => useSolitaire.getState().sourceFoundation
+  );
   
   // Register this foundation as a drop target
   useEffect(() => {
@@ -113,10 +127,40 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
     return isInDraggedCards && isActuallyDragging;
   };
   
-  // Check if the top card is animating to another location
+  // Check if we should show the second card (card underneath)
+  const shouldShowSecondCard = () => {
+    if (!secondCard) return false;
+    if (!topCard) return false;
+    
+    // Show second card when top card is being dragged
+    if (isTopCardBeingDragged()) return true;
+    
+    // Show second card when top card is animating
+    if (animatingCard && animatingCard.card.id === topCard.id) {
+      // For return animations, show second card until animation is near complete (80%)
+      if (animatingCard.isReturnAnimation) {
+        return !animatingCard.isNearComplete;
+      }
+      // For normal moves, show second card until animation FULLY completes
+      return true;
+    }
+    
+    return false;
+  };
+  
+  // Check if the top card should be hidden (for rendering purposes)
   const isTopCardAnimating = () => {
     if (!topCard) return false;
-    return !!(animatingCard && animatingCard.card.id === topCard.id);
+    if (!animatingCard || animatingCard.card.id !== topCard.id) return false;
+    
+    // For return animations, show card when near complete (80%+) to avoid flicker
+    if (animatingCard.isReturnAnimation && animatingCard.isNearComplete) {
+      return false;
+    }
+    
+    // For normal moves, keep card hidden until animation FULLY completes
+    // (card will appear in the NEW location, not the old one)
+    return true;
   };
   
   const handleCardClick = () => {
@@ -170,7 +214,13 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   };
 
   return (
-    <div id={id} className="relative" ref={foundationRef} data-drop-target="foundation">
+    <div 
+      id={id} 
+      className="relative" 
+      ref={foundationRef} 
+      data-drop-target="foundation"
+      data-foundation-pile={suit}
+    >
       {/* Invisible expanded drop zone - doesn't block clicks */}
       <div 
         className="absolute -inset-8 z-0 pointer-events-none"
@@ -189,8 +239,8 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
         isEmpty={cards.length === 0}
         className="bg-teal-600/20 border-teal-400/50 relative z-10"
       >
-      {/* Show second card if top card is being dragged and second card exists */}
-      {secondCard && isTopCardBeingDragged() && (
+      {/* Show second card when top card is being moved to a NEW location */}
+      {shouldShowSecondCard() && (
         <div style={{ position: 'absolute', top: 0, left: 0 }}>
           <Card 
             card={secondCard} 
@@ -210,6 +260,17 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
             onDoubleClick={handleCardClick}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
+            onTouchStart={(e) => {
+              if (topCard) {
+                handleTouchStart(e, [topCard], 'foundation', undefined, suit);
+                setIsActuallyDragging(true);
+              }
+            }}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={(e) => {
+              handleTouchEnd(e);
+              setIsActuallyDragging(false);
+            }}
             isPlayable={true}
             isDragging={isTopCardBeingDragged()}
             isAnimating={isTopCardAnimating()}

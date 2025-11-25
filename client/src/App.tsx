@@ -6,6 +6,7 @@ import { DeviceTestPanel } from './components/DeviceTestPanel';
 import { GameViewport } from './components/GameViewport';
 import { GameScaleProvider } from './contexts/GameScaleContext';
 import GameIntegration from './lib/gameIntegration';
+import { FlyingSuitIconManager } from './lib/flyingSuitIconManager';
 import "@fontsource/inter";
 
 function App() {
@@ -82,6 +83,17 @@ function App() {
             <GameBoard />
           </div>
         </GameViewport>
+        
+        {/* Ad banner placeholder - positioned at the bottom, OUTSIDE GameViewport */}
+        <div 
+          className="fixed bottom-0 left-0 w-full bg-red-600 flex items-center justify-center text-white text-lg font-bold"
+          style={{ height: '60px', zIndex: 9999 }}
+        >
+          🎯 Рекламный баннер 🎯
+        </div>
+        
+        {/* Flying suit icons manager */}
+        <FlyingSuitIconManager />
         
 {/* DeviceTestPanel temporarily hidden */}
         {/* <DeviceTestPanel

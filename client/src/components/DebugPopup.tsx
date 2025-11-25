@@ -54,10 +54,19 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
     if (!info) return;
     
     let debugText = `=== DEBUG INFO ===\n`;
-    debugText += `Event: ${info.event}\n`;
-    debugText += `Drop Coords: ${info.coords.x}, ${info.coords.y}\n`;
-    debugText += `Target: ${info.target}\n`;
-    debugText += `Time: ${new Date(info.timestamp).toLocaleTimeString()}\n\n`;
+    if (info.event) debugText += `Event: ${info.event}\n`;
+    if (info.coords) debugText += `Drop Coords: ${info.coords.x}, ${info.coords.y}\n`;
+    if (info.target) debugText += `Target: ${info.target}\n`;
+    if (info.timestamp) debugText += `Time: ${new Date(info.timestamp).toLocaleTimeString()}\n`;
+    debugText += `\n`;
+    
+    if (info.data) {
+      debugText += `=== DATA ===\n`;
+      Object.entries(info.data).forEach(([key, value]) => {
+        debugText += `${key}: ${value}\n`;
+      });
+      debugText += `\n`;
+    }
     
     if (info.viewport) {
       debugText += `=== VIEWPORT ===\n`;
@@ -84,7 +93,7 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
     }
     
     // Check which drop zone the coords fall into
-    if (info.dropZones) {
+    if (info.dropZones && info.coords) {
       debugText += `=== DROP ZONE CHECK ===\n`;
       const matchingZones = info.dropZones.filter(zone => {
         return info.coords.x >= zone.bounds.left && 
@@ -193,12 +202,23 @@ export function DebugPopup({ info, onClose }: DebugPopupProps) {
         
         {info ? (
           <>
-            <div><span className="text-blue-300">Event:</span> {info.event}</div>
-            <div><span className="text-blue-300">Drop:</span> {info.coords.x}, {info.coords.y}</div>
-            <div><span className="text-blue-300">Target:</span> {info.target}</div>
+            {info.event && <div><span className="text-blue-300">Event:</span> {info.event}</div>}
+            {info.coords && <div><span className="text-blue-300">Drop:</span> {info.coords.x}, {info.coords.y}</div>}
+            {info.target && <div><span className="text-blue-300">Target:</span> {info.target}</div>}
+            
+            {/* Display data object if present (for scale info, etc) */}
+            {info.data && (
+              <div className="mt-2 space-y-1">
+                {Object.entries(info.data).map(([key, value]) => (
+                  <div key={key}>
+                    <span className="text-green-300">{key}:</span> {String(value)}
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         ) : (
-          <div className="text-gray-400">Нет дебаг информации. Перетащите карту для отладки.</div>
+          <div className="text-gray-400">Нет дебаг информации. Откройте панель для просмотра.</div>
         )}
         
         {info?.viewport && (
