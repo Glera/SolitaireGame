@@ -3,7 +3,6 @@ import { Card } from './Card';
 import { Pile } from './Pile';
 import { Card as CardType, Suit } from '../../lib/solitaire/types';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
-import { getSuitSymbol } from '../../lib/solitaire/cardUtils';
 import { registerDropTarget, unregisterDropTarget, getCurrentBestTarget, setCurrentBestTarget } from '../../lib/solitaire/dropTargets';
 import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 import { useTouchDrag } from '../../hooks/useTouchDrag';
@@ -109,8 +108,14 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
 
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
   const secondCard = cards.length > 1 ? cards[cards.length - 2] : null;
-  const suitSymbol = getSuitSymbol(suit);
-  const isRed = suit === 'hearts' || suit === 'diamonds';
+  
+  // Check if a card is flying TO this foundation (to show it early and avoid flicker)
+  const incomingCard = animatingCard && 
+    animatingCard.targetSuit === suit && 
+    !animatingCard.isReturnAnimation &&
+    !animatingCard.isTableauMove
+      ? animatingCard.card 
+      : null;
   
   // Check if the top card is being dragged (only for real drag, not click)
   const isTopCardBeingDragged = () => {
@@ -251,6 +256,18 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
         </div>
       )}
       
+      {/* Show incoming card early (when animation is 80%+) to avoid flicker */}
+      {incomingCard && animatingCard?.isNearComplete && (
+        <div style={{ position: 'absolute', top: 0, left: 0, zIndex: 2 }}>
+          <Card 
+            card={incomingCard} 
+            isPlayable={false}
+            isDragging={false}
+            isAnimating={false}
+          />
+        </div>
+      )}
+      
       {/* Show top card */}
       {topCard ? (
         <div ref={cardRef} style={{ position: 'relative', zIndex: 1 }}>
@@ -280,9 +297,9 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
       
       {/* Show ace symbol when empty OR when top card is being dragged */}
       {(!topCard || isTopCardBeingDragged() || isTopCardAnimating()) && (
-        <div className="w-full h-full p-1 absolute top-0 left-0" style={{ zIndex: 0 }}>
-          <div className="text-xs font-bold leading-none text-amber-50 opacity-30 select-none">
-            <div className="text-xs">A</div>
+        <div className="w-full h-full absolute top-0 left-0 p-1" style={{ zIndex: 0 }}>
+          <div className="text-lg font-bold opacity-40 select-none text-white">
+            A
           </div>
         </div>
       )}

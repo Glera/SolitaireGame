@@ -36,7 +36,13 @@ function App() {
     
     // Register callback for current results requests from lobby
     gameIntegration.setGetCurrentResultsCallback(getCurrentResults);
-  }, [setHitSound, setSuccessSound, getCurrentResults]);
+    
+    // Register callback for starting new game from lobby (after collection reward)
+    gameIntegration.setStartNewGameCallback(() => {
+      console.log('🎮 Starting new game from lobby callback');
+      newGame();
+    });
+  }, [setHitSound, setSuccessSound, getCurrentResults, newGame]);
 
   const handleSizeChange = (width: number, height: number) => {
     setTestViewport({ width, height });

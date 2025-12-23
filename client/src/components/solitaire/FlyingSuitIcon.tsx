@@ -4,6 +4,7 @@ import { Suit } from '../../lib/solitaire/types';
 interface FlyingSuitIconProps {
   suit: Suit;
   startPosition: { x: number; y: number };
+  direction: 'left' | 'right';
   onComplete: () => void;
 }
 
@@ -21,52 +22,72 @@ const SUIT_COLORS: Record<Suit, string> = {
   spades: '#1f2937',
 };
 
-export function FlyingSuitIcon({ suit, startPosition, onComplete }: FlyingSuitIconProps) {
+export function FlyingSuitIcon({ suit, startPosition, direction, onComplete }: FlyingSuitIconProps) {
+  console.log(`🚀 FlyingSuitIcon mounted: ${suit} at (${Math.round(startPosition.x)}, ${Math.round(startPosition.y)}) dir=${direction}`);
+  
   const elementRef = useRef<HTMLDivElement>(null);
   const startTimeRef = useRef<number | null>(null);
   
-  // Random trajectory parameters (computed once on mount)
+  // Random trajectory parameters (computed once on mount) - PHYSICS-BASED falling
+  // Direction determines which way the icon flies horizontally
+  const baseHorizontalSpeed = 60 + Math.random() * 80; // 60-140 px/s
   const trajectoryRef = useRef({
-    // Random horizontal drift (-60 to +60 pixels)
-    horizontalDrift: (Math.random() - 0.5) * 120,
-    // Random vertical travel (150-250 pixels up)
-    verticalTravel: 150 + Math.random() * 100,
-    // Random rotation (-180 to +180 degrees)
-    rotation: (Math.random() - 0.5) * 360,
+    // Horizontal velocity based on direction (left = negative, right = positive)
+    horizontalVelocity: direction === 'left' ? -baseHorizontalSpeed : baseHorizontalSpeed,
+    // Initial upward velocity (small jump before falling) - 30 to 80 px
+    initialUpwardVelocity: -(30 + Math.random() * 50),
+    // Gravity (pixels per second²)
+    gravity: 400 + Math.random() * 200,
+    // Random rotation speed (-360 to +360 degrees per second)
+    rotationSpeed: (Math.random() - 0.5) * 720,
     // Random scale variation (0.8 to 1.2)
     startScale: 0.8 + Math.random() * 0.4,
-    // Animation duration (600-900ms)
-    duration: 600 + Math.random() * 300,
+    // Animation duration (800-1200ms)
+    duration: 800 + Math.random() * 400,
   });
   
   useEffect(() => {
     const trajectory = trajectoryRef.current;
+    let frameCount = 0;
     
     const animate = (timestamp: number) => {
       if (!startTimeRef.current) {
         startTimeRef.current = timestamp;
+        console.log(`🎬 FlyingSuitIcon animation started for ${suit}`);
       }
       
+      frameCount++;
       const elapsed = timestamp - startTimeRef.current;
       const progress = Math.min(elapsed / trajectory.duration, 1);
+      const timeSeconds = elapsed / 1000;
       
-      // Easing: start fast, slow down at the end
-      const easeOut = 1 - Math.pow(1 - progress, 3);
+      // Log first few frames
+      if (frameCount <= 3) {
+        console.log(`🎬 Frame ${frameCount}: progress=${progress.toFixed(2)}, time=${timeSeconds.toFixed(3)}s`);
+      }
       
-      // Calculate current position
-      const x = startPosition.x + trajectory.horizontalDrift * easeOut;
-      const y = startPosition.y - trajectory.verticalTravel * easeOut;
+      // Physics-based parabolic motion (like falling shards)
+      // x = x0 + vx * t
+      const x = startPosition.x + trajectory.horizontalVelocity * timeSeconds;
+      // y = y0 + vy * t + 0.5 * g * t² (parabola - small jump then fall)
+      const y = startPosition.y + 
+        trajectory.initialUpwardVelocity * timeSeconds + 
+        0.5 * trajectory.gravity * timeSeconds * timeSeconds;
       
-      // Scale: start at random, shrink to 0
+      // Scale: start at random, shrink to 0 (keep this effect!)
       const scale = trajectory.startScale * (1 - progress);
       
-      // Rotation
-      const rotation = trajectory.rotation * progress;
+      // Rotation accelerates as it falls
+      const rotation = trajectory.rotationSpeed * timeSeconds;
       
       // Opacity: full at start, fade out in last 30%
       const opacity = progress > 0.7 ? 1 - (progress - 0.7) / 0.3 : 1;
       
       if (elementRef.current) {
+        // Log first frame position
+        if (frameCount === 1) {
+          console.log(`📍 First frame position: x=${Math.round(x)}, y=${Math.round(y)}, scale=${scale.toFixed(2)}`);
+        }
         elementRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale}) rotate(${rotation}deg)`;
         elementRef.current.style.opacity = String(opacity);
       }
@@ -90,6 +111,8 @@ export function FlyingSuitIcon({ suit, startPosition, onComplete }: FlyingSuitIc
       ref={elementRef}
       className="fixed pointer-events-none z-[9999]"
       style={{
+        top: 0,
+        left: 0,
         transform: `translate(${startPosition.x}px, ${startPosition.y}px)`,
         color: SUIT_COLORS[suit],
         fontSize: '24px',

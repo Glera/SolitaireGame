@@ -4,7 +4,7 @@ import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { GameModeSelector } from './GameModeSelector';
 
-export const GAME_VERSION = '3.20.3';
+export const GAME_VERSION = '3.20.4';
 
 interface GameControlsProps {
   onDebugClick?: () => void;

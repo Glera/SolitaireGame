@@ -29,7 +29,8 @@ export function calculateStackOffsets(
     // Keep first card full size, compress only the offsets
     const offsetsHeight = totalHeightNeeded - cardHeight;
     const availableForOffsets = availableHeight - cardHeight;
-    compressionFactor = Math.max(0.45, availableForOffsets / offsetsHeight); // Min 45% of original (was 30%)
+    // Min 65% of original to keep card ranks readable (34px for mobile, 31px for desktop)
+    compressionFactor = Math.max(0.65, availableForOffsets / offsetsHeight);
   }
   
   // Apply compression to offsets

@@ -1,0 +1,539 @@
+import React, { useState, useEffect, forwardRef, useRef } from 'react';
+import ReactDOM from 'react-dom';
+import { getTotalXP, calculateLevel, setOnXPChangeCallback } from '../../lib/solitaire/experienceManager';
+import { OtherPlayerNotification } from './OtherPlayerNotification';
+
+interface Particle {
+  id: string;
+  angle: number;
+  distance: number;
+  size: number;
+  duration: number;
+}
+
+interface DonationProgressProps {
+  currentStars: number;
+  targetStars: number;
+  petStory: string;
+  donationAmount: string;
+  endTime: Date;
+  onDebugClick?: () => void;
+  onTestWin?: () => void;
+  onDropCollectionItem?: () => void;
+  onTestLevelUp?: () => void;
+  pulseKey?: number;
+  onOtherPlayerStars?: (count: number) => void;
+  disableOtherPlayerNotifications?: boolean;
+}
+
+// Circular progress component for player level
+const LevelIndicator: React.FC<{ level: number; progress: number; isPulsing?: boolean }> = ({ level, progress, isPulsing }) => {
+  const size = 36;
+  const strokeWidth = 3;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
+  
+  return (
+    <div 
+      className={`relative flex-shrink-0 ${isPulsing ? 'animate-level-pulse' : ''}`} 
+      style={{ width: size, height: size }}
+    >
+      {/* Background circle */}
+      <svg 
+        width={size} 
+        height={size} 
+        className="absolute top-0 left-0 -rotate-90"
+      >
+        {/* Track */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="rgba(0, 0, 0, 0.4)"
+          strokeWidth={strokeWidth}
+        />
+        {/* Progress */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="url(#levelGradient)"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          style={{ transition: 'stroke-dashoffset 0.5s ease-out' }}
+        />
+        <defs>
+          <linearGradient id="levelGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#a855f7" />
+            <stop offset="100%" stopColor="#ec4899" />
+          </linearGradient>
+        </defs>
+      </svg>
+      {/* Center circle with level number */}
+      <div 
+        className="absolute inset-0 flex items-center justify-center"
+        style={{
+          margin: strokeWidth,
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)',
+          boxShadow: isPulsing ? '0 0 16px rgba(168, 85, 247, 0.8)' : '0 0 8px rgba(168, 85, 247, 0.5)',
+          transition: 'box-shadow 0.2s ease-out'
+        }}
+      >
+        <span className="text-white font-bold text-sm" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+          {level}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps>(({
+  currentStars,
+  targetStars,
+  petStory,
+  donationAmount,
+  endTime,
+  onDebugClick,
+  onTestWin,
+  onDropCollectionItem,
+  onTestLevelUp,
+  pulseKey = 0,
+  onOtherPlayerStars,
+  disableOtherPlayerNotifications = false
+}, ref) => {
+  const progressBarContainerRef = useRef<HTMLDivElement>(null);
+  const progressBarInnerRef = useRef<HTMLDivElement>(null);
+  const otherPlayerTriggerRef = useRef<(() => void) | null>(null);
+  // Player XP state - updates when XP changes
+  const [playerXP, setPlayerXP] = useState(() => getTotalXP());
+  const [isLevelPulsing, setIsLevelPulsing] = useState(false);
+  const prevXPRef = useRef(playerXP);
+  
+  // Subscribe to XP changes
+  useEffect(() => {
+    setOnXPChangeCallback((newXP) => {
+      // Only pulse if XP actually increased
+      if (newXP > prevXPRef.current) {
+        setIsLevelPulsing(true);
+        setTimeout(() => setIsLevelPulsing(false), 300);
+      }
+      prevXPRef.current = newXP;
+      setPlayerXP(newXP);
+    });
+    // Initial load
+    setPlayerXP(getTotalXP());
+    prevXPRef.current = getTotalXP();
+    
+    return () => {
+      setOnXPChangeCallback(() => {});
+    };
+  }, []);
+  const [showInfo, setShowInfo] = useState(false);
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [particles, setParticles] = useState<Particle[]>([]);
+  const [progressShake, setProgressShake] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [animationKey, setAnimationKey] = useState(0);
+  const particleIdRef = useRef(0);
+  const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const prevPulseKeyRef = useRef(pulseKey);
+  
+  // Add new particles and shake effect when pulseKey changes (not on mount)
+  useEffect(() => {
+    // Skip if pulseKey is 0 or hasn't actually changed (prevents triggering on mount/remount)
+    if (pulseKey === 0 || pulseKey === prevPulseKeyRef.current) {
+      prevPulseKeyRef.current = pulseKey;
+      return;
+    }
+    prevPulseKeyRef.current = pulseKey;
+    
+    // Start animation
+    setIsAnimating(true);
+    setAnimationKey(prev => prev + 1);
+    
+    // Stop animation after it completes
+    if (animationTimeoutRef.current) {
+      clearTimeout(animationTimeoutRef.current);
+    }
+    animationTimeoutRef.current = setTimeout(() => {
+      setIsAnimating(false);
+    }, 600); // Animation duration
+    
+    const count = 8 + Math.floor(Math.random() * 5); // 8-12 particles
+    const newParticles: Particle[] = Array.from({ length: count }, (_, i) => ({
+      id: `${pulseKey}-${particleIdRef.current++}`,
+      angle: (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.5,
+      distance: 25 + Math.random() * 20, // 25-45px
+      size: 3 + Math.random() * 3, // 3-6px
+      duration: 0.3 + Math.random() * 0.2 // 0.3-0.5s
+    }));
+    
+    setParticles(prev => [...prev, ...newParticles]);
+    
+    // Remove these particles after animation completes
+    const maxDuration = Math.max(...newParticles.map(p => p.duration));
+    setTimeout(() => {
+      setParticles(prev => prev.filter(p => !newParticles.some(np => np.id === p.id)));
+    }, maxDuration * 1000 + 100);
+    
+    // Progress bar shake effect - add then remove extra width
+    if (shakeTimeoutRef.current) {
+      clearTimeout(shakeTimeoutRef.current);
+    }
+    setProgressShake(1.5); // Add 1.5% extra
+    shakeTimeoutRef.current = setTimeout(() => {
+      setProgressShake(0);
+    }, 150);
+  }, [pulseKey]);
+  
+  const baseProgress = Math.min((currentStars / targetStars) * 100, 100);
+  const progress = Math.min(baseProgress + progressShake, 100);
+  const isComplete = currentStars >= targetStars;
+  
+  // Calculate player level from XP
+  const levelInfo = calculateLevel(playerXP);
+  
+  // Countdown timer
+  useEffect(() => {
+    const updateTimer = () => {
+      const now = new Date().getTime();
+      const end = endTime.getTime();
+      const diff = Math.max(0, end - now);
+      
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      setTimeLeft({ days, hours, minutes, seconds });
+    };
+    
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [endTime]);
+  
+  const formatTime = (n: number) => n.toString().padStart(2, '0');
+  
+  return (
+    <>
+      <div className="w-full px-2 pt-2 pb-16 relative" ref={ref}>
+        {/* Top row with icons aligned to progress bar center */}
+        <div className="flex items-center gap-2" ref={progressBarContainerRef}>
+          {/* Player level indicator */}
+          <LevelIndicator level={levelInfo.level} progress={levelInfo.progress} isPulsing={isLevelPulsing} />
+          
+          {/* Combined star circle + progress bar */}
+          <div className="flex-1 relative">
+            {/* Progress bar background */}
+            <div className="h-8 bg-black/30 border border-white/20 rounded-full relative" ref={progressBarInnerRef}>
+              {/* Progress fill - sky blue, min width to show behind star icon */}
+              <div 
+                className="h-full transition-all duration-500 ease-out rounded-full"
+                style={{ 
+                  width: `calc(max(48px, ${baseProgress}%) + ${progressShake * 5}px)`,
+                  background: isComplete 
+                    ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)' 
+                    : 'linear-gradient(90deg, #38bdf8 0%, #0ea5e9 50%, #38bdf8 100%)',
+                  boxShadow: isComplete 
+                    ? '0 0 12px rgba(34, 197, 94, 0.6)' 
+                    : '0 0 12px rgba(56, 189, 248, 0.5)'
+                }}
+              />
+              
+              {/* Progress text overlay - centered in the bar, offset for star */}
+              <div className="absolute inset-0 flex items-center justify-center" style={{ paddingLeft: '24px' }}>
+                <span 
+                  key={`text-${animationKey}`}
+                  className={`text-sm font-bold drop-shadow-lg ${isAnimating ? 'animate-text-pulse' : ''}`}
+                  style={{ color: 'white' }}
+                >
+                  {currentStars.toLocaleString()} / {targetStars.toLocaleString()}
+                </span>
+              </div>
+            </div>
+            
+            {/* Star circle - positioned at left edge, vertically centered, sky blue background */}
+            <div 
+              data-star-icon
+              className="absolute z-10 w-10 h-10 rounded-full border border-sky-300/50 flex items-center justify-center"
+              style={{ 
+                left: '0px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%)',
+                boxShadow: '0 0 12px rgba(56, 189, 248, 0.5)',
+              }}
+            >
+              {/* Particles */}
+              {particles.map(particle => (
+                <div
+                  key={particle.id}
+                  className="absolute rounded-full animate-particle"
+                  style={{
+                    width: particle.size,
+                    height: particle.size,
+                    backgroundColor: '#fde047',
+                    boxShadow: '0 0 4px #fde047',
+                    '--particle-x': `${Math.cos(particle.angle) * particle.distance}px`,
+                    '--particle-y': `${Math.sin(particle.angle) * particle.distance}px`,
+                    '--particle-duration': `${particle.duration}s`,
+                  } as React.CSSProperties}
+                />
+              ))}
+              <span 
+                key={animationKey}
+                className={`text-2xl ${isAnimating ? 'animate-star-pulse' : ''}`} 
+                style={{ filter: 'drop-shadow(0 0 4px rgba(250, 204, 21, 0.8))' }}
+              >
+                ⭐
+              </span>
+            </div>
+            
+            {/* Other player notification - slides out from under progress bar */}
+            {onOtherPlayerStars && !disableOtherPlayerNotifications && (
+              <OtherPlayerNotification 
+                progressBarRef={progressBarInnerRef}
+                onStarsEarned={onOtherPlayerStars}
+                minInterval={20}
+                maxInterval={45}
+                triggerRef={otherPlayerTriggerRef}
+              />
+            )}
+            
+            {/* Timer - absolute positioned below progress bar, same width for perfect centering */}
+            <div 
+              className="absolute left-0 right-0 flex justify-center" 
+              style={{ top: '100%', marginTop: '4px', paddingLeft: '24px', zIndex: 1 }}
+            >
+              <span className="text-white/80 text-xs font-medium">
+                Осталось: {timeLeft.days} дн. {formatTime(timeLeft.hours)}:{formatTime(timeLeft.minutes)}:{formatTime(timeLeft.seconds)}
+              </span>
+            </div>
+          </div>
+          
+          {/* Dog icon + buttons grouped */}
+          <div className="flex-shrink-0 flex items-start" style={{ gap: '0px' }}>
+            <div className="w-9 h-8 flex items-center justify-center">
+              <span 
+                className={`text-3xl ${isComplete ? 'animate-bounce' : ''}`} 
+                style={{ filter: 'drop-shadow(0 0 5px rgba(251, 191, 36, 0.7))' }}
+              >
+                🐕
+              </span>
+            </div>
+            
+            {/* Buttons row */}
+            <div className="flex gap-1" style={{ marginTop: '16px', marginLeft: '-2px' }}>
+              {/* Info button */}
+              <button
+                onClick={() => setShowInfo(true)}
+                className="w-5 h-5 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 transition-colors border border-white/30"
+                aria-label="Информация о пожертвовании"
+              >
+                <span className="text-white text-xs font-bold">?</span>
+              </button>
+              
+              {/* Test win button (temporary) */}
+              {onTestWin && (
+                <button
+                  onClick={onTestWin}
+                  className="w-5 h-5 flex items-center justify-center rounded-full bg-green-500/30 hover:bg-green-500/50 transition-colors border border-green-400/50"
+                  aria-label="Тест победы"
+                >
+                  <span className="text-white text-xs">✓</span>
+                </button>
+              )}
+              
+              {/* Drop collection item button */}
+              {onDropCollectionItem && (
+                <button
+                  onClick={onDropCollectionItem}
+                  className="w-5 h-5 flex items-center justify-center rounded-full bg-amber-500/30 hover:bg-amber-500/50 transition-colors border border-amber-400/50"
+                  aria-label="Дроп коллекции"
+                >
+                  <span className="text-white text-xs">🎁</span>
+                </button>
+              )}
+              
+              {/* Test level up button */}
+              {onTestLevelUp && (
+                <button
+                  onClick={onTestLevelUp}
+                  className="w-5 h-5 flex items-center justify-center rounded-full bg-purple-500/30 hover:bg-purple-500/50 transition-colors border border-purple-400/50"
+                  aria-label="Тест левелапа"
+                >
+                  <span className="text-white text-xs">⬆</span>
+                </button>
+              )}
+              
+              {/* Test other player notification button */}
+              {onOtherPlayerStars && (
+                <button
+                  onClick={() => otherPlayerTriggerRef.current?.()}
+                  className="w-5 h-5 flex items-center justify-center rounded-full bg-indigo-500/30 hover:bg-indigo-500/50 transition-colors border border-indigo-400/50"
+                  aria-label="Тест уведомления от другого игрока"
+                >
+                  <span className="text-white text-xs">👤</span>
+                </button>
+              )}
+              
+              {/* Debug button */}
+              {onDebugClick && (
+                <button
+                  onClick={onDebugClick}
+                  className="w-5 h-5 flex items-center justify-center rounded-full bg-gray-500/30 hover:bg-gray-500/50 transition-colors border border-gray-400/50"
+                  aria-label="Debug info"
+                >
+                  <span className="text-white text-xs">🔧</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        
+      </div>
+      
+      {/* Info Modal - rendered via portal to escape transform stacking context */}
+      {showInfo && ReactDOM.createPortal(
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
+          onClick={() => setShowInfo(false)}
+        >
+          <div 
+            className="bg-gradient-to-b from-amber-900 to-amber-950 text-white p-5 rounded-2xl shadow-2xl max-w-sm w-full border border-amber-600/30"
+            style={{ margin: 'auto' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="relative mb-4">
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-2xl">🐕</span>
+                <h3 className="text-lg font-bold">Помогаем Бусинке</h3>
+              </div>
+              <button 
+                onClick={() => setShowInfo(false)}
+                className="absolute top-0 right-0 text-white/60 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center"
+              >
+                ×
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="space-y-3">
+              {/* Progress bar with text inside */}
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">⭐</span>
+                  <div className="flex-1 h-7 bg-black/30 rounded-full overflow-hidden relative">
+                    <div 
+                      className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full"
+                      style={{ width: `${baseProgress}%` }}
+                    />
+                    {/* Text overlay on progress bar */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-sm font-bold text-white drop-shadow-lg">
+                        {currentStars.toLocaleString()} / {targetStars.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {/* Timer below progress bar */}
+                <div className="text-center mt-1">
+                  <span className="text-white/70 text-xs">
+                    Осталось: {timeLeft.days} дн. {formatTime(timeLeft.hours)}:{formatTime(timeLeft.minutes)}:{formatTime(timeLeft.seconds)}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Story */}
+              <div className="bg-black/20 rounded-xl p-3">
+                <p className="text-white/80 text-sm leading-relaxed">
+                  {petStory}
+                </p>
+              </div>
+              
+              {/* Goal */}
+              <div className="bg-black/20 rounded-xl p-3 text-center">
+                <div className="text-amber-300 text-xs uppercase tracking-wide mb-1">Цель сбора</div>
+                <div className="font-bold text-green-400 text-xl">{donationAmount}</div>
+                <p className="text-white/70 text-sm mt-2 leading-relaxed">
+                  Чтобы собрать эту сумму из рекламной выручки, нам нужно набрать <span className="text-amber-300 font-semibold">{targetStars.toLocaleString()} ⭐</span>
+                </p>
+                <p className="text-white/60 text-xs mt-2">
+                  Звёзды начисляются за ежедневные задания
+                </p>
+              </div>
+            </div>
+            
+            {/* Close button */}
+            <button
+              onClick={() => setShowInfo(false)}
+              className="w-full mt-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl font-medium transition-colors text-white/80"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+      
+    </>
+  );
+});
+
+DonationProgress.displayName = 'DonationProgress';
+
+// Add CSS for star pulse animation
+const pulseStyleSheet = document.createElement('style');
+pulseStyleSheet.textContent = `
+  @keyframes star-pulse {
+    0% { transform: scale(1.5); }
+    100% { transform: scale(1); }
+  }
+  
+  .animate-star-pulse {
+    animation: star-pulse 0.3s ease-out;
+    transform-origin: center center;
+    display: inline-block;
+  }
+  
+  @keyframes particle-fly {
+    0% { 
+      transform: translate(0, 0) scale(1);
+      opacity: 1;
+    }
+    100% { 
+      transform: translate(var(--particle-x), var(--particle-y)) scale(0);
+      opacity: 0;
+    }
+  }
+  
+  .animate-particle {
+    animation: particle-fly var(--particle-duration) ease-out forwards;
+  }
+  
+  @keyframes text-pulse {
+    0% { transform: scale(1.2); color: #fde047; }
+    100% { transform: scale(1); color: #ffffff; }
+  }
+  
+  .animate-text-pulse {
+    animation: text-pulse 0.6s ease-out;
+    transform-origin: center center;
+    display: inline-block;
+  }
+`;
+
+if (!document.head.contains(pulseStyleSheet)) {
+  document.head.appendChild(pulseStyleSheet);
+}
+

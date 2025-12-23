@@ -24,15 +24,45 @@ export function WastePile({ cards }: WastePileProps) {
     endDrag,
     animatingCard,
     setShowDragPreview,
-    isStockAnimating
+    isStockAnimating,
+    isDealing,
+    hint
   } = useSolitaire();
   
   const cardRef = useRef<HTMLDivElement>(null);
   const [isShaking, setIsShaking] = useState(false);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Get last 3 cards for fan display + 4th for smooth exit
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
   const secondCard = cards.length > 1 ? cards[cards.length - 2] : null;
+  const thirdCard = cards.length > 2 ? cards[cards.length - 3] : null;
+  const fourthCard = cards.length > 3 ? cards[cards.length - 4] : null;
+  
+  // Card offset for fan effect (in pixels)
+  const CARD_FAN_OFFSET = 20;
+  
+  // Track 4th card visibility with timestamp
+  const fourthCardTimestampRef = useRef<{ id: string; time: number } | null>(null);
+  const [, forceUpdate] = useState(0);
+  
+  // Check if we should show the 4th card (within 150ms of appearance)
+  const shouldShowFourthCard = (() => {
+    if (!fourthCard) return false;
+    
+    const now = Date.now();
+    
+    // New 4th card appeared - record timestamp
+    if (!fourthCardTimestampRef.current || fourthCardTimestampRef.current.id !== fourthCard.id) {
+      fourthCardTimestampRef.current = { id: fourthCard.id, time: now };
+      // Schedule hide after 150ms
+      setTimeout(() => forceUpdate(n => n + 1), 155);
+      return true;
+    }
+    
+    // Check if still within 150ms window
+    return now - fourthCardTimestampRef.current.time < 150;
+  })();
 
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
@@ -57,41 +87,21 @@ export function WastePile({ cards }: WastePileProps) {
   const previousCardCountRef = useRef<number>(cards.length);
   const wasJustRecycledRef = useRef<boolean>(false);
   
-  // Detect when a NEW card appears from stock pile (count increases)
+  // Track card count changes for recycling detection
   useEffect(() => {
     const currentCount = cards.length;
     const previousCount = previousCardCountRef.current;
     
-    console.log('WastePile: Card count changed', {
-      previousCount,
-      currentCount,
-      topCardId: topCard?.id,
-      secondCardId: secondCard?.id,
-      timestamp: Date.now()
-    });
-    
-    // Track if this is a NEW card from stock pile (count increased)
     if (topCard && currentCount > previousCount) {
-      console.log('WastePile: New card appeared instantly');
       previousCardCountRef.current = currentCount;
       wasJustRecycledRef.current = false;
-      return;
     } else {
-      // Update refs without animation for other cases
       previousCardCountRef.current = currentCount;
-      
-      // If card was removed
-      if (currentCount < previousCount) {
-        console.log('WastePile: Card removed');
-        
-        // If waste pile is now empty, it means cards were recycled back to stock
-        if (currentCount === 0) {
-          console.log('WastePile: Cards recycled back to stock');
-          wasJustRecycledRef.current = true;
-        }
+      if (currentCount < previousCount && currentCount === 0) {
+        wasJustRecycledRef.current = true;
       }
     }
-  }, [topCard, secondCard, cards.length]);
+  }, [topCard, cards.length]);
   
   // Check if the top card is being dragged (only for real drag, not click)
   const isTopCardBeingDragged = () => {
@@ -149,6 +159,11 @@ export function WastePile({ cards }: WastePileProps) {
 
   const handleCardClick = () => {
     if (!topCard) return;
+    
+    // Don't allow clicks during dealing animation
+    if (isDealing) {
+      return;
+    }
     
     // Don't allow clicks during animation
     // Temporarily disabled to debug
@@ -248,61 +263,113 @@ export function WastePile({ cards }: WastePileProps) {
     }, 0);
   };
 
+  // Calculate how many cards to show in fan (up to 3)
+  // Visible cards: just the last 3
+  const visibleCards = [thirdCard, secondCard, topCard].filter(Boolean) as CardType[];
+  
+  // Track previous card IDs to know which cards are "new" (shouldn't animate position)
+  const prevCardIdsRef = useRef<Set<string>>(new Set());
+  const currentCardIds = new Set(visibleCards.map(c => c.id));
+  
+  // Update after render
+  useEffect(() => {
+    prevCardIdsRef.current = currentCardIds;
+  });
+  
+  // Fixed width for 3 cards to prevent layout shifts
+  const FIXED_FAN_WIDTH = 80 + 2 * CARD_FAN_OFFSET; // Always space for 3 cards
+  
   return (
     <Pile
       isEmpty={cards.length === 0}
-      className="bg-teal-600/10"
+      className=""
       data-waste-pile
+      style={{ 
+        // Fixed width for 3 cards - prevents game scale changes when fanning
+        width: `${FIXED_FAN_WIDTH}px`,
+        minWidth: `${FIXED_FAN_WIDTH}px`
+      }}
     >
-      {/* Show second card when top card is being moved to a NEW location */}
-      {shouldShowSecondCard() ? (
-        <div style={{ position: 'absolute', top: 0, left: 0 }}>
-          <Card 
-            card={secondCard} 
-            isPlayable={false}
-            isDragging={false}
-            isAnimating={false}
-          />
-        </div>
-      ) : null}
-      
-      {/* Show top card - hidden during stock animation so flying card can land on top */}
-      {topCard && !isStockAnimating ? (
-        <div 
-          key={topCard.id}
-          ref={cardRef}
-          style={{ 
-            position: 'relative', 
-            zIndex: 1
+      {/* Render 4th card at position 0 for 150ms while other cards shift */}
+      {shouldShowFourthCard && fourthCard && (
+        <div
+          key={`fourth-${fourthCard.id}`}
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            zIndex: -1
           }}
-          className={isShaking ? 'animate-shake' : ''}
-          data-card-is-top="true"
         >
-          <Card 
-            card={topCard} 
-            onClick={handleCardClick}
-            onDoubleClick={handleCardClick}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onTouchStart={(e) => {
-              if (topCard) {
-                handleTouchStart(e, [topCard], 'waste');
-                setIsActuallyDragging(true);
-              }
-            }}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={(e) => {
-              handleTouchEnd(e);
-              setIsActuallyDragging(false);
-            }}
-            isPlayable={true}
-            isDragging={isTopCardBeingDragged()}
-            isAnimating={isTopCardAnimating()}
+          <Card
+            card={fourthCard}
+            isPlayable={false}
+            isClickable={false}
           />
         </div>
-      ) : !topCard ? (
-        <div className="w-full h-full" />
-      ) : null}
+      )}
+      
+      {/* Render fan of up to 3 cards */}
+      {visibleCards.map((card, index) => {
+        const isTop = index === visibleCards.length - 1;
+        const offset = index * CARD_FAN_OFFSET;
+        
+        // Check if this card should be hidden (animating from stock or being dragged)
+        const shouldHideTop = isTop && (isTopCardBeingDragged() || isTopCardAnimating() || isStockAnimating);
+        
+        // Skip rendering the top card entirely while stock animation is playing
+        // (the flying card from StockPile will show instead)
+        if (shouldHideTop && isStockAnimating) {
+          return null;
+        }
+        
+        // Only animate position for cards that were already visible (not new cards)
+        const wasAlreadyVisible = prevCardIdsRef.current.has(card.id);
+        
+        return (
+          <div
+            key={card.id}
+            ref={isTop ? cardRef : undefined}
+            style={{
+              position: 'absolute',
+              left: `${offset}px`,
+              top: 0,
+              zIndex: index,
+              // Only apply transition to cards that are shifting, not new ones
+              transition: wasAlreadyVisible ? 'left 0.15s linear' : 'none',
+              // Hide if being dragged or animating (but not stock animation - that's handled above)
+              opacity: (shouldHideTop && !isStockAnimating) ? 0 : 1
+            }}
+            className={isTop && isShaking ? 'animate-shake' : ''}
+            data-card-is-top={isTop ? "true" : undefined}
+          >
+            <Card
+              card={card}
+              onClick={isTop ? handleCardClick : undefined}
+              onDoubleClick={isTop ? handleCardClick : undefined}
+              onDragStart={isTop ? handleDragStart : undefined}
+              onDragEnd={isTop ? handleDragEnd : undefined}
+              onTouchStart={isTop ? (e) => {
+                handleTouchStart(e, [card], 'waste');
+                setIsActuallyDragging(true);
+              } : undefined}
+              onTouchMove={isTop ? handleTouchMove : undefined}
+              onTouchEnd={isTop ? (e) => {
+                handleTouchEnd(e);
+                setIsActuallyDragging(false);
+              } : undefined}
+              isPlayable={isTop}
+              isDragging={isTop && isTopCardBeingDragged()}
+              isAnimating={isTop && isTopCardAnimating()}
+              isClickable={isTop}
+              isHinted={isTop && hint?.type === 'waste' && hint?.cardId === card.id}
+            />
+          </div>
+        );
+      })}
+      
+      {/* Empty state */}
+      {cards.length === 0 && <div className="w-full h-full" />}
     </Pile>
   );
 }

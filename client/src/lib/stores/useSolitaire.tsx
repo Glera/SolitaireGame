@@ -4,7 +4,6 @@ import { initializeGame, drawFromStock, moveCards, getMovableCards } from '../so
 import { canPlaceOnTableau } from '../solitaire/cardUtils';
 import { clearAllDropTargetHighlights } from '../solitaire/styleManager';
 import { calculateCardPoints, calculateCardPointsRaw, resetScoredCards } from '../solitaire/scoring';
-import { addPointsToProgress } from '../solitaire/progressManager';
 import { addFloatingScore } from '../solitaire/floatingScoreManager';
 import GameIntegration from '../gameIntegration';
 import { generateSolvableGame, generateUnsolvableGame } from '../solitaire/solvableGenerator';
@@ -163,7 +162,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   setAnimationNearComplete: () => {
     const state = get();
     if (state.animatingCard) {
-      console.log('🎬 Setting animation near complete flag');
       set({ 
         animatingCard: { 
           ...state.animatingCard, 
@@ -185,8 +183,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     const currentState = get();
     const newState = drawFromStock(currentState);
     set(newState);
-    
-    console.log('🎴 Draw card: triggered, calling auto-collect');
     
     // Trigger auto-collect after drawing from stock
     setTimeout(() => {
@@ -213,8 +209,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     
     // If we were dragging cards, animate them back to their source
     if (state.isDragging && state.draggedCards.length > 0) {
-      console.log('🔙 endDrag: Animating return to source');
-      
       const dragPreview = document.querySelector('[data-drag-preview]') as HTMLElement;
       if (dragPreview) {
         const previewRect = dragPreview.getBoundingClientRect();
@@ -279,16 +273,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   dropCards: (targetType, targetIndex, targetFoundation) => {
     const state = get();
     
-    console.log('🏢 dropCards called:', {
-      isDragging: state.isDragging,
-      draggedCards: state.draggedCards.map(c => `${c.suit}-${c.rank}`),
-      source: { type: state.sourceType, index: state.sourceIndex, foundation: state.sourceFoundation },
-      target: { type: targetType, index: targetIndex, foundation: targetFoundation },
-      timestamp: Date.now()
-    });
-    
     if (!state.isDragging) {
-      console.log('⚠️ Not in dragging state, ignoring drop');
       return;
     }
     
@@ -307,7 +292,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     );
     
     if (newGameState) {
-      console.log('✅ Move successful, updating game state');
       set({
         ...newGameState,
         isDragging: false,
@@ -332,8 +316,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           });
         });
         
-        
-        console.log('🎉 Game won! Notifying lobby with score:', totalScore);
         GameIntegration.getInstance().onGameEnd(totalScore, gameTime, newGameState.totalGifts);
       }
       
@@ -344,12 +326,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         setTimeout(() => {
           get().triggerAutoCollect();
         }, 100); // Small delay to let state update
-      } else {
-        console.log('🚫 Auto-collect: Skipping because player moved card from foundation');
       }
     } else {
-      console.log('❌ Move failed, invalid move attempted - animating return');
-      
       // Find source element for return animation
       const dragPreview = document.querySelector('[data-drag-preview]') as HTMLElement;
       if (dragPreview && state.draggedCards.length > 0) {
@@ -364,18 +342,12 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         } else if (state.sourceType === 'tableau' && state.sourceIndex !== undefined) {
           // Find the specific card element in the tableau column
           sourceElement = document.querySelector(`[data-card-id="${firstDraggedCard.id}"]`) as HTMLElement;
-          console.log('🔍 Return animation: Looking for card', firstDraggedCard.id, 'found:', !!sourceElement);
         } else if (state.sourceType === 'foundation' && state.sourceFoundation) {
           sourceElement = document.querySelector(`[data-foundation-pile="${state.sourceFoundation}"]`) as HTMLElement;
         }
         
         if (sourceElement) {
           const sourceRect = sourceElement.getBoundingClientRect();
-          
-          console.log('📐 Return animation coordinates:', {
-            start: { x: previewRect.left, y: previewRect.top },
-            end: { x: sourceRect.left, y: sourceRect.top }
-          });
           
           // Animate return with full stack if multiple cards
           set({
@@ -416,10 +388,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     const suit = card.suit;
     const foundationCards = state.foundations[suit];
     
-    console.log(`🔍 canAutoMoveToFoundation: checking ${card.suit}-${card.rank}, foundation ${suit} has ${foundationCards.length} cards`);
-    
     if (foundationCards.length === 0 && card.rank === 'A') {
-      console.log(`✅ canAutoMoveToFoundation: Ace can be moved to empty foundation ${suit}`);
       return suit;
     }
     
@@ -435,16 +404,12 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
                       topCard.rank === 'Q' ? 12 :
                       topCard.rank === 'K' ? 13 :
                       parseInt(topCard.rank);
-      
-      console.log(`🔍 Comparing: ${card.suit}-${card.rank} (${cardValue}) vs top ${topCard.suit}-${topCard.rank} (${topValue})`);
                       
       if (cardValue === topValue + 1) {
-        console.log(`✅ canAutoMoveToFoundation: ${card.suit}-${card.rank} can go on ${topCard.suit}-${topCard.rank}`);
         return suit;
       }
     }
     
-    console.log(`❌ canAutoMoveToFoundation: ${card.suit}-${card.rank} cannot move to foundation`);
     return null;
   },
   
@@ -498,7 +463,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     const currentOrder = get().foundationSlotOrder;
     if (!currentOrder.includes(suit)) {
       const newOrder = [...currentOrder, suit];
-      console.log(`🎯 Reserving slot ${currentOrder.length} for ${suit}`);
       set({ foundationSlotOrder: newOrder });
       
       // Wait for React to update DOM with new order before getting element position
@@ -507,7 +471,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         const updatedEndElement = document.querySelector(`[data-foundation-pile="${suit}"]`) as HTMLElement;
         
         if (!updatedEndElement) {
-          console.warn(`⚠️ Could not find foundation pile for suit ${suit} after reorder`);
           autoCollectingCards.delete(card.id); // Clean up on failure
           return;
         }
@@ -577,16 +540,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   findTableauPlacementForCard: (card) => {
     const state = get();
     
-    console.log('🔍 findTableauPlacementForCard: Searching for placement', {
-      card: `${card.suit}-${card.rank}`,
-      tableauColumns: state.tableau.map((col, i) => ({
-        index: i,
-        length: col.length,
-        topCard: col.length > 0 ? `${col[col.length - 1].suit}-${col[col.length - 1].rank}` : 'empty',
-        topCardFaceUp: col.length > 0 ? col[col.length - 1].faceUp : false
-      }))
-    });
-    
     // Try each tableau column to find a valid placement
     for (let colIndex = 0; colIndex < state.tableau.length; colIndex++) {
       const column = state.tableau[colIndex];
@@ -594,7 +547,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       // If column is empty, only King can be placed
       if (column.length === 0) {
         if (card.rank === 'K') {
-          console.log(`✅ findTableauPlacementForCard: King can go to empty column ${colIndex}`);
           return colIndex;
         }
         continue;
@@ -603,21 +555,16 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       // Check if card can be placed on the last card in the column
       const lastCard = column[column.length - 1];
       const canPlace = canPlaceOnTableau(lastCard, card); // lastCard is bottom (target), card is top (being placed)
-      console.log(`🔍 Column ${colIndex}: Can place ${card.suit}-${card.rank} (${card.color}) on ${lastCard.suit}-${lastCard.rank} (${lastCard.color})? ${canPlace} (faceUp: ${lastCard.faceUp})`);
       
       if (lastCard.faceUp && canPlace) {
-        console.log(`✅ findTableauPlacementForCard: Card can go to column ${colIndex} on ${lastCard.suit}-${lastCard.rank}`);
         return colIndex;
       }
     }
     
-    console.log('❌ findTableauPlacementForCard: No valid placement found');
     return null; // No valid placement found
   },
   
   autoMoveToTableau: (card, targetColumnIndex, startElement) => {
-    console.log(`🚀 autoMoveToTableau: moving ${card.suit}-${card.rank} to tableau column ${targetColumnIndex}`);
-    
     const state = get();
     const targetColumn = state.tableau[targetColumnIndex];
     
@@ -628,11 +575,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       // Find the last card in the target column
       const lastCard = targetColumn[targetColumn.length - 1];
       endElement = document.querySelector(`[data-card-id="${lastCard.id}"]`) as HTMLElement;
-      console.log('🎯 autoMoveToTableau: Found last card in column', lastCard.id);
     } else {
       // Column is empty, use the column container
       endElement = document.querySelector(`[data-tableau-column="${targetColumnIndex}"]`) as HTMLElement;
-      console.log('🎯 autoMoveToTableau: Column is empty, using container');
     }
     
     if (startElement && endElement) {
@@ -661,14 +606,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       // Apply scale to the offset
       const verticalOffset = baseOffset * scale;
       
-      console.log('📐 autoMoveToTableau: Animation coordinates', {
-        start: { x: startRect.left, y: startRect.top },
-        end: { x: endRect.left, y: endRect.top + verticalOffset },
-        baseOffset,
-        scale,
-        verticalOffset
-      });
-      
       // For animation to tableau, we don't need cardStartPosition (no points scored)
       set({
         animatingCard: {
@@ -682,7 +619,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         }
       });
     } else {
-      console.log('⚠️ autoMoveToTableau: Missing elements, moving immediately');
       // No animation, move immediately by using moveCards
       const state = get();
       
@@ -727,8 +663,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   },
   
   autoMoveStackToTableau: (cards, sourceColumnIndex, targetColumnIndex, startElement) => {
-    console.log(`🚀 autoMoveStackToTableau: moving ${cards.length} cards from column ${sourceColumnIndex} to column ${targetColumnIndex}`);
-    
     const state = get();
     const targetColumn = state.tableau[targetColumnIndex];
     
@@ -739,11 +673,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       // Find the last card in the target column
       const lastCard = targetColumn[targetColumn.length - 1];
       endElement = document.querySelector(`[data-card-id="${lastCard.id}"]`) as HTMLElement;
-      console.log('🎯 autoMoveStackToTableau: Found last card in column', lastCard.id);
     } else {
       // Column is empty, use the column container
       endElement = document.querySelector(`[data-tableau-column="${targetColumnIndex}"]`) as HTMLElement;
-      console.log('🎯 autoMoveStackToTableau: Column is empty, using container');
     }
     
     if (startElement && endElement) {
@@ -772,14 +704,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       // Apply scale to the offset
       const verticalOffset = baseOffset * scale;
       
-      console.log('📐 autoMoveStackToTableau: Animation coordinates', {
-        start: { x: startRect.left, y: startRect.top },
-        end: { x: endRect.left, y: endRect.top + verticalOffset },
-        baseOffset,
-        scale,
-        verticalOffset
-      });
-      
       // Animate the bottom card of the stack
       set({
         animatingCard: {
@@ -796,7 +720,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         }
       });
     } else {
-      console.log('⚠️ autoMoveStackToTableau: Missing elements, moving immediately');
       // No animation, move immediately
       const newGameState = moveCards(
         state,
@@ -825,19 +748,14 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     
     // Check if this is a return animation (failed drop) - just clear animation state
     if (animating?.isReturnAnimation) {
-      console.log('🔙 Return animation complete, clearing animatingCard state immediately');
       set({ animatingCard: null });
       return;
     }
     
     // Check if this is a tableau move
     if (animating?.isTableauMove && animating.targetTableauColumn !== undefined) {
-      console.log(`🎯 Tableau move animation complete, moving to column ${animating.targetTableauColumn}`);
-      
       // Check if this is a stack move
       if (animating.isStackMove && animating.stackCards && animating.sourceTableauColumn !== undefined) {
-        console.log(`🎯 Stack move: ${animating.stackCards.length} cards from column ${animating.sourceTableauColumn}`);
-        
         const newGameState = moveCards(
           state,
           animating.stackCards,
@@ -957,8 +875,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           });
         });
         
-        
-        console.log('🎉 Game won! Notifying lobby with score:', totalScore);
         GameIntegration.getInstance().onGameEnd(totalScore, gameTime, newGameState.totalGifts);
       }
       
@@ -971,13 +887,13 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     }
   },
   
-  addPointsToProgress: (points: number) => {
-    addPointsToProgress(points);
+  addPointsToProgress: (_points: number) => {
+    // Points are handled by the progress bar component directly
+    // This function is called by game logic but actual display is managed by DonationProgress
   },
   
   onGiftEarned: (gifts: number) => {
     set({ totalGifts: gifts });
-    console.log(`🎁 Gift earned! Total gifts: ${gifts}`);
   },
   
   addFloatingScore: (points: number, x: number, y: number, cardRank: string, isPremium?: boolean) => {
@@ -997,11 +913,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       });
     });
     
-    console.log('📊 Current results calculated:', {
-      score: currentScore,
-      giftsEarned: state.totalGifts
-    });
-    
     return {
       score: currentScore,
       giftsEarned: state.totalGifts
@@ -1010,13 +921,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   
   triggerAutoCollect: () => {
     const state = get();
-    
-    console.log('🤖 Auto-collect: Starting check...', {
-      animatingCard: state.animatingCard ? `${state.animatingCard.card.suit}-${state.animatingCard.card.rank}` : 'none',
-      tableauCols: state.tableau.filter(c => c.length > 0).length,
-      wasteCards: state.waste.length,
-      stockCards: state.stock.length
-    });
     
     // Check if ALL remaining cards can be moved to foundations
     // This includes: tableau (with proper uncovering), waste pile, and stock
@@ -1032,7 +936,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         spades: [...state.foundations.spades.map(c => ({...c}))]
       };
       
-      const rankOrder: { [key in Rank]: number } = {
+      const rankOrder: { [key: string]: number } = {
         'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
         '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13
       };
@@ -1122,7 +1026,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           
           if (stockCycles > maxStockCycles) {
             // We've cycled too many times, game is not fully solvable
-            console.log(`🤖 Auto-collect: Failed after ${stockCycles} stock cycles`);
             break;
           }
           
@@ -1140,7 +1043,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         if (!foundMove) {
           // No more moves possible - check if we solved it
           const remainingCards = virtualTableau.flat().length + virtualStock.length + virtualWaste.length;
-          console.log(`🤖 Auto-collect: Stopped. ${remainingCards} cards remaining in play, ${movedCount} moved to foundations`);
           
           // Success if all 52 cards are in foundations
           return remainingCards === 0;
@@ -1149,17 +1051,13 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       
       // Check final result
       const remainingCards = virtualTableau.flat().length + virtualStock.length + virtualWaste.length;
-      console.log(`🤖 Auto-collect: Max iterations reached. ${remainingCards} cards remaining, ${movedCount} moved`);
       return remainingCards === 0;
     };
     
     // Check if we can fully auto-collect
     if (!canFullyAutoCollect()) {
-      console.log('🤖 Auto-collect: Not all cards can be auto-collected yet, waiting...');
       return;
     }
-    
-    console.log('🤖 Auto-collect: Full auto-collect possible! Starting chain...');
     
     // Find all cards that can be auto-moved RIGHT NOW
     interface AutoMoveCandidate {
@@ -1173,8 +1071,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       const currentState = get();
       const candidates: AutoMoveCandidate[] = [];
       
-      console.log(`🔍 Finding candidates: tableau=${currentState.tableau.filter(c => c.length > 0).length} cols, waste=${currentState.waste.length}, stock=${currentState.stock.length}`);
-      
       // 1. Check tableau columns
       for (let i = 0; i < currentState.tableau.length; i++) {
         const column = currentState.tableau[i];
@@ -1183,7 +1079,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           if (topCard.faceUp) {
             const targetSuit = get().canAutoMoveToFoundation(topCard);
             if (targetSuit) {
-              console.log(`✅ Found move: ${topCard.suit}-${topCard.rank} from tableau ${i} to foundation`);
               candidates.push({
                 card: topCard,
                 suit: targetSuit,
@@ -1200,14 +1095,11 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         const wasteTop = currentState.waste[currentState.waste.length - 1];
         const targetSuit = get().canAutoMoveToFoundation(wasteTop);
         if (targetSuit) {
-          console.log(`✅ Found move: ${wasteTop.suit}-${wasteTop.rank} from waste to foundation`);
           candidates.push({
             card: wasteTop,
             suit: targetSuit,
             sourceType: 'waste'
           });
-        } else {
-          console.log(`❌ Waste card ${wasteTop.suit}-${wasteTop.rank} cannot move to foundation yet`);
         }
       }
       
@@ -1215,7 +1107,6 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       if (candidates.length === 0) {
         if (currentState.stock.length > 0) {
           // Stock has cards - draw one
-          console.log(`🎴 No immediate moves, drawing from stock (${currentState.stock.length} cards)`);
           candidates.push({
             card: currentState.stock[currentState.stock.length - 1],
             suit: 'hearts', // Placeholder
@@ -1223,14 +1114,11 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           });
         } else if (currentState.waste.length > 0) {
           // Stock empty but waste has cards - recycle waste to stock
-          console.log(`♻️ No immediate moves, recycling waste (${currentState.waste.length} cards) to stock`);
           candidates.push({
             card: currentState.waste[0], // Placeholder
             suit: 'hearts', // Placeholder
             sourceType: 'stock' // Will trigger drawCard which handles recycling
           });
-        } else {
-          console.log(`❌ No moves available and stock/waste empty - stopping`);
         }
       }
       
@@ -1240,15 +1128,11 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     const candidates = findCandidates();
     
     if (candidates.length === 0) {
-      console.log('🤖 Auto-collect: No more moves possible, auto-collect complete!');
       return;
     }
     
-    console.log(`🤖 Auto-collect: Found ${candidates.length} card(s) to process`);
-    
     // Special case: if first candidate is stock draw, handle it separately
     if (candidates[0].sourceType === 'stock') {
-      console.log(`🤖 Auto-collect: Drawing card from stock`);
       get().drawCard();
       // drawCard will trigger auto-collect automatically after drawing
       return;
@@ -1257,17 +1141,12 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     // Launch ALL available cards immediately in parallel - NO batching!
     const moveCandidates = candidates.filter(c => c.sourceType !== 'stock');
     
-    console.log(`🚀 Auto-collect: Launching ALL ${moveCandidates.length} cards in parallel`);
-    
     moveCandidates.forEach((candidate, index) => {
       // Ultra-fast animation speed with aggressive exponential speedup
       const baseSpeed = 25; // Start at 25ms
       const speedupFactor = 0.85; // Each card 15% faster
       const minSpeed = 3; // Minimum 3ms
       const animationSpeed = Math.max(minSpeed, baseSpeed * Math.pow(speedupFactor, index));
-      
-      // Launch immediately, no setTimeout
-      console.log(`🤖 Auto-collect: Moving ${candidate.card.suit}-${candidate.card.rank} from ${candidate.sourceType} (${Math.round(animationSpeed)}ms)`);
       
       // Find DOM elements for animation
       let startElement: HTMLElement | undefined;

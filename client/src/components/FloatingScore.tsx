@@ -6,49 +6,32 @@ interface FloatingScoreProps {
   x: number;
   y: number;
   onComplete: () => void;
-  isPremium?: boolean;
   breakdown?: {
     cardRank: string;
     points: number;
   };
 }
 
-export function FloatingScore({ score, x, y, onComplete, isPremium = false, breakdown }: FloatingScoreProps) {
+export function FloatingScore({ score, x, y, onComplete }: FloatingScoreProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // console.log(`🎯 FloatingScore: Component mounted with score ${score} at (${x}, ${y})`);
     setMounted(true);
     
     const timer = setTimeout(() => {
       setIsVisible(false);
       setTimeout(() => {
         onComplete();
-      }, 100); // Allow fade out to complete
-    }, 1500); // Match the animation duration (1.5s)
+      }, 100);
+    }, 1500);
 
-    return () => {
-      // console.log(`🎯 FloatingScore: Cleanup for score ${score}`);
-      clearTimeout(timer);
-    };
-  }, []); // Empty dependency array to prevent re-creation
+    return () => clearTimeout(timer);
+  }, []);
 
-  if (!mounted) {
-    // console.log(`🎯 FloatingScore: Not mounted yet for score ${score}`);
+  if (!mounted || !isVisible || score == null) {
     return null;
   }
-
-  if (!isVisible || score == null || score === undefined) {
-    // console.log(`🎯 FloatingScore: Not rendering - isVisible: ${isVisible}, score: ${score}, mounted: ${mounted}`);
-    return null;
-  }
-
-  // console.log(`🎯 FloatingScore: Rendering score ${score} at (${x}, ${y})`);
-
-  // Simple test - render text directly
-  // const testText = `+${score} POINTS`;
-  // console.log(`🎯 FloatingScore: Test text: "${testText}"`);
 
   return createPortal(
     <div
@@ -60,15 +43,15 @@ export function FloatingScore({ score, x, y, onComplete, isPremium = false, brea
         willChange: 'transform, opacity',
         isolation: 'isolate',
         position: 'fixed',
-        zIndex: 10000, // Very high z-index to be above everything
+        zIndex: 10000,
       }}
     >
       <div 
         style={{
-          color: isPremium ? 'rgb(59, 130, 246)' : '#f8fafc', // Blue for premium, white for normal
-          fontSize: isPremium ? '2rem' : '1.5rem', // Larger size
-          fontWeight: 900, // font-black - same as cards
-          textShadow: '1px 0 0 #000000, -1px 0 0 #000000, 0 1px 0 #000000, 0 -1px 0 #000000', // Black outline
+          color: '#f8fafc',
+          fontSize: '1.5rem',
+          fontWeight: 900,
+          textShadow: '1px 0 0 #000000, -1px 0 0 #000000, 0 1px 0 #000000, 0 -1px 0 #000000',
           transform: 'translate3d(0,0,0)',
           backfaceVisibility: 'hidden',
           whiteSpace: 'nowrap',

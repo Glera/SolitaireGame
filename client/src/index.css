@@ -203,3 +203,180 @@ canvas {
 .animate-shake {
   animation: cardShake 400ms ease-in-out; /* Increased from 200ms to 400ms for two oscillations */
 }
+
+/* Collection button pop animation - quick and snappy */
+@keyframes collection-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-collection-pop {
+  animation: collection-pop 0.15s ease-out;
+}
+
+/* New collection item pulse animation */
+@keyframes new-item-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0px rgba(250, 204, 21, 0);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 20px rgba(250, 204, 21, 0.8);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0px rgba(250, 204, 21, 0);
+  }
+}
+
+/* Card dealing animation - cards fly in from stock pile */
+@keyframes cardDeal {
+  0% {
+    transform: translateX(500px) translateY(-200px) rotate(15deg);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(0) translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.card-dealing {
+  animation: cardDeal 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94) backwards;
+}
+
+/* Stock pile dealing animation */
+@keyframes stockDeal {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.stock-dealing {
+  animation: stockDeal 0.3s ease-out backwards;
+}
+
+/* Hint glow animation */
+@keyframes hintGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px 3px rgba(255, 215, 0, 0.6), 0 0 20px 6px rgba(255, 215, 0, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 20px 8px rgba(255, 215, 0, 0.9), 0 0 40px 15px rgba(255, 215, 0, 0.5);
+    transform: scale(1.02);
+  }
+}
+
+.hint-glow {
+  animation: hintGlow 0.8s ease-in-out infinite;
+  z-index: 100;
+  position: relative;
+}
+
+/* Level indicator pulse animation */
+@keyframes levelPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-level-pulse {
+  animation: levelPulse 0.3s ease-out;
+}
+
+/* Trophy appear animation */
+@keyframes trophy-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.8);
+  }
+  60% {
+    transform: translateY(-5px) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.trophy-appear {
+  animation: trophy-appear 0.5s ease-out both;
+}
+
+/* Trophy glow animation for celebration screen */
+@keyframes trophy-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 20px rgba(250, 204, 21, 0.6));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 40px rgba(250, 204, 21, 1));
+    transform: scale(1.05);
+  }
+}
+
+/* Collection item pop animation - for reward animation */
+@keyframes collection-item-pop {
+  0% {
+    transform: translate(10px, 10px) scale(1);
+    opacity: 0;
+  }
+  20% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  60% {
+    transform: translate(0, 0) scale(1.15);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+/* Collection header appear animation - for serial rewards */
+@keyframes collection-header-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(-15px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Collection icon pop animation - starts when parent reaches max size */
+@keyframes collection-icon-pop {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
+  }
+}

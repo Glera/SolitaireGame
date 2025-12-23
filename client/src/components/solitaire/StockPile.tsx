@@ -11,7 +11,7 @@ interface StockPileProps {
 }
 
 export function StockPile({ cards }: StockPileProps) {
-  const { drawCard, waste, setStockAnimating, animatingCard } = useSolitaire();
+  const { drawCard, waste, setStockAnimating, animatingCard, isDealing, hint } = useSolitaire();
   const { scale } = useGameScaleContext();
   const [isAnimating, setIsAnimating] = useState(false);
   const [flyingCard, setFlyingCard] = useState<CardType | null>(null);
@@ -21,6 +21,11 @@ export function StockPile({ cards }: StockPileProps) {
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
   
   const handleClick = () => {
+    // Don't allow clicks during dealing animation
+    if (isDealing) {
+      return;
+    }
+    
     // Don't allow clicks during any animation
     // Temporarily disabled to debug
     // if (isAnimating || animatingCard) {
@@ -38,9 +43,8 @@ export function StockPile({ cards }: StockPileProps) {
       timestamp: Date.now()
     });
     
-    // Start animation if there's a card to flip
+    // Start animation if there's a card to fly
     if (topCard) {
-      // Show the card face-up immediately for animation
       const cardToFly = { ...topCard, faceUp: true };
       setFlyingCard(cardToFly);
       setIsAnimating(true);
@@ -62,7 +66,15 @@ export function StockPile({ cards }: StockPileProps) {
       }
       
       const wasteRect = wastePile.getBoundingClientRect();
-      const dx = wasteRect.left - stockRect.left;
+      
+      // Calculate fan offset - new card will be at rightmost position in the fan
+      // After drawCard(), waste.length already includes the new card
+      const CARD_FAN_OFFSET = 20;
+      const wasteCount = useSolitaire.getState().waste.length;
+      // Fan shows max 3 cards: positions 0, 20, 40 (scaled)
+      const fanOffset = Math.min(wasteCount - 1, 2) * CARD_FAN_OFFSET * scale;
+      
+      const dx = wasteRect.left + fanOffset - stockRect.left;
       const dy = wasteRect.top - stockRect.top;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
@@ -118,12 +130,17 @@ export function StockPile({ cards }: StockPileProps) {
     
     const wasteRect = wastePile.getBoundingClientRect();
     
+    // Calculate fan offset for end position (scaled)
+    const CARD_FAN_OFFSET = 20;
+    const wasteCount = waste.length;
+    const fanOffset = Math.min(wasteCount - 1, 2) * CARD_FAN_OFFSET * scale;
+    
     // Start position (relative to viewport for fixed positioning)
     const startX = stockRect.left;
     const startY = stockRect.top;
     
-    // End position (relative to viewport for fixed positioning)
-    const endX = wasteRect.left;
+    // End position (with fan offset for correct card position)
+    const endX = wasteRect.left + fanOffset;
     const endY = wasteRect.top;
     
     // Calculate distance to move
@@ -146,7 +163,7 @@ export function StockPile({ cards }: StockPileProps) {
         <Pile
           onClick={handleClick}
           isEmpty={cards.length === 0}
-          className="cursor-pointer hover:bg-teal-600/10"
+          className={`${waste.length === 0 && cards.length === 0 ? "" : "cursor-pointer hover:bg-teal-600/10"} ${hint?.type === 'stock' ? 'hint-glow rounded-lg' : ''}`}
           data-stock-pile
         >
           {/* Always show top card, even during animation */}
@@ -154,11 +171,12 @@ export function StockPile({ cards }: StockPileProps) {
             <div className="w-full h-full" key={`static-${topCard.id}`}>
               <Card card={topCard} />
             </div>
-          ) : (
+          ) : waste.length > 0 ? (
+            // Show recycle button only if there are cards in waste to recycle
             <div className="flex items-center justify-center h-full">
               <div className="text-lg select-none">🔄</div>
             </div>
-          )}
+          ) : null}
         </Pile>
       </div>
       
@@ -177,7 +195,25 @@ export function StockPile({ cards }: StockPileProps) {
             transform: `scale(${scale})`,
             transformOrigin: 'top left'
           }}>
-            <Card card={flyingCard} />
+            {/* Simple card face up - no 3D flip */}
+            <div
+              className="w-20 h-28 bg-amber-50 p-1 shadow-md rounded-lg border border-stone-900"
+              style={{ borderRadius: '0.5rem' }}
+            >
+              <div className="w-full h-full flex flex-col relative px-0.5 pt-0 pb-1">
+                <div className="flex justify-between items-start -mx-1 -mt-0.5">
+                  <div className={`${flyingCard.rank === '10' ? "text-3xl" : "text-4xl"} font-extrabold leading-none ${flyingCard.rank !== '10' ? "pl-1" : ""} ${flyingCard.color === 'red' ? "text-red-600" : "text-black"}`}>
+                    {flyingCard.rank}
+                  </div>
+                  <div className={`${flyingCard.rank === '10' ? "text-xl" : "text-2xl"} font-extrabold leading-none ${flyingCard.color === 'red' ? "text-red-600" : "text-black"}`}>
+                    {flyingCard.suit === 'hearts' ? '♥' : flyingCard.suit === 'diamonds' ? '♦' : flyingCard.suit === 'clubs' ? '♣' : '♠'}
+                  </div>
+                </div>
+                <div className={`text-[3rem] font-black absolute bottom-[-2px] left-1/2 -translate-x-1/2 ${flyingCard.color === 'red' ? "text-red-600" : "text-black"}`}>
+                  {flyingCard.suit === 'hearts' ? '♥' : flyingCard.suit === 'diamonds' ? '♦' : flyingCard.suit === 'clubs' ? '♣' : '♠'}
+                </div>
+              </div>
+            </div>
           </div>
         </div>,
         document.body

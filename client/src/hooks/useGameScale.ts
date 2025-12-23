@@ -30,31 +30,39 @@ export function useGameScale(): GameDimensions {
       const containerWidth = window.innerWidth;
       const containerHeight = window.innerHeight;
 
-      // Reserved spaces (in pixels)
+      // Reserved spaces (in pixels) - must match actual UI measurements
       const AD_SPACE = 60;          // Bottom ad space for banner
-      const PROGRESS_BAR = 70;      // Progress bar at top
-      const CONTROLS = 25;          // Room info + game controls
-      const PADDING = 10;           // Padding and spacing
+      const PROGRESS_BAR = 95;      // Progress bar container (95px in GameBoard)
+      const CONTROLS = 50;          // Room info + game controls + margins
+      const PADDING = 20;           // Padding and spacing between elements
       
       const reservedHeight = AD_SPACE + PROGRESS_BAR + CONTROLS + PADDING;
       const availableHeight = containerHeight - reservedHeight;
 
       // Base game dimensions (at scale 1)
       // 7 columns × 80px (card width w-20) + 6 gaps × 4px (gap-1) = 560 + 24 = 584px
-      // But we also need to account for actual game board width with proper margins
-      const BASE_WIDTH = 600;   // Slightly larger to better fill screen
+      // Top row uses justify-between with fixed 584px width to match tableau
+      const BASE_WIDTH = 600;   // Slightly larger for padding
       
       // Height calculation:
       // - Top row (Stock/Waste/Foundations): 112px (card height h-28) + 12px gap = 124px
-      // - Tableau: Optimize for typical case (not absolute maximum)
+      // - Tableau: Account for maximum possible stack
       //   - First card: 112px (full card)
-      //   - Remaining cards: Assume typical 10 cards max visible
+      //   - Maximum stack: 19 cards (6 face-down + 13 face-up), but compressed
+      //   - With 50% compression: face-up offset 26px, face-down 6px
+      //   - Worst case: 6*6 + 12*26 = 36 + 312 = 348px + 112 = 460px for tableau
       const isMobile = containerWidth <= 768;
       const CARD_HEIGHT = 112;
-      const CARD_VERTICAL_OFFSET = isMobile ? 52 : 48;  // Mobile uses 52px, desktop 48px
-      const TYPICAL_MAX_CARDS = 10;     // Reduced from 13 to better fit screens
+      // Minimum readable offset at 65% compression (must match stackCompression.ts)
+      // Mobile: 52px * 0.65 = 34px, Desktop: 48px * 0.65 = 31px
+      const MIN_FACE_UP_OFFSET = isMobile ? 34 : 31;
+      const MIN_FACE_DOWN_OFFSET = 8;  // 12px * 0.65 ≈ 8px
+      const MAX_FACE_DOWN = 6;  // Maximum face-down cards in a column
+      const MAX_FACE_UP = 13;   // Maximum face-up cards (full suit)
       const TOP_ROW_HEIGHT = CARD_HEIGHT + 12; // Top row + gap = 124px
-      const TABLEAU_HEIGHT = CARD_HEIGHT + ((TYPICAL_MAX_CARDS - 1) * CARD_VERTICAL_OFFSET);
+      const TABLEAU_HEIGHT = CARD_HEIGHT + 
+        (MAX_FACE_DOWN * MIN_FACE_DOWN_OFFSET) + 
+        ((MAX_FACE_UP - 1) * MIN_FACE_UP_OFFSET);
       const BASE_HEIGHT = TOP_ROW_HEIGHT + TABLEAU_HEIGHT;
 
       // Calculate scale to fit

@@ -1,6 +1,7 @@
 // Integration with game lobby system
 class GameIntegration {
   private getCurrentResultsCallback?: () => { score: number; giftsEarned: number } | null;
+  private startNewGameCallback?: () => void;
 
   constructor() {
     // Уведомляем лобби что игра готова
@@ -38,11 +39,23 @@ class GameIntegration {
           console.log('⚠️ No callback set for current results');
         }
       }
+      
+      // Обработка сообщения для запуска следующего уровня после награды за коллекцию
+      if (event.data.type === 'START_NEXT_LEVEL' || event.data.type === 'START_GAME' || event.data.type === 'NEW_GAME') {
+        console.log('🎮 Received start next level message from lobby');
+        if (this.startNewGameCallback) {
+          this.startNewGameCallback();
+        }
+      }
     });
   }
   
   setGetCurrentResultsCallback(callback: () => { score: number; giftsEarned: number } | null) {
     this.getCurrentResultsCallback = callback;
+  }
+  
+  setStartNewGameCallback(callback: () => void) {
+    this.startNewGameCallback = callback;
   }
   
   // Вызывается когда игра закончена
