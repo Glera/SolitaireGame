@@ -2,6 +2,7 @@ import { GameState, Card, Suit } from './types';
 import { createDeck, shuffleDeck, canPlaceOnTableau, canPlaceOnFoundation } from './cardUtils';
 import { calculateCardPoints, calculateCardPointsWithBreakdown } from './scoring';
 import { getRoomFromURL, getPremiumCardsCount } from '../roomUtils';
+import { awardCardXP } from './experienceManager';
 
 // Select random cards to be premium
 function selectPremiumCards(allCards: Card[], count: number): Set<string> {
@@ -160,31 +161,32 @@ export function moveCards(
   } else if (targetType === 'foundation' && targetFoundation) {
     newState.foundations[targetFoundation] = [...newState.foundations[targetFoundation], ...cards];
     
-    // Calculate points for cards moved to foundation
-    if (onPointsEarned) {
-      let totalPoints = 0;
+    // Calculate points and XP for cards moved to foundation
+    for (const card of cards) {
+      // Award XP for moving card to foundation
+      awardCardXP(card.id);
       
-      for (const card of cards) {
+      if (onPointsEarned) {
         const result = calculateCardPointsWithBreakdown(card);
         const points = result.points;
-        totalPoints += points;
         
-        // Show floating score for each card
-        if (points > 0 && onFloatingScore && result.breakdown) {
-          // Use card start position if available, otherwise fallback to center
-          let scoreX = window.innerWidth / 2;
-          let scoreY = 200;
+        if (points > 0) {
+          onPointsEarned(points);
           
-          if (cardStartPosition) {
-            scoreX = cardStartPosition.x;
-            scoreY = cardStartPosition.y;
+          // Show floating score for each card
+          if (onFloatingScore && result.breakdown) {
+            // Use card start position if available, otherwise fallback to center
+            let scoreX = window.innerWidth / 2;
+            let scoreY = 200;
+            
+            if (cardStartPosition) {
+              scoreX = cardStartPosition.x;
+              scoreY = cardStartPosition.y;
+            }
+            
+            onFloatingScore(points, scoreX, scoreY, result.breakdown.cardRank, card.isPremium);
           }
-          
-          onFloatingScore(points, scoreX, scoreY, result.breakdown.cardRank, card.isPremium);
         }
-      }
-      if (totalPoints > 0) {
-        onPointsEarned(totalPoints);
       }
     }
   }

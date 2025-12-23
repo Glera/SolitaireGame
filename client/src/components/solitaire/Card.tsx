@@ -40,30 +40,35 @@ export function Card({
   const [showFace, setShowFace] = useState(card.faceUp);
   const prevFaceUpRef = useRef(card.faceUp);
   
-  // Detect when card flips from faceDown to faceUp
+  // Flip animation (150ms) - only when card changes from faceDown to faceUp
   useEffect(() => {
-    if (!prevFaceUpRef.current && card.faceUp) {
-      // Card is flipping from back to front
-      console.log('🎴 3D FLIP START:', card.suit, card.rank);
+    const wasFaceDown = !prevFaceUpRef.current;
+    const isNowFaceUp = card.faceUp;
+    
+    if (wasFaceDown && isNowFaceUp) {
+      // Card is flipping from back to front - animate
       setIsFlipping(true);
-      // Show face at halfway point of animation
+      setShowFace(false); // Start showing back
+      
       const timer1 = setTimeout(() => {
-        setShowFace(true);
-      }, 150); // Half of 300ms animation
-      // End flipping state
+        setShowFace(true); // Show face at halfway point
+      }, 75);
+      
       const timer2 = setTimeout(() => {
         setIsFlipping(false);
-      }, 300);
+      }, 150);
       
+      prevFaceUpRef.current = card.faceUp;
       return () => {
         clearTimeout(timer1);
         clearTimeout(timer2);
       };
     } else {
+      // No animation - just update state
       setShowFace(card.faceUp);
+      prevFaceUpRef.current = card.faceUp;
     }
-    prevFaceUpRef.current = card.faceUp;
-  }, [card.faceUp]);
+  }, [card.faceUp, card.id]); // Also depend on card.id to detect same card
 
   const suitSymbol = getSuitSymbol(card.suit);
   const isRed = card.color === 'red';
@@ -180,7 +185,7 @@ export function Card({
         className="w-full h-full relative"
         style={{
           transformStyle: 'preserve-3d',
-          transition: isFlipping ? 'transform 0.3s ease-out' : 'none',
+          transition: isFlipping ? 'transform 0.15s ease-out' : 'none',
           transform: showFace ? 'rotateY(0deg)' : 'rotateY(180deg)'
         }}
       >

@@ -4,24 +4,31 @@ import { getRoomFromURL, getPremiumCardsCount } from '../roomUtils';
 const SUITS: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
 const RANKS: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
+const RANK_VALUES: { [key in Rank]: number } = {
+  'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
+  '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13
+};
+
 /**
- * Generates a GUARANTEED solvable solitaire game using classic layout
- * Algorithm: Deal cards in classic pattern (1,2,3...7), then verify solvability
- * If not solvable, reshuffle and try again
+ * Generates an EASY and DYNAMIC solvable solitaire game
+ * Strategy:
+ * - Aces and low cards are more accessible (top of tableau or early in stock)
+ * - Cards are arranged to create more immediate moves
+ * - Less "digging" through stock required
  */
 export function generateSolvableGame(): GameState {
   const roomType = getRoomFromURL();
   
-  console.log('🎲 Starting solvable game generation...');
+  console.log('🎲 Starting EASY solvable game generation...');
   
-  const maxAttempts = 100;
+  const maxAttempts = 300;
   let attempts = 0;
+  let bestGame: { tableau: Card[][], stock: Card[], score: number } | null = null;
   
   while (attempts < maxAttempts) {
     attempts++;
-    console.log(`🎲 Attempt ${attempts}...`);
     
-    // Create and shuffle all 52 cards
+    // Create all 52 cards
     const allCards: Card[] = [];
     SUITS.forEach(suit => {
       const color: Color = (suit === 'hearts' || suit === 'diamonds') ? 'red' : 'black';
@@ -36,64 +43,193 @@ export function generateSolvableGame(): GameState {
       });
     });
     
-    // Shuffle cards
+    // Smart shuffle: bias low cards towards accessible positions
+    // First, separate cards by "importance" (lower = more important to be accessible)
+    const aces = allCards.filter(c => c.rank === 'A');
+    const twos = allCards.filter(c => c.rank === '2');
+    const threes = allCards.filter(c => c.rank === '3');
+    const lowCards = allCards.filter(c => RANK_VALUES[c.rank] >= 4 && RANK_VALUES[c.rank] <= 6);
+    const midCards = allCards.filter(c => RANK_VALUES[c.rank] >= 7 && RANK_VALUES[c.rank] <= 10);
+    const highCards = allCards.filter(c => RANK_VALUES[c.rank] >= 11);
+    
+    // Shuffle each group
+    const shuffleArray = <T>(arr: T[]): T[] => {
+      const result = [...arr];
+      for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+      }
+      return result;
+    };
+    
+    const shuffledAces = shuffleArray(aces);
+    const shuffledTwos = shuffleArray(twos);
+    const shuffledThrees = shuffleArray(threes);
+    const shuffledLow = shuffleArray(lowCards);
+    const shuffledMid = shuffleArray(midCards);
+    const shuffledHigh = shuffleArray(highCards);
+    
+    // Build tableau with strategic placement
+    const tableau: Card[][] = Array(7).fill(null).map(() => []);
+    
+    // Strategy: Put some aces as top cards of tableau columns
+    // Put 2s and 3s in accessible positions
+    // Kings at bottom of columns (they can start new piles)
+    
+    // First, let's create a pool of cards for top positions (face-up)
+    const topCardPool: Card[] = [];
+    // Add 1-2 aces to top positions (guaranteed accessible)
+    topCardPool.push(...shuffledAces.splice(0, Math.min(2, shuffledAces.length)));
+    // Add some twos and threes
+    topCardPool.push(...shuffledTwos.splice(0, Math.min(2, shuffledTwos.length)));
+    topCardPool.push(...shuffledThrees.splice(0, Math.min(1, shuffledThrees.length)));
+    // Fill rest with random low/mid cards
+    topCardPool.push(...shuffledLow.splice(0, Math.max(0, 7 - topCardPool.length)));
+    
+    // Shuffle top card pool
+    const shuffledTopPool = shuffleArray(topCardPool);
+    
+    // Remaining cards for hidden positions and stock
+    const remainingCards = shuffleArray([
+      ...shuffledAces, ...shuffledTwos, ...shuffledThrees,
+      ...shuffledLow, ...shuffledMid, ...shuffledHigh
+    ]);
+    
+    // Deal tableau
+    let remainingIdx = 0;
+    for (let col = 0; col < 7; col++) {
+      // Hidden cards (0 to col-1)
+      for (let row = 0; row < col; row++) {
+        const card = remainingCards[remainingIdx++];
+        card.faceUp = false;
+        tableau[col].push(card);
+      }
+      // Top card (face-up) - from our curated pool if available
+      const topCard = col < shuffledTopPool.length ? shuffledTopPool[col] : remainingCards[remainingIdx++];
+      topCard.faceUp = true;
+      tableau[col].push(topCard);
+    }
+    
+    // Stock gets remaining cards, but ordered so low cards come up sooner
+    const stockCards = remainingCards.slice(remainingIdx);
+    
+    // Sort stock so that useful cards appear earlier (when drawn)
+    // Cards are drawn from end, so put low cards at end
+    stockCards.sort((a, b) => {
+      // Higher rank values go first (will be drawn later)
+      // Lower rank values go last (will be drawn sooner)
+      return RANK_VALUES[b.rank] - RANK_VALUES[a.rank];
+    });
+    
+    // Add some randomness to stock (don't make it too predictable)
+    for (let i = 0; i < stockCards.length; i++) {
+      if (Math.random() < 0.3) { // 30% chance to swap with nearby card
+        const swapIdx = Math.min(stockCards.length - 1, i + Math.floor(Math.random() * 5));
+        [stockCards[i], stockCards[swapIdx]] = [stockCards[swapIdx], stockCards[i]];
+      }
+    }
+    
+    const stock = stockCards.map(c => ({ ...c, faceUp: false }));
+    
+    // Check if this layout is solvable and score it
+    if (isSolvable(tableau, stock)) {
+      // Score the layout - higher is better (more accessible low cards)
+      let score = 0;
+      
+      // Bonus for aces in top positions
+      tableau.forEach(col => {
+        const topCard = col[col.length - 1];
+        if (topCard.rank === 'A') score += 50;
+        if (topCard.rank === '2') score += 30;
+        if (topCard.rank === '3') score += 20;
+      });
+      
+      // Bonus for low cards early in stock
+      stock.slice(-10).forEach((card, idx) => {
+        if (card.rank === 'A') score += 40 - idx * 2;
+        if (card.rank === '2') score += 25 - idx;
+      });
+      
+      // Track best game
+      if (!bestGame || score > bestGame.score) {
+        bestGame = { tableau: tableau.map(col => col.map(c => ({...c}))), stock: stock.map(c => ({...c})), score };
+        console.log(`🎲 Attempt ${attempts}: Found game with score ${score}`);
+      }
+      
+      // If we found a really good one, use it
+      if (score >= 100) {
+        console.log(`✅ Found excellent game on attempt ${attempts} with score ${score}!`);
+        break;
+      }
+    }
+  }
+  
+  // Use best game found, or generate a basic solvable one
+  if (bestGame) {
+    console.log(`✅ Using best game with score ${bestGame.score}`);
+    return {
+      tableau: bestGame.tableau,
+      foundations: { hearts: [], diamonds: [], clubs: [], spades: [] },
+      stock: bestGame.stock,
+      waste: [],
+      isWon: false,
+      moves: 0,
+      startTime: new Date(),
+      totalGifts: 0,
+      roomType,
+      gameMode: 'solvable'
+    };
+  }
+  
+  // Fallback to basic generation
+  console.warn('⚠️ Could not find good game, using basic generation');
+  return generateBasicSolvableGame();
+}
+
+/**
+ * Basic solvable game generator (fallback)
+ */
+function generateBasicSolvableGame(): GameState {
+  const roomType = getRoomFromURL();
+  const maxAttempts = 100;
+  let attempts = 0;
+  
+  while (attempts < maxAttempts) {
+    attempts++;
+    
+    const allCards: Card[] = [];
+    SUITS.forEach(suit => {
+      const color: Color = (suit === 'hearts' || suit === 'diamonds') ? 'red' : 'black';
+      RANKS.forEach(rank => {
+        allCards.push({ id: `${suit}-${rank}`, suit, rank, color, faceUp: false });
+      });
+    });
+    
     for (let i = allCards.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [allCards[i], allCards[j]] = [allCards[j], allCards[i]];
     }
     
-    // Deal in classic pattern: column 0 gets 1 card, column 1 gets 2 cards, etc.
     const tableau: Card[][] = Array(7).fill(null).map(() => []);
     let cardIndex = 0;
     
     for (let col = 0; col < 7; col++) {
       for (let row = 0; row <= col; row++) {
         const card = allCards[cardIndex++];
-        // Only top card (last in column) is face-up
         card.faceUp = row === col;
         tableau[col].push(card);
       }
     }
     
-    // Remaining cards go to stock
     const stock: Card[] = [];
     while (cardIndex < allCards.length) {
-      const card = allCards[cardIndex++];
-      card.faceUp = false;
-      stock.push(card);
+      stock.push({ ...allCards[cardIndex++], faceUp: false });
     }
     
-    console.log(`🎲 Dealt cards: ${tableau.flat().length} on tableau, ${stock.length} in stock`);
-    
-    // Check if this layout is solvable
     if (isSolvable(tableau, stock)) {
-      console.log(`✅ Found solvable game on attempt ${attempts}!`);
-      
-      // Select premium cards from tableau only
-      // COMMENTED OUT: Premium cards logic disabled
-      /*
-      const tableauCards = tableau.flat();
-      const premiumCount = getPremiumCardsCount(roomType);
-      const premiumCardIds = selectPremiumCards(tableauCards, premiumCount);
-      
-      // Mark premium cards
-      tableau.forEach(column => {
-        column.forEach(card => {
-          if (premiumCardIds.has(card.id)) {
-            card.isPremium = true;
-          }
-        });
-      });
-      */
-      
       return {
         tableau,
-        foundations: {
-          hearts: [],
-          diamonds: [],
-          clubs: [],
-          spades: []
-        },
+        foundations: { hearts: [], diamonds: [], clubs: [], spades: [] },
         stock,
         waste: [],
         isWon: false,
@@ -106,10 +242,7 @@ export function generateSolvableGame(): GameState {
     }
   }
   
-  // Fallback: couldn't find solvable game, return last attempt
-  console.warn(`⚠️ Could not find solvable game after ${maxAttempts} attempts, using last shuffle`);
-  
-  // Create one more shuffle
+  // Fallback: return a random game
   const allCards: Card[] = [];
   SUITS.forEach(suit => {
     const color: Color = (suit === 'hearts' || suit === 'diamonds') ? 'red' : 'black';
@@ -344,8 +477,8 @@ function canPlaceOnTableauReverse(card: Card, topCard: Card): boolean {
 }
 
 /**
- * Check if a solitaire layout is solvable using a simplified solver
- * This tries to actually solve the game with a depth-limited search
+ * Check if a solitaire layout is solvable using an improved solver
+ * Uses priority-based moves and multiple passes through stock
  */
 function isSolvable(tableau: Card[][], stock: Card[]): boolean {
   // Quick reject: if no aces accessible at all
@@ -367,61 +500,83 @@ function isSolvable(tableau: Card[][], stock: Card[]): boolean {
     spades: []
   };
   
-  // Try to make progress for a limited number of moves
-  const maxMoves = 200;
-  let moves = 0;
-  let madeProgress = true;
+  const rankOrder: { [key in Rank]: number } = {
+    'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
+    '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13
+  };
   
-  while (madeProgress && moves < maxMoves) {
-    madeProgress = false;
-    moves++;
+  // Helper: check if moving to foundation is "safe" (won't block other cards)
+  const isSafeFoundationMove = (card: Card): boolean => {
+    const cardRank = rankOrder[card.rank];
+    // Aces and 2s are always safe
+    if (cardRank <= 2) return true;
     
-    // 1. Try to move cards to foundations
+    // For higher cards, check if opposite color foundations are high enough
+    const oppositeColors = card.color === 'red' ? ['clubs', 'spades'] : ['hearts', 'diamonds'];
+    const minOppositeRank = Math.min(
+      ...oppositeColors.map(suit => {
+        const pile = simFoundations[suit as Suit];
+        return pile.length === 0 ? 0 : rankOrder[pile[pile.length - 1].rank];
+      })
+    );
+    
+    // Safe to move if card rank is at most 2 higher than min opposite foundation
+    return cardRank <= minOppositeRank + 2;
+  };
+  
+  // Try to make progress
+  const maxMoves = 500;
+  let moves = 0;
+  let stockCycles = 0;
+  const maxStockCycles = 3;
+  let lastFoundationCount = 0;
+  let stuckCounter = 0;
+  
+  while (moves < maxMoves && stockCycles <= maxStockCycles) {
+    moves++;
+    let madeProgress = false;
+    
+    // Priority 1: Move safe cards to foundations (cards that won't block progress)
     for (let col = 0; col < simTableau.length; col++) {
       if (simTableau[col].length === 0) continue;
       const topCard = simTableau[col][simTableau[col].length - 1];
       if (!topCard.faceUp) continue;
       
-      if (canMoveToFoundation(topCard, simFoundations)) {
+      if (canMoveToFoundation(topCard, simFoundations) && isSafeFoundationMove(topCard)) {
         simTableau[col].pop();
         simFoundations[topCard.suit].push(topCard);
-        
-        // Flip next card if exists
         if (simTableau[col].length > 0) {
           simTableau[col][simTableau[col].length - 1].faceUp = true;
         }
-        
         madeProgress = true;
         break;
       }
     }
     
-    if (madeProgress) continue;
-    
-    // 2. Try to move from waste to foundations
-    if (simWaste.length > 0) {
+    if (!madeProgress && simWaste.length > 0) {
       const wasteTop = simWaste[simWaste.length - 1];
-      if (canMoveToFoundation(wasteTop, simFoundations)) {
+      if (canMoveToFoundation(wasteTop, simFoundations) && isSafeFoundationMove(wasteTop)) {
         simWaste.pop();
         simFoundations[wasteTop.suit].push(wasteTop);
         madeProgress = true;
-        continue;
       }
     }
     
-    // 3. Try to move cards between tableau columns
+    if (madeProgress) {
+      stuckCounter = 0;
+      continue;
+    }
+    
+    // Priority 2: Move cards to reveal face-down cards
     for (let srcCol = 0; srcCol < simTableau.length; srcCol++) {
       if (simTableau[srcCol].length === 0) continue;
       
-      // Find first face-up card
-      let firstFaceUpIdx = -1;
-      for (let i = 0; i < simTableau[srcCol].length; i++) {
-        if (simTableau[srcCol][i].faceUp) {
-          firstFaceUpIdx = i;
-          break;
-        }
-      }
+      // Count face-down cards
+      const faceDownCount = simTableau[srcCol].filter(c => !c.faceUp).length;
+      if (faceDownCount === 0) continue;
       
+      // Find first face-up card
+      let firstFaceUpIdx = simTableau[srcCol].findIndex(c => c.faceUp);
       if (firstFaceUpIdx === -1) continue;
       
       const cardToMove = simTableau[srcCol][firstFaceUpIdx];
@@ -430,42 +585,37 @@ function isSolvable(tableau: Card[][], stock: Card[]): boolean {
         if (srcCol === dstCol) continue;
         
         if (simTableau[dstCol].length === 0) {
-          // Only move King to empty column
-          if (cardToMove.rank === 'K' && firstFaceUpIdx < simTableau[srcCol].length - 1) {
+          if (cardToMove.rank === 'K' && firstFaceUpIdx > 0) {
             const cards = simTableau[srcCol].splice(firstFaceUpIdx);
             simTableau[dstCol].push(...cards);
-            
-            // Flip next card in source
             if (simTableau[srcCol].length > 0) {
               simTableau[srcCol][simTableau[srcCol].length - 1].faceUp = true;
             }
-            
             madeProgress = true;
             break;
           }
         } else {
           const dstTop = simTableau[dstCol][simTableau[dstCol].length - 1];
-          if (canPlaceOnTableau(cardToMove, dstTop)) {
+          if (dstTop.faceUp && canPlaceOnTableau(cardToMove, dstTop)) {
             const cards = simTableau[srcCol].splice(firstFaceUpIdx);
             simTableau[dstCol].push(...cards);
-            
-            // Flip next card in source
             if (simTableau[srcCol].length > 0) {
               simTableau[srcCol][simTableau[srcCol].length - 1].faceUp = true;
             }
-            
             madeProgress = true;
             break;
           }
         }
       }
-      
       if (madeProgress) break;
     }
     
-    if (madeProgress) continue;
+    if (madeProgress) {
+      stuckCounter = 0;
+      continue;
+    }
     
-    // 4. Try to move from waste to tableau
+    // Priority 3: Move waste to tableau
     if (simWaste.length > 0) {
       const wasteTop = simWaste[simWaste.length - 1];
       
@@ -478,41 +628,90 @@ function isSolvable(tableau: Card[][], stock: Card[]): boolean {
           }
         } else {
           const colTop = simTableau[col][simTableau[col].length - 1];
-          if (canPlaceOnTableau(wasteTop, colTop)) {
+          if (colTop.faceUp && canPlaceOnTableau(wasteTop, colTop)) {
             simTableau[col].push(simWaste.pop()!);
             madeProgress = true;
             break;
           }
         }
       }
-      
-      if (madeProgress) continue;
     }
     
-    // 5. Draw from stock
+    if (madeProgress) {
+      stuckCounter = 0;
+      continue;
+    }
+    
+    // Priority 4: Any card to foundation (even if not "safe")
+    for (let col = 0; col < simTableau.length; col++) {
+      if (simTableau[col].length === 0) continue;
+      const topCard = simTableau[col][simTableau[col].length - 1];
+      if (!topCard.faceUp) continue;
+      
+      if (canMoveToFoundation(topCard, simFoundations)) {
+        simTableau[col].pop();
+        simFoundations[topCard.suit].push(topCard);
+        if (simTableau[col].length > 0) {
+          simTableau[col][simTableau[col].length - 1].faceUp = true;
+        }
+        madeProgress = true;
+        break;
+      }
+    }
+    
+    if (!madeProgress && simWaste.length > 0) {
+      const wasteTop = simWaste[simWaste.length - 1];
+      if (canMoveToFoundation(wasteTop, simFoundations)) {
+        simWaste.pop();
+        simFoundations[wasteTop.suit].push(wasteTop);
+        madeProgress = true;
+      }
+    }
+    
+    if (madeProgress) {
+      stuckCounter = 0;
+      continue;
+    }
+    
+    // Priority 5: Draw from stock or recycle
     if (simStock.length > 0) {
       const card = simStock.pop()!;
       card.faceUp = true;
       simWaste.push(card);
       madeProgress = true;
-      continue;
     } else if (simWaste.length > 0) {
-      // Recycle waste to stock
-      while (simWaste.length > 0) {
-        const card = simWaste.pop()!;
-        card.faceUp = false;
-        simStock.unshift(card);
+      stockCycles++;
+      if (stockCycles <= maxStockCycles) {
+        while (simWaste.length > 0) {
+          const card = simWaste.pop()!;
+          card.faceUp = false;
+          simStock.unshift(card);
+        }
+        madeProgress = true;
       }
-      madeProgress = true;
-      continue;
     }
+    
+    // Check if stuck
+    const currentFoundationCount = Object.values(simFoundations).reduce((sum, pile) => sum + pile.length, 0);
+    if (currentFoundationCount === lastFoundationCount) {
+      stuckCounter++;
+      if (stuckCounter > 50) {
+        break; // Truly stuck
+      }
+    } else {
+      stuckCounter = 0;
+      lastFoundationCount = currentFoundationCount;
+    }
+    
+    if (!madeProgress) break;
   }
   
-  // Check if we made significant progress
+  // Check result
   const foundationCount = Object.values(simFoundations).reduce((sum, pile) => sum + pile.length, 0);
   
-  // If we moved at least 30% of cards to foundations, consider it solvable
-  return foundationCount >= 16;
+  // Require ALL 52 cards in foundations for true solvability
+  // But accept 48+ as "very likely solvable" (92%+)
+  return foundationCount >= 48;
 }
 
 /**

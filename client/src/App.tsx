@@ -40,7 +40,7 @@ function App() {
     // Register callback for starting new game from lobby (after collection reward)
     gameIntegration.setStartNewGameCallback(() => {
       console.log('🎮 Starting new game from lobby callback');
-      newGame();
+      newGame('solvable');
     });
   }, [setHitSound, setSuccessSound, getCurrentResults, newGame]);
 
@@ -51,7 +51,7 @@ function App() {
     // Force game reinitialization by changing key and starting new game
     setGameKey(prev => prev + 1);
     setTimeout(() => {
-      newGame();
+      newGame('solvable');
     }, 0);
   };
 
@@ -65,7 +65,7 @@ function App() {
       setTestViewport({ width: window.innerWidth, height: window.innerHeight });
       setGameKey(prev => prev + 1);
       setTimeout(() => {
-        newGame();
+        newGame('solvable');
       }, 0);
     }
   };

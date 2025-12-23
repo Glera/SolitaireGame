@@ -245,7 +245,7 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
         className="bg-teal-600/20 border-teal-400/50 relative z-10"
       >
       {/* Show second card when top card is being moved to a NEW location */}
-      {shouldShowSecondCard() && (
+      {shouldShowSecondCard() && secondCard && (
         <div style={{ position: 'absolute', top: 0, left: 0 }}>
           <Card 
             card={secondCard} 

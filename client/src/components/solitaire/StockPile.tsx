@@ -11,7 +11,7 @@ interface StockPileProps {
 }
 
 export function StockPile({ cards }: StockPileProps) {
-  const { drawCard, waste, setStockAnimating, animatingCard, isDealing, hint } = useSolitaire();
+  const { drawCard, waste, setStockAnimating, animatingCard, isAutoCollecting, isDealing } = useSolitaire();
   const { scale } = useGameScaleContext();
   const [isAnimating, setIsAnimating] = useState(false);
   const [flyingCard, setFlyingCard] = useState<CardType | null>(null);
@@ -21,20 +21,12 @@ export function StockPile({ cards }: StockPileProps) {
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
   
   const handleClick = () => {
-    // Don't allow clicks during dealing animation
-    if (isDealing) {
+    // Block clicks during auto-collect
+    if (isAutoCollecting) {
       return;
     }
     
-    // Don't allow clicks during any animation
-    // Temporarily disabled to debug
-    // if (isAnimating || animatingCard) {
-    //   console.log('⏸️ StockPile: Animation in progress, ignoring click');
-    //   return;
-    // }
-    
     if (isAnimating) {
-      console.log('⏸️ StockPile: Local animation in progress, ignoring click');
       return;
     }
     
@@ -163,8 +155,9 @@ export function StockPile({ cards }: StockPileProps) {
         <Pile
           onClick={handleClick}
           isEmpty={cards.length === 0}
-          className={`${waste.length === 0 && cards.length === 0 ? "" : "cursor-pointer hover:bg-teal-600/10"} ${hint?.type === 'stock' ? 'hint-glow rounded-lg' : ''}`}
+          className={`${waste.length === 0 && cards.length === 0 ? "" : "cursor-pointer hover:bg-teal-600/10"} ${isDealing ? 'stock-dealing' : ''}`}
           data-stock-pile
+          style={isDealing ? { animationDelay: '840ms' } : undefined}
         >
           {/* Always show top card, even during animation */}
           {topCard ? (

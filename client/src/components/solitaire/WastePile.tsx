@@ -25,8 +25,7 @@ export function WastePile({ cards }: WastePileProps) {
     animatingCard,
     setShowDragPreview,
     isStockAnimating,
-    isDealing,
-    hint
+    isAutoCollecting
   } = useSolitaire();
   
   const cardRef = useRef<HTMLDivElement>(null);
@@ -160,17 +159,10 @@ export function WastePile({ cards }: WastePileProps) {
   const handleCardClick = () => {
     if (!topCard) return;
     
-    // Don't allow clicks during dealing animation
-    if (isDealing) {
+    // Block clicks during auto-collect
+    if (isAutoCollecting) {
       return;
     }
-    
-    // Don't allow clicks during animation
-    // Temporarily disabled to debug
-    // if (animatingCard) {
-    //   console.log('⏸️ WastePile: Animation in progress, ignoring click');
-    //   return;
-    // }
 
     console.log('🎯 WastePile: Card clicked', topCard);
 
@@ -217,6 +209,12 @@ export function WastePile({ cards }: WastePileProps) {
 
   const handleDragStart = (e: React.DragEvent) => {
     if (!topCard) return;
+    
+    // Block drag during auto-collect
+    if (isAutoCollecting) {
+      e.preventDefault();
+      return;
+    }
     
     // Clear any click timeout since we're actually dragging
     if (clickTimeoutRef.current) {
@@ -362,7 +360,6 @@ export function WastePile({ cards }: WastePileProps) {
               isDragging={isTop && isTopCardBeingDragged()}
               isAnimating={isTop && isTopCardAnimating()}
               isClickable={isTop}
-              isHinted={isTop && hint?.type === 'waste' && hint?.cardId === card.id}
             />
           </div>
         );

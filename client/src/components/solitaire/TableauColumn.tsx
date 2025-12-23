@@ -34,7 +34,10 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     showDragPreview,
     setShowDragPreview,
     endDrag,
-    animatingCard
+    animatingCard,
+    isAutoCollecting,
+    isDealing,
+    dealingCardIds
   } = useSolitaire();
   
   const { scale } = useGameScaleContext();
@@ -92,12 +95,10 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     const card = cards[cardIndex];
     if (!card.faceUp) return;
     
-    // Don't allow clicks during animation
-    // Temporarily disabled to debug
-    // if (animatingCard) {
-    //   console.log('⏸️ TableauColumn: Animation in progress, ignoring click');
-    //   return;
-    // }
+    // Block clicks during auto-collect
+    if (isAutoCollecting) {
+      return;
+    }
 
     // Get all cards from this index to the end (the stack we want to move)
     const cardsToMove = cards.slice(cardIndex);
@@ -162,6 +163,12 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   const handleDragStart = (e: React.DragEvent, cardIndex: number) => {
+    // Block drag during auto-collect
+    if (isAutoCollecting) {
+      e.preventDefault();
+      return;
+    }
+    
     // Mark as actually dragging
     setIsActuallyDragging(true);
     
@@ -357,15 +364,27 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
           
           const offsets = calculateStackOffsets(cards, availableHeight, isMobile);
           
+          // Calculate global card index for dealing animation delay
+          // Cards before this column: sum of (i+1) for i from 0 to columnIndex-1 = columnIndex*(columnIndex+1)/2
+          const cardsBeforeColumn = (columnIndex * (columnIndex + 1)) / 2;
+          
           return cards.map((card, index) => {
             const cumulativeOffset = offsets[index];
+            const globalCardIndex = cardsBeforeColumn + index;
+            const dealDelay = globalCardIndex * 30; // 30ms between each card
+            
+            // Only apply dealing animation to cards that were dealt at game start
+            const shouldAnimate = isDealing && dealingCardIds.has(card.id);
             
             return (
             <div
               key={card.id}
               ref={el => cardRefs.current[index] = el}
-              className={`absolute ${shakingCardIds.includes(card.id) ? 'animate-shake' : ''}`}
-              style={{ top: `${cumulativeOffset}px` }}
+              className={`absolute ${shakingCardIds.includes(card.id) ? 'animate-shake' : ''} ${shouldAnimate ? 'card-dealing' : ''}`}
+              style={{ 
+                top: `${cumulativeOffset}px`,
+                animationDelay: shouldAnimate ? `${dealDelay}ms` : undefined
+              }}
               data-card-id={card.id}
               data-card-is-top={index === cards.length - 1}
               onDragOver={(e) => { 

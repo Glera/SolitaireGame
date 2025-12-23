@@ -100,35 +100,32 @@ export function resetAllXP(): void {
   }
 }
 
-// Level thresholds - XP needed for each level
-// First level up after ~2 games, then gradually harder
+// Level system: 
+// - Level 1→2: 2 games max
+// - Level 2→3: 3 games max
+// - Level N→N+1: min(N+1, 10) games max
 // One win = ~102 XP (52 cards + 50 bonus)
-const LEVEL_THRESHOLDS = [
-  0,      // Level 1: 0 XP
-  150,    // Level 2: 150 XP (~2 games to level up)
-  250,    // Level 3: 250 XP (+100)
-  370,    // Level 4: 370 XP (+120)
-  510,    // Level 5: 510 XP (+140)
-  670,    // Level 6: 670 XP (+160)
-  850,    // Level 7: 850 XP (+180)
-  1050,   // Level 8: 1050 XP (+200)
-  1280,   // Level 9: 1280 XP (+230)
-  1540,   // Level 10: 1540 XP (+260)
-  1830,   // Level 11: 1830 XP (+290)
-  2150,   // Level 12: 2150 XP (+320)
-  2500,   // Level 13: 2500 XP (+350)
-  2880,   // Level 14: 2880 XP (+380)
-  3300,   // Level 15: 3300 XP (+420)
-  3760,   // Level 16: 3760 XP (+460)
-  4260,   // Level 17: 4260 XP (+500)
-  4800,   // Level 18: 4800 XP (+540)
-  5380,   // Level 19: 5380 XP (+580)
-  6000,   // Level 20: 6000 XP (+620)
-  // After level 20, each level needs +650 more XP
-];
+const XP_PER_GAME = 102;
+const MAX_GAMES_PER_LEVEL = 10;
 
-// XP per level for levels beyond the threshold array
-const XP_PER_LEVEL_AFTER_20 = 650;
+// Calculate XP needed to reach a specific level
+function getXPForLevel(level: number): number {
+  if (level <= 1) return 0;
+  
+  let totalXP = 0;
+  for (let lvl = 2; lvl <= level; lvl++) {
+    // Games needed to go from lvl-1 to lvl
+    const gamesNeeded = Math.min(lvl, MAX_GAMES_PER_LEVEL);
+    totalXP += gamesNeeded * XP_PER_GAME;
+  }
+  return totalXP;
+}
+
+// Get XP needed to go from level to level+1
+function getXPForNextLevel(level: number): number {
+  const gamesNeeded = Math.min(level + 1, MAX_GAMES_PER_LEVEL);
+  return gamesNeeded * XP_PER_GAME;
+}
 
 export interface LevelInfo {
   level: number;
@@ -142,43 +139,22 @@ export interface LevelInfo {
  * Calculate player level from total XP
  */
 export function calculateLevel(totalXP: number): LevelInfo {
+  // Find current level by checking thresholds
   let level = 1;
-  
-  // Find current level
-  for (let i = 1; i < LEVEL_THRESHOLDS.length; i++) {
-    if (totalXP >= LEVEL_THRESHOLDS[i]) {
-      level = i + 1;
-    } else {
-      break;
-    }
+  while (getXPForLevel(level + 1) <= totalXP) {
+    level++;
+    // Safety limit
+    if (level > 1000) break;
   }
   
-  // For levels beyond the threshold array
-  if (level >= LEVEL_THRESHOLDS.length) {
-    const lastThreshold = LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1];
-    const extraXP = totalXP - lastThreshold;
-    const extraLevels = Math.floor(extraXP / XP_PER_LEVEL_AFTER_20);
-    level = LEVEL_THRESHOLDS.length + extraLevels;
-  }
-  
-  // Calculate progress to next level
-  let currentThreshold: number;
-  let nextThreshold: number;
-  
-  if (level < LEVEL_THRESHOLDS.length) {
-    currentThreshold = LEVEL_THRESHOLDS[level - 1];
-    nextThreshold = LEVEL_THRESHOLDS[level];
-  } else {
-    // Beyond predefined thresholds
-    const lastThreshold = LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1];
-    const levelsAfterLast = level - LEVEL_THRESHOLDS.length;
-    currentThreshold = lastThreshold + levelsAfterLast * XP_PER_LEVEL_AFTER_20;
-    nextThreshold = currentThreshold + XP_PER_LEVEL_AFTER_20;
-  }
+  const currentThreshold = getXPForLevel(level);
+  const nextThreshold = getXPForLevel(level + 1);
   
   const xpInCurrentLevel = totalXP - currentThreshold;
   const xpNeededForNext = nextThreshold - currentThreshold;
-  const progress = Math.min((xpInCurrentLevel / xpNeededForNext) * 100, 100);
+  const progress = xpNeededForNext > 0 
+    ? Math.min((xpInCurrentLevel / xpNeededForNext) * 100, 100) 
+    : 100;
   
   return {
     level,

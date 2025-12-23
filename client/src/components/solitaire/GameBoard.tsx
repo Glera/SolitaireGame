@@ -15,6 +15,7 @@ import { DailyQuests } from './DailyQuests';
 import { Collections, defaultCollections, type Collection } from './Collections';
 import { NoMovesModal } from './NoMovesModal';
 import { FlyingCollectionIcon, setFlyingIconCallback, setCollectionsButtonPosition, getCollectionsButtonPosition, tryCollectionDrop, setOnCardToFoundationCallback } from './FlyingCollectionIcon';
+import { FlyingCardsContainer } from './FlyingCard';
 import { CardAnimation } from './CardAnimation';
 import { DragPreview } from './DragPreview';
 import { DebugPopup, setDebugCallback, type DebugInfo } from '../DebugPopup';
@@ -62,7 +63,13 @@ export function GameBoard() {
     gameMode,
     foundationSlotOrder,
     newGame,
-    addPointsToProgress: addPoints
+    addPointsToProgress: addPoints,
+    hasNoMoves,
+    checkForAvailableMoves,
+    clearNoMoves,
+    hint,
+    getHint,
+    clearHint
   } = useSolitaire();
   
   const { playSuccess } = useAudio();
@@ -351,11 +358,14 @@ export function GameBoard() {
     }));
     
     // Track which collection has new items and which specific items are new
-    setNewItemsInCollections(prev => new Set(Array.from(prev).concat(collectionId)));
-    setNewItemIds(prev => new Set(Array.from(prev).concat(itemId)));
-    
-    // Show notification on button
-    setHasNewCollectionItem(true);
+    // But only if collection is not already rewarded (no need to view rewarded collections)
+    if (!rewardedCollections.has(collectionId)) {
+      setNewItemsInCollections(prev => new Set(Array.from(prev).concat(collectionId)));
+      setNewItemIds(prev => new Set(Array.from(prev).concat(itemId)));
+      
+      // Show notification on button
+      setHasNewCollectionItem(true);
+    }
     setCollectionButtonPulse(true);
     setTimeout(() => setCollectionButtonPulse(false), 150);
   };
@@ -526,23 +536,22 @@ export function GameBoard() {
   }, [isWon]);
   
   // Check for available moves after each game state change
-  // NOTE: checkForAvailableMoves not implemented in this version
-  /*
   useEffect(() => {
-    // Don't check during dealing animation or if already won
-    const state = useSolitaire.getState();
-    if (isWon || state.animatingCard || state.isStockAnimating) return;
+    // Don't check if already won or showing no moves
+    if (isWon || hasNoMoves) return;
     
     // Delay the check to let animations complete and state settle
     const timer = setTimeout(() => {
-      // Double-check animations haven't started
       const currentState = useSolitaire.getState();
-      if (currentState.animatingCard || currentState.isStockAnimating) return;
-    }, 500); // Increased delay to let animations complete
+      // Skip if animations are running or dealing - will be triggered again when they complete
+      if (currentState.animatingCard || currentState.isStockAnimating || currentState.isAutoCollecting || currentState.isDealing) return;
+      if (currentState.isWon || currentState.hasNoMoves) return;
+      
+      checkForAvailableMoves();
+    }, 500); // Increased delay to ensure animations complete
     
     return () => clearTimeout(timer);
-  }, [tableau, waste, stock, foundations, isWon, animatingCard]);
-  */
+  }, [tableau, waste, stock, foundations, isWon, animatingCard, hasNoMoves, checkForAvailableMoves]);
   
   
   // Handle win screen complete - check for level up first, then daily quests
@@ -874,6 +883,25 @@ export function GameBoard() {
 
   // Note: Drag end is now handled by individual drag components via onDragEnd
 
+  // Generate CSS for hint highlight - single pulse, no glow
+  const hintStyle = hint ? `
+    ${hint.cardId ? `
+      [data-card-id="${hint.cardId}"] {
+        animation: hint-pulse 0.3s ease-in-out !important;
+      }
+    ` : ''}
+    ${hint.type === 'stock' ? `
+      [data-stock-pile] {
+        animation: hint-pulse 0.3s ease-in-out !important;
+      }
+    ` : ''}
+    @keyframes hint-pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+  ` : '';
+
   return (
     <div 
       className="min-h-screen bg-green-800 flex flex-col items-center justify-start" 
@@ -884,6 +912,8 @@ export function GameBoard() {
         overflow: 'hidden'
       }}
     >
+      {/* Hint highlight style */}
+      {hint && <style>{hintStyle}</style>}
       <div 
         className="w-full" 
         style={{
@@ -1041,11 +1071,14 @@ export function GameBoard() {
         onStarArrived={handleStarArrived}
       />
       
-      {/* No Moves Modal - disabled in this version */}
+      {/* No Moves Modal */}
       <NoMovesModal
-        isVisible={false}
-        onNewGame={() => newGame('solvable')}
-        onClose={() => {}}
+        isVisible={hasNoMoves}
+        onNewGame={() => {
+          clearNoMoves();
+          newGame('solvable');
+        }}
+        onClose={clearNoMoves}
       />
       
       
@@ -1110,6 +1143,24 @@ export function GameBoard() {
           setRewardedCollections(prev => new Set(Array.from(prev).concat(collectionId)));
           // Add stars
           setTotalStars(prev => prev + reward);
+          // Remove from new items - rewarded collections don't need viewing
+          setNewItemsInCollections(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(collectionId);
+            if (newSet.size === 0) {
+              setHasNewCollectionItem(false);
+            }
+            return newSet;
+          });
+          // Remove item IDs for this collection
+          const collection = collections.find(c => c.id === collectionId);
+          if (collection) {
+            setNewItemIds(prev => {
+              const newSet = new Set(prev);
+              collection.items.forEach(item => newSet.delete(item.id));
+              return newSet;
+            });
+          }
         }}
         onRewardAnimationComplete={(collectionId) => {
           // Remove this collection from pending rewards queue
@@ -1123,6 +1174,10 @@ export function GameBoard() {
           setAllCollectionsRewarded(true);
           // Add stars
           setTotalStars(prev => prev + reward);
+          // Clear all new item notifications - everything is rewarded
+          setNewItemsInCollections(new Set());
+          setNewItemIds(new Set());
+          setHasNewCollectionItem(false);
         }}
         onDebugCompleteAll={() => {
           // Debug: Mark all items as collected
@@ -1186,12 +1241,15 @@ export function GameBoard() {
       {/* Bottom Buttons - Daily Quests and Collections */}
       {!showDailyQuests && !showWinScreen && !showCollections && (
         <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2">
-          {/* Hint Button - disabled in this version */}
+          {/* Hint Button */}
           <button
-            onClick={() => {}}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 rounded-full shadow-lg border border-white/20 transition-all hover:scale-105 opacity-50 cursor-not-allowed"
-            title="Подсказка (недоступна)"
-            disabled
+            onClick={() => {
+              getHint();
+              // Clear hint after animation completes
+              setTimeout(() => clearHint(), 350);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 rounded-full shadow-lg border border-white/20 transition-all hover:scale-105"
+            title="Подсказка"
           >
             <span className="text-lg">💡</span>
             <span className="text-white font-semibold text-sm">Подсказка</span>
@@ -1283,6 +1341,9 @@ export function GameBoard() {
       {collisionParticles.map(particle => (
         <CollisionParticleComponent key={particle.id} particle={particle} />
       ))}
+      
+      {/* Flying Cards for parallel auto-collect animation */}
+      <FlyingCardsContainer />
     </div>
   );
 }
