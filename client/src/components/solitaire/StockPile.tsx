@@ -30,11 +30,6 @@ export function StockPile({ cards }: StockPileProps) {
       return;
     }
     
-    console.log('StockPile: Click, drawing card', { 
-      stockCount: cards.length,
-      timestamp: Date.now()
-    });
-    
     // Start animation if there's a card to fly
     if (topCard) {
       const cardToFly = { ...topCard, faceUp: true };
@@ -80,8 +75,6 @@ export function StockPile({ cards }: StockPileProps) {
       // Clamp duration: minimum 50ms, no maximum limit for constant speed
       const clampedDuration = Math.max(50, duration);
       
-      console.log(`🃏 Stock animation: distance=${Math.round(distance)}px adjustedDistance=${Math.round(adjustedDistance)}px scale=${scale.toFixed(2)} duration=${Math.round(clampedDuration)}ms`);
-      
       // Animate the flying card
       const startTime = performance.now();
       
@@ -96,11 +89,15 @@ export function StockPile({ cards }: StockPileProps) {
           requestAnimationFrame(animate);
         } else {
           // Animation complete, show the card in waste pile
-          console.log('🎯 Animation complete');
           setIsAnimating(false);
           setFlyingCard(null);
           setAnimationProgress(0);
-          setStockAnimating(false); // Animation finished, show card in WastePile
+          setStockAnimating(false);
+          
+          // Check for available moves - call directly from store for fresh state
+          setTimeout(() => {
+            useSolitaire.getState().checkForAvailableMoves();
+          }, 50);
         }
       };
       
@@ -108,6 +105,11 @@ export function StockPile({ cards }: StockPileProps) {
     } else {
       // No animation for recycle action
       drawCard();
+      
+      // Check for available moves - call directly from store for fresh state
+      setTimeout(() => {
+        useSolitaire.getState().checkForAvailableMoves();
+      }, 50);
     }
   };
   

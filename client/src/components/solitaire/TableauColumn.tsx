@@ -102,19 +102,12 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
 
     // Get all cards from this index to the end (the stack we want to move)
     const cardsToMove = cards.slice(cardIndex);
-    
-    console.log('🎯 TableauColumn: Card(s) clicked', {
-      clickedCard: card,
-      stackSize: cardsToMove.length,
-      isTopCard: cardIndex === cards.length - 1
-    });
 
     // Only allow moving if it's a single card (for now, stacks to tableau need special logic)
     if (cardsToMove.length === 1) {
       // Priority 1: Try auto-move to foundation first
       const foundationSuit = canAutoMoveToFoundation(card);
       if (foundationSuit) {
-        console.log('✅ TableauColumn: Moving to foundation', foundationSuit);
         const startElement = cardRefs.current[cardIndex];
         const endElement = document.querySelector(`[data-foundation-pile="${foundationSuit}"]`) as HTMLElement;
         autoMoveToFoundation(card, foundationSuit, startElement || undefined, endElement || undefined);
@@ -124,40 +117,33 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       // Priority 2: Try to find a place in tableau (excluding current column)
       const tableauColumnIndex = findTableauPlacementForCard(card);
       
-      console.log('🔍 TableauColumn: Tableau placement search result:', tableauColumnIndex);
-      
       // Make sure we don't move to the same column
       if (tableauColumnIndex !== null && tableauColumnIndex !== columnIndex) {
-        console.log('✅ TableauColumn: Moving to tableau column', tableauColumnIndex);
         const startElement = cardRefs.current[cardIndex];
         autoMoveToTableau(card, tableauColumnIndex, startElement || undefined);
         return;
       }
       
       // No valid moves found - shake the card and all cards above it
-      console.log(`⚠️ No valid moves for ${card.suit}-${card.rank}`);
       const cardsToShake = cards.slice(cardIndex).map(c => c.id);
       setShakingCardIds(cardsToShake);
       setTimeout(() => setShakingCardIds([]), 400);
+      // Check if there are any moves at all
+      setTimeout(() => useSolitaire.getState().checkForAvailableMoves(), 50);
     } else {
       // For stacks, only try to move to tableau (foundation doesn't accept stacks)
-      console.log('🔍 TableauColumn: Trying to find placement for stack');
-      
-      // Find a column where we can place this stack
-      const tableauColumnIndex = findTableauPlacementForCard(card); // Check if bottom card of stack can be placed
+      const tableauColumnIndex = findTableauPlacementForCard(card);
       
       if (tableauColumnIndex !== null && tableauColumnIndex !== columnIndex) {
-        console.log('✅ TableauColumn: Moving stack to tableau column', tableauColumnIndex);
         const startElement = cardRefs.current[cardIndex];
-        
-        // Use autoMoveStackToTableau to animate the whole stack
         autoMoveStackToTableau(cardsToMove, columnIndex, tableauColumnIndex, startElement || undefined);
       } else {
         // No valid moves - shake the whole stack
-        console.log(`⚠️ No valid moves for stack starting with ${card.suit}-${card.rank}`);
         const cardsToShake = cards.slice(cardIndex).map(c => c.id);
         setShakingCardIds(cardsToShake);
         setTimeout(() => setShakingCardIds([]), 400);
+        // Check if there are any moves at all
+        setTimeout(() => useSolitaire.getState().checkForAvailableMoves(), 50);
       }
     }
   };

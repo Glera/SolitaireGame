@@ -13,7 +13,6 @@ import { DonationProgress } from './DonationProgress';
 import { WinScreen } from './WinScreen';
 import { DailyQuests } from './DailyQuests';
 import { Collections, defaultCollections, type Collection } from './Collections';
-import { NoMovesModal } from './NoMovesModal';
 import { FlyingCollectionIcon, setFlyingIconCallback, setCollectionsButtonPosition, getCollectionsButtonPosition, tryCollectionDrop, setOnCardToFoundationCallback } from './FlyingCollectionIcon';
 import { FlyingCardsContainer } from './FlyingCard';
 import { CardAnimation } from './CardAnimation';
@@ -26,6 +25,7 @@ import { setAddFloatingScoreFunction } from '../../lib/solitaire/floatingScoreMa
 import { resetAllXP, setOnLevelUpCallback } from '../../lib/solitaire/experienceManager';
 import { LevelUpScreen } from './LevelUpScreen';
 import { PromoWidget } from './PromoWidget';
+import { Shop, type ShopItem } from './Shop';
 import { GAME_VERSION } from '../../version';
 import { Suit } from '../../lib/solitaire/types';
 
@@ -69,7 +69,9 @@ export function GameBoard() {
     clearNoMoves,
     hint,
     getHint,
-    clearHint
+    clearHint,
+    isDealing,
+    isAutoCollecting
   } = useSolitaire();
   
   const { playSuccess } = useAudio();
@@ -145,6 +147,16 @@ export function GameBoard() {
   const [dailyQuestsAfterWin, setDailyQuestsAfterWin] = useState(false);
   // Track if collections were opened automatically after winning (vs manually via button)
   const [collectionsAfterWin, setCollectionsAfterWin] = useState(false);
+  
+  // Shop state
+  const [showShop, setShowShop] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(() => {
+    return localStorage.getItem('solitaire_premium_subscription') === 'true';
+  });
+  
+  // No moves state - show new game button when no moves available
+  const [showNewGameButton, setShowNewGameButton] = useState(false);
+  
   const [dailyQuests, setDailyQuests] = useState<Quest[]>(() => {
     const saved = localStorage.getItem('solitaire_daily_quests');
     if (saved) {
@@ -241,6 +253,13 @@ export function GameBoard() {
   useEffect(() => {
     localStorage.setItem('solitaire_all_collections_rewarded', allCollectionsRewarded.toString());
   }, [allCollectionsRewarded]);
+  
+  // Show new game button when no moves available
+  useEffect(() => {
+    if (hasNoMoves) {
+      setShowNewGameButton(true);
+    }
+  }, [hasNoMoves]);
   
   // Queue of pending collection rewards (for when player completes multiple collections in one game)
   const [pendingCollectionRewards, setPendingCollectionRewards] = useState<string[]>([]);
@@ -540,18 +559,21 @@ export function GameBoard() {
     // Don't check if already won or showing no moves
     if (isWon || hasNoMoves) return;
     
+    // Don't check during dealing or auto-collecting
+    if (isDealing || isAutoCollecting) return;
+    
     // Delay the check to let animations complete and state settle
     const timer = setTimeout(() => {
       const currentState = useSolitaire.getState();
-      // Skip if animations are running or dealing - will be triggered again when they complete
+      // Skip if animations are running - will be triggered again when they complete
       if (currentState.animatingCard || currentState.isStockAnimating || currentState.isAutoCollecting || currentState.isDealing) return;
       if (currentState.isWon || currentState.hasNoMoves) return;
       
       checkForAvailableMoves();
-    }, 500); // Increased delay to ensure animations complete
+    }, 300); // Reduced delay
     
     return () => clearTimeout(timer);
-  }, [tableau, waste, stock, foundations, isWon, animatingCard, hasNoMoves, checkForAvailableMoves]);
+  }, [tableau, waste, stock, foundations, isWon, animatingCard, hasNoMoves, checkForAvailableMoves, isDealing, isAutoCollecting]);
   
   
   // Handle win screen complete - check for level up first, then daily quests
@@ -688,6 +710,8 @@ export function GameBoard() {
     }
     
     // No unrewarded collections - start new game
+    clearNoMoves();
+    setShowNewGameButton(false);
     newGame('solvable');
   };
   
@@ -776,6 +800,127 @@ export function GameBoard() {
     // Set pending level up and show screen
     setPendingLevelUp(nextLevel);
     setShowLevelUp(true);
+  };
+  
+  // Handle shop purchase
+  const handleShopPurchase = (item: ShopItem) => {
+    // Add stars
+    setTotalStars(prev => prev + item.stars);
+    
+    // Collect items from collections
+    let itemsToCollect = item.items;
+    let guaranteedUnique = item.guaranteed;
+    
+    // First, collect guaranteed unique items
+    if (guaranteedUnique > 0) {
+      const uncollectedItems: Array<{ collectionId: string; itemId: string }> = [];
+      collections.forEach(collection => {
+        collection.items.forEach(collItem => {
+          if (!collItem.collected) {
+            uncollectedItems.push({ collectionId: collection.id, itemId: collItem.id });
+          }
+        });
+      });
+      
+      // Shuffle and take guaranteed unique items
+      const shuffled = [...uncollectedItems].sort(() => Math.random() - 0.5);
+      const uniqueToCollect = shuffled.slice(0, Math.min(guaranteedUnique, shuffled.length));
+      
+      uniqueToCollect.forEach(({ collectionId, itemId }) => {
+        setCollections(prev => prev.map(coll => {
+          if (coll.id === collectionId) {
+            return {
+              ...coll,
+              items: coll.items.map(i => i.id === itemId ? { ...i, collected: true } : i)
+            };
+          }
+          return coll;
+        }));
+        
+        // Mark as new item
+        setNewItemIds(prev => new Set(Array.from(prev).concat(itemId)));
+        setNewItemsInCollections(prev => {
+          const newSet = new Set(prev);
+          newSet.add(collectionId);
+          return newSet;
+        });
+        setHasNewCollectionItem(true);
+        
+        itemsToCollect--;
+      });
+    }
+    
+    // Then collect remaining items (can be duplicates)
+    for (let i = 0; i < itemsToCollect; i++) {
+      // Get all items (for duplicates probability)
+      const allItems: Array<{ collectionId: string; itemId: string; collected: boolean }> = [];
+      collections.forEach(collection => {
+        collection.items.forEach(collItem => {
+          allItems.push({ collectionId: collection.id, itemId: collItem.id, collected: collItem.collected });
+        });
+      });
+      
+      if (allItems.length === 0) break;
+      
+      const randomItem = allItems[Math.floor(Math.random() * allItems.length)];
+      
+      if (!randomItem.collected) {
+        setCollections(prev => prev.map(coll => {
+          if (coll.id === randomItem.collectionId) {
+            return {
+              ...coll,
+              items: coll.items.map(item => item.id === randomItem.itemId ? { ...item, collected: true } : item)
+            };
+          }
+          return coll;
+        }));
+        
+        // Mark as new item
+        setNewItemIds(prev => new Set(Array.from(prev).concat(randomItem.itemId)));
+        setNewItemsInCollections(prev => {
+          const newSet = new Set(prev);
+          newSet.add(randomItem.collectionId);
+          return newSet;
+        });
+        setHasNewCollectionItem(true);
+      }
+      // If already collected, it's a duplicate - no action needed
+    }
+    
+    // Close shop
+    setShowShop(false);
+    
+    // Check if any collections were completed by this purchase
+    // Use setTimeout to ensure state is updated
+    setTimeout(() => {
+      setCollections(currentCollections => {
+        // Find completed but unrewarded collections
+        const unrewardedCollections = currentCollections
+          .filter(c => c.items.every(i => i.collected) && !rewardedCollections.has(c.id))
+          .map(c => c.id);
+        
+        if (unrewardedCollections.length > 0) {
+          // Sync displayed stars before showing collections
+          const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
+          setDisplayedStars(actualTotal);
+          
+          // Queue unrewarded collections for rewards
+          setPendingCollectionRewards(unrewardedCollections);
+          
+          // Open collections to show rewards
+          setShowCollections(true);
+        }
+        
+        return currentCollections; // Don't change state
+      });
+    }, 100);
+  };
+  
+  // Handle subscription
+  const handleSubscribe = () => {
+    setIsSubscribed(true);
+    localStorage.setItem('solitaire_premium_subscription', 'true');
+    setShowShop(false);
   };
   
   // Drop a unique collection item (one that player doesn't have yet)
@@ -1071,15 +1216,6 @@ export function GameBoard() {
         onStarArrived={handleStarArrived}
       />
       
-      {/* No Moves Modal */}
-      <NoMovesModal
-        isVisible={hasNoMoves}
-        onNewGame={() => {
-          clearNoMoves();
-          newGame('solvable');
-        }}
-        onClose={clearNoMoves}
-      />
       
       
       {/* Level Up Screen */}
@@ -1100,6 +1236,26 @@ export function GameBoard() {
         onReset={handleResetDailyQuests}
         progressBarRef={progressBarRef}
         onStarArrived={handleStarArrived}
+      />
+      
+      {/* Shop */}
+      <Shop
+        isVisible={showShop}
+        onClose={() => setShowShop(false)}
+        onPurchase={handleShopPurchase}
+        onSubscribe={handleSubscribe}
+        isSubscribed={isSubscribed}
+        onStarArrived={(count) => {
+          // Animate star counter
+          setDisplayedStars(prev => prev + count);
+        }}
+        onCollectionItemArrived={(x, y) => {
+          // Create collision particles at arrival point
+          createCollisionParticles(x, y);
+          // Pulse the collections button
+          setCollectionButtonPulse(true);
+          setTimeout(() => setCollectionButtonPulse(false), 150);
+        }}
       />
       
       {/* Collections */}
@@ -1124,6 +1280,8 @@ export function GameBoard() {
             } else if (collectionsAfterWin) {
               // No more rewards and was opened after win - start new game
               setCollectionsAfterWin(false);
+              clearNoMoves();
+              setShowNewGameButton(false);
               newGame('solvable');
             }
           }
@@ -1232,15 +1390,31 @@ export function GameBoard() {
             onDebugClick={handleDebugClick}
             pulseKey={starPulseKey}
             onOtherPlayerStars={handleOtherPlayerStars}
-            disableOtherPlayerNotifications={showDailyQuests || showCollections || showWinScreen || showLevelUp}
+            disableOtherPlayerNotifications={showDailyQuests || showCollections || showWinScreen || showLevelUp || showShop}
           />
         </div>,
         document.body
       )}
       
       {/* Bottom Buttons - Daily Quests and Collections */}
-      {!showDailyQuests && !showWinScreen && !showCollections && (
+      {!showDailyQuests && !showWinScreen && !showCollections && !showShop && (
         <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2">
+          {/* New Game Button - shown when no moves available */}
+          {showNewGameButton && (
+            <button
+              onClick={() => {
+                clearNoMoves();
+                setShowNewGameButton(false);
+                newGame('solvable');
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 rounded-full shadow-lg border border-white/20 transition-all hover:scale-105 animate-pulse"
+              title="Новая раскладка"
+            >
+              <span className="text-lg">🔄</span>
+              <span className="text-white font-semibold text-sm">Новая</span>
+            </button>
+          )}
+          
           {/* Hint Button */}
           <button
             onClick={() => {
@@ -1276,6 +1450,22 @@ export function GameBoard() {
                 </span>
               );
             })()}
+          </button>
+          
+          {/* Shop Button */}
+          <button
+            onClick={() => {
+              const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
+              setDisplayedStars(actualTotal);
+              setShowShop(true);
+            }}
+            className="relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-full shadow-lg border border-white/20 transition-all hover:scale-105"
+          >
+            <span className="text-lg">🛒</span>
+            <span className="text-white font-semibold text-sm">Магазин</span>
+            {isSubscribed && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500">👑</span>
+            )}
           </button>
           
           {/* Collections Button */}
