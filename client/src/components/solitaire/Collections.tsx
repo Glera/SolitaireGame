@@ -227,6 +227,16 @@ interface FlyingStar {
   flyDuration: number;
 }
 
+interface CollectionFlyingChip {
+  id: number;
+  collectionId: string;
+  startX: number;
+  startY: number;
+  targetY: number;
+  velocityX: number;
+  velocityY: number;
+}
+
 // Max flying star icons
 const MAX_FLYING_ICONS = 10;
 
@@ -278,8 +288,12 @@ export function Collections({
   const [selectedTrophy, setSelectedTrophy] = useState<Trophy | null>(null);
   const [trophies, setTrophies] = useState<Trophy[]>([]);
   const [animatedProgress, setAnimatedProgress] = useState<Record<string, number>>({});
+  const [rewardProgressAnimation, setRewardProgressAnimation] = useState<Record<string, number>>({}); // 0-100 for reward animation
   const [pulsingItems, setPulsingItems] = useState<Set<string>>(new Set());
   const [collectingItemIndex, setCollectingItemIndex] = useState<number | null>(null); // For collection completion effect
+  const [justRewardedCollectionId, setJustRewardedCollectionId] = useState<string | null>(null); // For return-to-main animation
+  const [mainProgressOvershoot, setMainProgressOvershoot] = useState<Record<string, number>>({}); // Overshoot % per collection
+  const [mainProgressPulse, setMainProgressPulse] = useState<Record<string, boolean>>({}); // Pulse state per collection
   const [collectingCollectionIndex, setCollectingCollectionIndex] = useState<number | null>(null); // For grand prize effect
   const [animatingIconIndices, setAnimatingIconIndices] = useState<Set<number>>(new Set()); // Icons currently animating (persists longer than collectingItemIndex)
   const [visibleIconIndices, setVisibleIconIndices] = useState<Set<number>>(new Set()); // Icons that have been revealed (starts empty, fills as animation plays)
@@ -287,6 +301,21 @@ export function Collections({
   const [visibleCollectionIndices, setVisibleCollectionIndices] = useState<Set<number>>(new Set()); // Collections that have been revealed
   const [grandPrizeProgress, setGrandPrizeProgress] = useState(0); // 0-100 for grand prize progress bar
   const [isGrandPrizeProgressAnimating, setIsGrandPrizeProgressAnimating] = useState(false); // Flag to show grandPrizeProgress instead of totalProgress
+  const [totalProgressOvershoot, setTotalProgressOvershoot] = useState(0); // Overshoot % for total progress bar
+  const [totalProgressPulse, setTotalProgressPulse] = useState(false); // Pulse state for total progress bar
+  const [displayedCompletedCount, setDisplayedCompletedCount] = useState<number | null>(null); // Delayed display count for animation
+  const [flyingChips, setFlyingChips] = useState<CollectionFlyingChip[]>([]); // Flying chips to total progress
+  const [chipAnimationQueue, setChipAnimationQueue] = useState<string[]>([]); // Queue of collection IDs for chip animations
+  const chipAnimationQueueRef = useRef<string[]>([]); // Ref to track queue for closure
+  const [pendingChipAnimationsTrigger, setPendingChipAnimationsTrigger] = useState(0); // Trigger to start animations
+  const pendingChipAnimationsRef = useRef<string[]>([]); // Accumulate rewarded collections across window reopens
+  const [grandPrizePulsePhase, setGrandPrizePulsePhase] = useState<'none' | 'trophy' | 'stars'>('none'); // Grand prize pulse animation
+  const [pendingCompleteAnimation, setPendingCompleteAnimation] = useState<Set<string>>(new Set()); // Collections waiting to show "complete" state
+  const [showCompleteLabel, setShowCompleteLabel] = useState<Set<string>>(new Set()); // Collections showing "Выполнено" label
+  const [pulsingIcons, setPulsingIcons] = useState<Set<string>>(new Set()); // Collections with pulsing icons
+  const isAnimatingChipsRef = useRef(false); // Flag to prevent multiple animation loops
+  const totalProgressBarRef = useRef<HTMLDivElement>(null);
+  const collectionCardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const prevVisibleRef = useRef(false);
   const hasAnimatedRef = useRef(false);
   
@@ -652,8 +681,13 @@ export function Collections({
         }
         
         // Check if all collections are now complete and rewarded - trigger grand prize
+        // Note: rewardedCollections may not include current collection yet (parent updates async)
+        // So we check if all OTHER collections are rewarded, and current one just got rewarded
+        const currentCollectionId = pendingRewardCollectionId || selectedCollection?.id;
         const allComplete = collections.every(c => c.items.every(i => i.collected));
-        const allRewarded = rewardedCollections && collections.every(c => rewardedCollections.has(c.id));
+        const allRewarded = collections.every(c => 
+          c.id === currentCollectionId || (rewardedCollections && rewardedCollections.has(c.id))
+        );
         
         if (allComplete && allRewarded && !allCollectionsRewarded && !grandPrizeGivenRef.current) {
           // Mark as pending to prevent useEffect from also triggering
@@ -871,9 +905,33 @@ export function Collections({
   
   // Handle closing detail view - always go back to main collections screen
   const handleCloseDetailView = () => {
+    const rewardedCollectionId = selectedCollection?.id;
+    const wasRewarded = showRewardClaimed && rewardedCollectionId;
+    
     setSelectedCollection(null);
     // Reset visible indices to prevent flash when next reward collection opens
     setVisibleIconIndices(new Set());
+    
+    // If reward was claimed, accumulate for later animation
+    // Skip only if ALL collections are complete AND ALL are rewarded (grand prize next)
+    if (wasRewarded && rewardedCollectionId) {
+      const allComplete = collections.every(c => c.items.every(i => i.collected));
+      // Check if all collections will be rewarded after this one
+      // (current one is being rewarded + all others already rewarded)
+      const allWillBeRewarded = allComplete && collections.every(c => 
+        c.id === rewardedCollectionId || (rewardedCollections && rewardedCollections.has(c.id))
+      );
+      
+      // Add to animation queue unless grand prize is next
+      if (!allWillBeRewarded) {
+        // Accumulate rewarded collection for animation (persists across window reopens)
+        if (!pendingChipAnimationsRef.current.includes(rewardedCollectionId)) {
+          pendingChipAnimationsRef.current.push(rewardedCollectionId);
+          // Trigger useEffect to start animations
+          setPendingChipAnimationsTrigger(prev => prev + 1);
+        }
+      }
+    }
   };
   
   // Handle selecting a collection - also marks it as viewed and triggers item pulse
@@ -931,6 +989,18 @@ export function Collections({
       // Reset flying trophy
       setFlyingTrophy(null);
       setPetIconHidden(false);
+      // Reset chip animation state
+      setFlyingChips([]);
+      setChipAnimationQueue([]);
+      chipAnimationQueueRef.current = [];
+      pendingChipAnimationsRef.current = [];
+      isAnimatingChipsRef.current = false;
+      setTotalProgressOvershoot(0);
+      setTotalProgressPulse(false);
+      setGrandPrizePulsePhase('none');
+      setPendingCompleteAnimation(new Set());
+      setShowCompleteLabel(new Set());
+      setPulsingIcons(new Set());
       // Note: don't reset hasNewTrophy - keep it until user views trophies tab
     }
   }, [isVisible]);
@@ -985,6 +1055,176 @@ export function Collections({
       prevVisibleRef.current = false;
     }
   }, [isVisible, collections, newItemsInCollections]);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    chipAnimationQueueRef.current = chipAnimationQueue;
+  }, [chipAnimationQueue]);
+  
+  // When all rewards are claimed (pendingRewardCollectionId becomes null), start animations
+  useEffect(() => {
+    if (!isVisible || activeTab !== 'collections') return;
+    if (pendingRewardCollectionId) return; // Still showing reward screens
+    if (pendingChipAnimationsRef.current.length === 0) return; // No animations pending
+    if (isAnimatingChipsRef.current) return; // Already animating
+    
+    // IMMEDIATELY set displayed count to prevent visual glitch
+    const actualCompleted = collections.filter(c => c.items.every(i => i.collected)).length;
+    const pendingCount = pendingChipAnimationsRef.current.length;
+    setDisplayedCompletedCount(Math.max(0, actualCompleted - pendingCount));
+    
+    // Small delay to ensure we're on main screen
+    const timer = setTimeout(() => {
+      if (pendingChipAnimationsRef.current.length === 0) return;
+      
+      // Move pending animations to queue and start
+      const animationsToRun = [...pendingChipAnimationsRef.current];
+      pendingChipAnimationsRef.current = [];
+      
+      // Mark all as pending complete animation
+      animationsToRun.forEach(id => {
+        setPendingCompleteAnimation(prev => new Set(prev).add(id));
+      });
+      
+      // Start animation queue
+      setChipAnimationQueue(animationsToRun);
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [isVisible, activeTab, pendingRewardCollectionId, pendingChipAnimationsTrigger, collections]);
+  
+  // Process chip animation queue - launch chips one by one with delay
+  useEffect(() => {
+    if (chipAnimationQueue.length === 0 || isAnimatingChipsRef.current) return;
+    if (activeTab !== 'collections') return;
+    
+    isAnimatingChipsRef.current = true;
+    
+    const processQueue = (index: number) => {
+      // Use ref to get current queue (handles items added during animation)
+      const currentQueue = chipAnimationQueueRef.current;
+      
+      if (index >= currentQueue.length) {
+        isAnimatingChipsRef.current = false;
+        setChipAnimationQueue([]);
+        // Reset displayed count to show real value
+        setDisplayedCompletedCount(null);
+        
+        // After all chips animated, pulse grand prize (trophy then stars) - quick "pum-pum"
+        // Wait 500ms to let progress bar animation settle
+        setTimeout(() => {
+          setGrandPrizePulsePhase('trophy');
+          setTimeout(() => {
+            setGrandPrizePulsePhase('none');
+            setTimeout(() => {
+              setGrandPrizePulsePhase('stars');
+              setTimeout(() => {
+                setGrandPrizePulsePhase('none');
+              }, 150);
+            }, 50);
+          }, 150);
+        }, 500);
+        return;
+      }
+      
+      const collectionId = currentQueue[index];
+      
+      // Step 1: Animate progress bar from current to 100% (no text shown during animation)
+      setRewardProgressAnimation(prev => ({ ...prev, [collectionId]: 0 }));
+      
+      // Animate progress bar over 400ms
+      const progressDuration = 400;
+      const progressSteps = 20;
+      const stepDuration = progressDuration / progressSteps;
+      let currentStep = 0;
+      
+      const progressInterval = setInterval(() => {
+        currentStep++;
+        const progress = Math.min((currentStep / progressSteps) * 100, 100);
+        setRewardProgressAnimation(prev => ({ ...prev, [collectionId]: progress }));
+        
+        if (currentStep >= progressSteps) {
+          clearInterval(progressInterval);
+          
+          // Step 2: When progress bar reaches 100% - simultaneously:
+          // - Change background color
+          // - Show "Собрано" label
+          // - Launch chip
+          setPendingCompleteAnimation(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(collectionId);
+            return newSet;
+          });
+          setShowCompleteLabel(prev => new Set(prev).add(collectionId));
+          
+          // Clear progress animation to show label
+          setRewardProgressAnimation(prev => {
+            const newState = { ...prev };
+            delete newState[collectionId];
+            return newState;
+          });
+          
+          // Launch chip immediately
+          launchChipToTotalProgress(collectionId);
+          
+          // Process next item after chip animation completes (~1 second)
+          setTimeout(() => {
+            processQueue(index + 1);
+          }, 1000);
+        }
+      }, stepDuration);
+    };
+    
+    // Start processing after a small delay to ensure DOM is ready
+    setTimeout(() => processQueue(0), 200);
+  }, [chipAnimationQueue, activeTab]);
+  
+  // Launch chip from collection to total progress bar
+  const launchChipToTotalProgress = (collectionId: string) => {
+    if (!totalProgressBarRef.current) return;
+    
+    const totalBarRect = totalProgressBarRef.current.getBoundingClientRect();
+    const targetY = totalBarRect.top + totalBarRect.height / 2;
+    
+    // Get start position from collection card icon (center-top area where icon is)
+    let startX = window.innerWidth / 2;
+    let startY = window.innerHeight / 2;
+    
+    const collectionCard = collectionCardRefs.current[collectionId];
+    if (collectionCard) {
+      const rect = collectionCard.getBoundingClientRect();
+      startX = rect.left + rect.width / 2;
+      // Start from icon position (upper part of card, roughly 30% from top)
+      startY = rect.top + rect.height * 0.3;
+    }
+    
+    const chip: CollectionFlyingChip = {
+      id: Date.now(),
+      collectionId,
+      startX,
+      startY,
+      targetY,
+      velocityX: -1 + Math.random() * 2,
+      velocityY: -5 - Math.random() * 2
+    };
+    
+    setFlyingChips(prev => [...prev, chip]);
+  };
+  
+  // Handle chip arrival at total progress bar
+  const handleChipArrived = (chip: CollectionFlyingChip) => {
+    setFlyingChips(prev => prev.filter(c => c.id !== chip.id));
+    
+    // Increment displayed completed count
+    setDisplayedCompletedCount(prev => prev !== null ? prev + 1 : null);
+    
+    // Trigger overshoot and pulse on total progress bar
+    setTotalProgressOvershoot(8);
+    setTotalProgressPulse(true);
+    
+    setTimeout(() => setTotalProgressOvershoot(0), 300);
+    setTimeout(() => setTotalProgressPulse(false), 400);
+  };
   
   if (!isVisible) return null;
   
@@ -1307,17 +1547,28 @@ export function Collections({
           {activeTab === 'collections' && (
             <div className="h-full flex flex-col">
             {/* Total Progress - Static */}
-            <div className="bg-black/30 rounded-xl p-3 mb-3 flex-shrink-0">
+            {(() => {
+              // Use delayed count during chip animation, otherwise use actual count
+              const displayCount = displayedCompletedCount !== null ? displayedCompletedCount : completedCollections;
+              const displayProgress = collections.length > 0 ? (displayCount / collections.length) * 100 : 0;
+              const isFullyComplete = displayCount === collections.length;
+              
+              return (
+            <div className={`bg-black/30 rounded-xl p-3 mb-3 flex-shrink-0 transition-all duration-300 ${totalProgressPulse ? 'scale-[1.02]' : ''}`}>
               <div className="flex justify-between text-xs mb-1.5">
                 <span className="text-white/70">Общий прогресс</span>
-                <span className="text-white font-semibold">{completedCollections} / {collections.length} коллекций</span>
+                <span className={`font-semibold transition-all duration-200 ${totalProgressPulse ? 'scale-110 text-amber-300' : 'text-white'}`}>
+                  {displayCount} / {collections.length} коллекций
+                </span>
               </div>
-              <div className="h-2 bg-slate-700 rounded-full overflow-hidden mb-2">
+              <div ref={totalProgressBarRef} className="h-2 bg-slate-700 rounded-full overflow-hidden mb-2">
                 <div 
-                  className="h-full rounded-full transition-all duration-700 ease-out"
+                  className="h-full rounded-full transition-all duration-300 ease-out"
                   style={{ 
-                    width: isGrandPrizeProgressAnimating ? `${grandPrizeProgress}%` : `${totalProgress}%`,
-                    background: allCollectionsComplete 
+                    width: isGrandPrizeProgressAnimating 
+                      ? `${grandPrizeProgress}%` 
+                      : `${Math.min(displayProgress + totalProgressOvershoot, 100)}%`,
+                    background: isFullyComplete 
                       ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)'
                       : 'linear-gradient(90deg, #f59e0b 0%, #eab308 100%)'
                   }}
@@ -1325,18 +1576,27 @@ export function Collections({
               </div>
               
               {/* Grand Prize */}
-              <div className={`rounded-xl p-2 text-center ${allCollectionsComplete ? 'bg-green-900/30 border border-green-500/30' : 'bg-slate-800/50'}`} style={{ minHeight: '55px' }}>
+              <div className={`rounded-xl p-2 text-center ${isFullyComplete ? 'bg-green-900/30 border border-green-500/30' : 'bg-slate-800/50'}`} style={{ minHeight: '55px' }}>
                 <div className="text-xs text-white/70 mb-1">Приз за все коллекции</div>
                 {!(allCollectionsRewarded || (showGrandPrizeClaimed && petIconHidden)) ? (
                   <div className="flex items-center justify-center gap-3">
-                    <div className="text-center" style={{ visibility: petIconHidden ? 'hidden' : 'visible' }}>
+                    <div 
+                      className={`text-center transition-all duration-150 ${grandPrizePulsePhase === 'trophy' ? 'scale-125' : ''}`}
+                      style={{ 
+                        visibility: petIconHidden ? 'hidden' : 'visible',
+                        filter: grandPrizePulsePhase === 'trophy' ? 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.8))' : 'none'
+                      }}
+                    >
                       <div ref={petIconRef} className="text-2xl">{petIcon}</div>
                     </div>
                     <div className="text-base text-white/30" style={{ visibility: grandPrizeIconHidden ? 'hidden' : 'visible' }}>+</div>
                     <div 
                       ref={grandPrizeIconRef}
-                      className="text-center"
-                      style={{ visibility: grandPrizeIconHidden ? 'hidden' : 'visible' }}
+                      className={`text-center transition-all duration-150 ${grandPrizePulsePhase === 'stars' ? 'scale-125' : ''}`}
+                      style={{ 
+                        visibility: grandPrizeIconHidden ? 'hidden' : 'visible',
+                        filter: grandPrizePulsePhase === 'stars' ? 'drop-shadow(0 0 8px rgba(250, 204, 21, 0.8))' : 'none'
+                      }}
                     >
                       <div className="text-base font-bold text-yellow-400">100 ⭐</div>
                     </div>
@@ -1346,6 +1606,8 @@ export function Collections({
                 )}
               </div>
             </div>
+              );
+            })()}
             
             {/* Collections Grid */}
             {(() => {
@@ -1364,13 +1626,26 @@ export function Collections({
                 const hasNew = hasNewItems(collection.id);
                 const isCollecting = collectingCollectionIndex === index;
                 const isCollectionVisible = !isGrandPrizeMode || visibleCollectionIndices.has(index);
+                const overshoot = mainProgressOvershoot[collection.id] ?? 0;
+                
+                // Check if reward progress animation is active
+                const rewardProgress = rewardProgressAnimation[collection.id];
+                const isRewardAnimating = rewardProgress !== undefined;
+                
+                // Hide "complete" state if animation is pending
+                const showAsComplete = isComplete && !pendingCompleteAnimation.has(collection.id);
+                const showLabel = showAsComplete && (showCompleteLabel.has(collection.id) || !chipAnimationQueue.includes(collection.id));
+                
+                // Show progress bar during reward animation even if complete
+                const showProgressBar = !showAsComplete || isRewardAnimating;
                 
                 return (
                   <button
                     key={collection.id}
+                    ref={el => collectionCardRefs.current[collection.id] = el}
                     onClick={() => handleSelectCollection(collection)}
-                    className={`relative rounded-xl p-2 text-center hover:brightness-110 ${
-                      isComplete 
+                    className={`relative rounded-xl p-2 text-center hover:brightness-110 transition-all duration-300 ${
+                      showAsComplete 
                         ? 'bg-green-900/30 border border-green-500/40' 
                         : 'bg-slate-700/50 border border-slate-600/30 hover:border-indigo-400/50'
                     }`}
@@ -1402,19 +1677,33 @@ export function Collections({
                     </div>
                     <div className="text-[10px] text-white/80 truncate">{collection.name}</div>
                     
-                    {isComplete ? (
-                      <div className="text-green-400 text-[10px] font-semibold">✓ Собрано</div>
-                    ) : (
-                      <>
-                        <div className="h-1.5 bg-slate-600 rounded-full overflow-hidden mt-1">
-                          <div 
-                            className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-700 ease-out"
-                            style={{ width: `${displayProgress}%` }}
-                          />
+                    {/* Fixed height container for progress/complete label to prevent layout shift */}
+                    <div className="h-[24px] flex flex-col justify-center">
+                      {showAsComplete && showLabel && !isRewardAnimating ? (
+                        <div 
+                          className="text-green-400 text-[10px] font-semibold"
+                        >
+                          ✓ Собрано
                         </div>
-                        <div className="text-[10px] text-white/50 mt-0.5">{progress.collected}/{progress.total}</div>
-                      </>
-                    )}
+                      ) : showProgressBar ? (
+                        <>
+                          <div className="h-1.5 bg-slate-600 rounded-full overflow-hidden mt-1">
+                            <div 
+                              className={`h-full rounded-full bg-gradient-to-r ${isRewardAnimating ? 'from-green-500 to-emerald-500' : 'from-indigo-500 to-purple-500'} transition-all duration-100 ease-out`}
+                              style={{ width: `${isRewardAnimating ? rewardProgress : Math.min(displayProgress + overshoot, 100)}%` }}
+                            />
+                          </div>
+                          {/* Hide text during reward animation */}
+                          {!isRewardAnimating && (
+                            <div className="text-[10px] mt-0.5 text-white/50">
+                              {progress.collected}/{progress.total}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="h-full" />
+                      )}
+                    </div>
                   </button>
                 );
               })}
@@ -1487,6 +1776,15 @@ export function Collections({
           key={star.id}
           star={star}
           onArrived={() => handleStarArrival(star)}
+        />
+      ))}
+      
+      {/* Flying chips for collection completion */}
+      {flyingChips.map(chip => (
+        <CollectionChip
+          key={chip.id}
+          chip={chip}
+          onArrived={() => handleChipArrived(chip)}
         />
       ))}
       
@@ -1809,5 +2107,98 @@ function FlyingTrophy({
     >
       {icon}
     </div>
+  );
+}
+
+// Flying chip component for collection completion - bezier curve animation (flying UP)
+function CollectionChip({ chip, onArrived }: { chip: CollectionFlyingChip; onArrived: () => void }) {
+  const elementRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const arrivedRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const onArrivedRef = useRef(onArrived);
+  
+  onArrivedRef.current = onArrived;
+  
+  useEffect(() => {
+    setIsVisible(true);
+    
+    const duration = 800; // ms
+    const startX = chip.startX;
+    const startY = chip.startY;
+    const targetX = chip.startX + (Math.random() - 0.5) * 40; // Slight horizontal drift
+    const targetY = chip.targetY;
+    
+    // Control point for bezier - arc to the side
+    const controlX = startX + (Math.random() - 0.5) * 100;
+    const controlY = (startY + targetY) / 2 - 30;
+    
+    const animate = (timestamp: number) => {
+      if (!elementRef.current) {
+        rafRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      
+      if (startTimeRef.current === null) {
+        startTimeRef.current = timestamp;
+      }
+      
+      const elapsed = timestamp - startTimeRef.current;
+      const progress = Math.min(elapsed / duration, 1);
+      const easedProgress = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+      
+      // Quadratic bezier
+      const t = easedProgress;
+      const mt = 1 - t;
+      const x = mt * mt * startX + 2 * mt * t * controlX + t * t * targetX;
+      const y = mt * mt * startY + 2 * mt * t * controlY + t * t * targetY;
+      
+      const rotation = progress * 360;
+      const scale = 1 + Math.sin(progress * Math.PI) * 0.3; // Pulse during flight
+      
+      elementRef.current.style.left = `${x}px`;
+      elementRef.current.style.top = `${y}px`;
+      elementRef.current.style.transform = `translate(-50%, -50%) rotate(${rotation}deg) scale(${scale})`;
+      
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate);
+      } else {
+        if (!arrivedRef.current) {
+          arrivedRef.current = true;
+          elementRef.current.style.display = 'none';
+          onArrivedRef.current();
+          setIsVisible(false);
+        }
+      }
+    };
+    
+    rafRef.current = requestAnimationFrame(animate);
+    
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [chip]);
+  
+  if (!isVisible) return null;
+  
+  return ReactDOM.createPortal(
+    <div
+      ref={elementRef}
+      className="fixed pointer-events-none z-[10000]"
+      style={{
+        left: chip.startX,
+        top: chip.startY,
+        transform: 'translate(-50%, -50%)',
+        width: '10px',
+        height: '10px',
+        borderRadius: '3px',
+        backgroundColor: '#f59e0b',
+        boxShadow: '0 0 6px #f59e0b, 0 0 12px #d97706',
+      }}
+    />,
+    document.body
   );
 }

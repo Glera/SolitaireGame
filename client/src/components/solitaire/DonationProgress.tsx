@@ -21,6 +21,7 @@ interface DonationProgressProps {
   onTestWin?: () => void;
   onDropCollectionItem?: () => void;
   onTestLevelUp?: () => void;
+  onNextDay?: () => void;
   pulseKey?: number;
   onOtherPlayerStars?: (count: number) => void;
   disableOtherPlayerNotifications?: boolean;
@@ -103,6 +104,7 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
   onTestWin,
   onDropCollectionItem,
   onTestLevelUp,
+  onNextDay,
   pulseKey = 0,
   onOtherPlayerStars,
   disableOtherPlayerNotifications = false
@@ -371,6 +373,17 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
                   aria-label="Тест левелапа"
                 >
                   <span className="text-white text-xs">⬆</span>
+                </button>
+              )}
+              
+              {/* Next day button */}
+              {onNextDay && (
+                <button
+                  onClick={onNextDay}
+                  className="w-5 h-5 flex items-center justify-center rounded-full bg-sky-500/30 hover:bg-sky-500/50 transition-colors border border-sky-400/50"
+                  aria-label="Следующий день"
+                >
+                  <span className="text-white text-xs">📅</span>
                 </button>
               )}
               

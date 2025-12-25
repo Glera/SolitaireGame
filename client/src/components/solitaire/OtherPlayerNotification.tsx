@@ -329,7 +329,7 @@ export function OtherPlayerNotification({
             top: '100%', // Right at bottom edge of progress bar
             left: 0,
             right: 0,
-            height: '34px',
+            height: '50px', // Increased to fit 2 lines of text
             zIndex: 5,
           }}
         >

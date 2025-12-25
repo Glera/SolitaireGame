@@ -33,6 +33,17 @@ interface FlyingStar {
   flyDuration: number;
 }
 
+interface FlyingChip {
+  id: number;
+  questId: string;
+  startX: number;
+  startY: number;
+  targetX: number;
+  targetY: number;
+  velocityX: number;
+  velocityY: number;
+}
+
 // Max flying star icons
 const MAX_FLYING_ICONS = 10;
 
@@ -43,18 +54,45 @@ interface DailyQuestsProps {
   onReset?: () => void;
   progressBarRef?: React.RefObject<HTMLDivElement>;
   onStarArrived?: (count?: number) => void; // count defaults to 1
+  // Monthly progress
+  monthlyProgress?: number;
+  monthlyTarget?: number;
+  monthlyReward?: number;
+  onMonthlyRewardClaim?: () => void;
+  monthlyRewardClaimed?: boolean;
+  onMonthlyProgressIncrement?: () => void; // Called when monthly progress should increase
 }
 
-export function DailyQuests({ isVisible, quests, onClose, onReset, progressBarRef, onStarArrived }: DailyQuestsProps) {
+export function DailyQuests({ 
+  isVisible, 
+  quests, 
+  onClose, 
+  onReset, 
+  progressBarRef, 
+  onStarArrived,
+  monthlyProgress = 0,
+  monthlyTarget = 50,
+  monthlyReward = 50,
+  onMonthlyRewardClaim,
+  monthlyRewardClaimed = false,
+  onMonthlyProgressIncrement
+}: DailyQuestsProps) {
   const [isAnimating, setIsAnimating] = useState(false);
   const [animatedProgress, setAnimatedProgress] = useState<Record<string, number>>({});
   const [displayedCount, setDisplayedCount] = useState<Record<string, number>>({});
   const [textPulseKey, setTextPulseKey] = useState<Record<string, number>>({});
   const [flyingStars, setFlyingStars] = useState<FlyingStar[]>([]);
+  const [flyingChips, setFlyingChips] = useState<FlyingChip[]>([]);
   const [hiddenRewardIcons, setHiddenRewardIcons] = useState<Record<string, boolean>>({});
   const [isReady, setIsReady] = useState(false);
   const [showCompletedLabel, setShowCompletedLabel] = useState<Record<string, boolean>>({});
+  const [monthlyBarPulse, setMonthlyBarPulse] = useState(false);
+  const [monthlyTextPulse, setMonthlyTextPulse] = useState(false);
+  const [monthlyOvershoot, setMonthlyOvershoot] = useState(0); // Extra % to show temporarily
   const rewardIconRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const questCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const questProgressBarRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const monthlyBarRef = useRef<HTMLDivElement>(null);
   const starsArrivedCount = useRef<Record<string, number>>({});
   const expectedStarsCount = useRef<Record<string, number>>({});
   
@@ -93,19 +131,22 @@ export function DailyQuests({ isVisible, quests, onClose, onReset, progressBarRe
         [quest.id]: Date.now()
       }));
       
-      // Check if quest just completed - launch stars
+      // Check if quest just completed - launch stars AND chip simultaneously
       if (quest.current >= quest.target && quest.completed) {
         // expectedStarsCount will be set in launchStarsForQuest with proper icon count
         starsArrivedCount.current[quest.id] = 0;
         // Show completed label immediately when stars start flying
         setShowCompletedLabel(prev => ({ ...prev, [quest.id]: true }));
         launchStarsForQuest(quest);
-        // Next quest will be animated after all stars arrive (handled in handleStarArrived)
+        // Launch chip at the same moment progress bar reaches 100%
+        // This creates effect of progress bar "pushing out" the chip
+        launchChipToMonthlyBar(quest.id);
+        // Next quest will be animated after chip arrives (handled in handleChipArrived)
       } else {
-        // No stars to wait for - animate next quest after small delay
+        // No completion - animate next quest after progress bar settles
         const nextTimer = setTimeout(() => {
           animateNextQuest();
-        }, 200);
+        }, 400);
         timersRef.current.push(nextTimer);
       }
     }, 700);
@@ -118,8 +159,12 @@ export function DailyQuests({ isVisible, quests, onClose, onReset, progressBarRe
       // Reset everything first
       setIsReady(false);
       setFlyingStars([]);
+      setFlyingChips([]);
       setHiddenRewardIcons({});
       setTextPulseKey({});
+      setMonthlyBarPulse(false);
+      setMonthlyTextPulse(false);
+      setMonthlyOvershoot(0);
       starsArrivedCount.current = {};
       expectedStarsCount.current = {};
       questQueueRef.current = [];
@@ -284,23 +329,68 @@ export function DailyQuests({ isVisible, quests, onClose, onReset, progressBarRe
     setFlyingStars(prev => [...prev, ...stars]);
   };
   
+  const launchChipToMonthlyBar = (questId: string) => {
+    if (!monthlyBarRef.current) return;
+    
+    // Get target position (monthly progress bar center)
+    const monthlyRect = monthlyBarRef.current.getBoundingClientRect();
+    const targetX = monthlyRect.left + monthlyRect.width / 2;
+    const targetY = monthlyRect.top + monthlyRect.height / 2;
+    
+    // Get start position from the right edge of quest progress bar
+    let startX = window.innerWidth / 2;
+    let startY = window.innerHeight / 2;
+    
+    const questProgressBarEl = questProgressBarRefs.current[questId];
+    if (questProgressBarEl) {
+      const rect = questProgressBarEl.getBoundingClientRect();
+      startX = rect.right; // Right edge of progress bar
+      startY = rect.top + rect.height / 2;
+    }
+    
+    // Create one chip that bounces off and falls down
+    // Gentle upward impulse for smooth parabolic arc (1-2 seconds total)
+    const chip: FlyingChip = {
+      id: Date.now(),
+      questId,
+      startX,
+      startY,
+      targetX,
+      targetY,
+      velocityX: -1.5 + Math.random() * 1, // Gentle left drift
+      velocityY: -5 - Math.random() * 2  // Smooth upward arc
+    };
+    
+    setFlyingChips(prev => [...prev, chip]);
+  };
+  
+  const handleChipArrived = (chip: FlyingChip) => {
+    // Update monthly progress with pulse effect
+    onMonthlyProgressIncrement?.();
+    
+    // Trigger text pulse animation
+    setMonthlyTextPulse(true);
+    setTimeout(() => setMonthlyTextPulse(false), 400);
+    
+    // Trigger overshoot animation (show 5% extra then return)
+    setMonthlyOvershoot(5);
+    setTimeout(() => setMonthlyOvershoot(0), 300);
+    
+    // Pulse the bar
+    setMonthlyBarPulse(true);
+    setTimeout(() => setMonthlyBarPulse(false), 400);
+    
+    // Animate next quest after effects complete (wait for pulse to finish)
+    // This ensures player sees the monthly bar update before next quest starts
+    const nextTimer = setTimeout(() => {
+      animateNextQuest();
+    }, 600);
+    timersRef.current.push(nextTimer);
+  };
+  
   const handleStarArrived = (star: FlyingStar) => {
     onStarArrived?.(star.value);
-    
-    // Track arrived icons
-    starsArrivedCount.current[star.questId] = (starsArrivedCount.current[star.questId] || 0) + 1;
-    
-    // Check if all icons for this quest have arrived
-    const expectedCount = expectedStarsCount.current[star.questId] || 0;
-    const arrivedCount = starsArrivedCount.current[star.questId] || 0;
-    
-    if (arrivedCount >= expectedCount) {
-      // All icons arrived - animate next quest after small delay
-      const nextTimer = setTimeout(() => {
-        animateNextQuest();
-      }, 200);
-      timersRef.current.push(nextTimer);
-    }
+    // Stars fly independently, chip is launched with progress bar completion
   };
   
   if (!isVisible || !isReady) return null;
@@ -335,6 +425,7 @@ export function DailyQuests({ isVisible, quests, onClose, onReset, progressBarRe
             {quests.map((quest, index) => (
               <div 
                 key={quest.id}
+                ref={el => questCardRefs.current[quest.id] = el}
                 className={`relative rounded-xl p-3 transition-all border ${
                   showCompletedLabel[quest.id] 
                     ? 'bg-lime-900/30 border-lime-600/40' 
@@ -363,28 +454,29 @@ export function DailyQuests({ isVisible, quests, onClose, onReset, progressBarRe
                     </div>
                     <p className="text-slate-400 text-xs mt-0.5">{quest.description}</p>
                     
-                    {/* Progress bar - hidden for completed quests */}
-                    {!showCompletedLabel[quest.id] && (
-                      <div className="mt-2">
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-slate-400">
-                            Прогресс
-                          </span>
-                          <span 
-                            key={textPulseKey[quest.id] || 0}
-                            className={textPulseKey[quest.id] ? 'animate-quest-text-pulse' : 'text-white'}
-                          >
-                            {displayedCount[quest.id] ?? 0} / {quest.target}
-                          </span>
-                        </div>
-                        <div className="h-2 bg-slate-600 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r from-sky-500 to-sky-400"
-                            style={{ width: `${Math.min(((animatedProgress[quest.id] ?? 0) / quest.target) * 100, 100)}%` }}
-                          />
-                        </div>
+                    {/* Progress bar - invisible but keeps space when completed */}
+                    <div className={`mt-2 ${showCompletedLabel[quest.id] ? 'invisible' : ''}`}>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-slate-400">
+                          Прогресс
+                        </span>
+                        <span 
+                          key={textPulseKey[quest.id] || 0}
+                          className={textPulseKey[quest.id] ? 'animate-quest-text-pulse' : 'text-white'}
+                        >
+                          {displayedCount[quest.id] ?? 0} / {quest.target}
+                        </span>
                       </div>
-                    )}
+                      <div 
+                        ref={el => questProgressBarRefs.current[quest.id] = el}
+                        className="h-2 bg-slate-600 rounded-full overflow-hidden"
+                      >
+                        <div 
+                          className="h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r from-sky-500 to-sky-400"
+                          style={{ width: `${Math.min(((animatedProgress[quest.id] ?? 0) / quest.target) * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
                 
@@ -411,6 +503,63 @@ export function DailyQuests({ isVisible, quests, onClose, onReset, progressBarRe
             ))}
           </div>
           
+          {/* Monthly Progress - at the bottom */}
+          <div 
+            ref={monthlyBarRef}
+            className={`mt-4 p-3 bg-gradient-to-r from-amber-900/40 to-orange-900/40 rounded-xl border transition-all duration-300 ${monthlyBarPulse ? 'scale-[1.02] border-amber-400/60' : 'border-amber-600/30'}`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🏆</span>
+                <span className="text-sm font-semibold text-amber-200">Месячный бонус</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-yellow-400">⭐</span>
+                <span className="text-sm font-bold text-yellow-300">{monthlyReward}</span>
+              </div>
+            </div>
+            
+            {/* Progress bar with overshoot animation */}
+            <div className="relative h-4 bg-slate-800/60 rounded-full overflow-hidden border border-amber-700/30">
+              <div 
+                className="absolute inset-y-0 left-0 bg-gradient-to-r from-amber-500 to-orange-400 rounded-full transition-all duration-300"
+                style={{ 
+                  width: `${Math.min((monthlyProgress / monthlyTarget) * 100 + monthlyOvershoot, 100)}%` 
+                }}
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span 
+                  className={`text-xs font-bold text-white drop-shadow-lg transition-all duration-200 ${monthlyTextPulse ? 'scale-125 text-amber-300' : ''}`}
+                >
+                  {monthlyProgress} / {monthlyTarget}
+                </span>
+              </div>
+            </div>
+            
+            {/* Claim button or status */}
+            {monthlyProgress >= monthlyTarget && !monthlyRewardClaimed && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMonthlyRewardClaim?.();
+                }}
+                className="mt-2 w-full py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold text-sm rounded-lg shadow-lg animate-pulse transition-all"
+              >
+                🎁 Забрать награду!
+              </button>
+            )}
+            {monthlyRewardClaimed && (
+              <div className="mt-2 text-center text-sm text-amber-400 font-semibold">
+                ✓ Награда получена!
+              </div>
+            )}
+            {monthlyProgress < monthlyTarget && (
+              <div className="mt-1 text-center text-xs text-amber-300/70">
+                Выполняй задания каждый день
+              </div>
+            )}
+          </div>
+          
           {/* Footer */}
           <div className="mt-3 text-center">
             <button
@@ -429,6 +578,15 @@ export function DailyQuests({ isVisible, quests, onClose, onReset, progressBarRe
           key={star.id}
           star={star}
           onArrived={() => handleStarArrived(star)}
+        />
+      ))}
+      
+      {/* Flying chip to monthly bar */}
+      {flyingChips.map(chip => (
+        <QuestFlyingChip
+          key={chip.id}
+          chip={chip}
+          onArrived={() => handleChipArrived(chip)}
         />
       ))}
     </>
@@ -563,6 +721,92 @@ function QuestFlyingStar({ star, onArrived }: { star: FlyingStar; onArrived: () 
     >
       ⭐
     </div>,
+    document.body
+  );
+}
+
+// Flying chip component for monthly progress - physics-based bounce and fall
+function QuestFlyingChip({ chip, onArrived }: { chip: FlyingChip; onArrived: () => void }) {
+  const elementRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const arrivedRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
+  const onArrivedRef = useRef(onArrived);
+  
+  // Physics state
+  const posRef = useRef({ x: chip.startX, y: chip.startY });
+  const velRef = useRef({ x: chip.velocityX, y: chip.velocityY });
+  const rotationRef = useRef(0);
+  
+  onArrivedRef.current = onArrived;
+  
+  useEffect(() => {
+    setIsVisible(true);
+    
+    const gravity = 0.12; // Slower acceleration for smoother arc (1-2 sec flight)
+    const rotationSpeed = 4; // Slower rotation for elegance
+    
+    const animate = () => {
+      if (!elementRef.current) {
+        rafRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      
+      // Apply gravity - creates smooth parabolic arc
+      velRef.current.y += gravity;
+      
+      // Update position
+      posRef.current.x += velRef.current.x;
+      posRef.current.y += velRef.current.y;
+      
+      // Update rotation
+      rotationRef.current += rotationSpeed;
+      
+      // Update element position
+      elementRef.current.style.left = `${posRef.current.x}px`;
+      elementRef.current.style.top = `${posRef.current.y}px`;
+      elementRef.current.style.transform = `translate(-50%, -50%) rotate(${rotationRef.current}deg)`;
+      
+      // Check if reached target Y (monthly bar)
+      if (posRef.current.y >= chip.targetY) {
+        if (!arrivedRef.current) {
+          arrivedRef.current = true;
+          elementRef.current.style.display = 'none';
+          onArrivedRef.current();
+          setIsVisible(false);
+        }
+        return;
+      }
+      
+      rafRef.current = requestAnimationFrame(animate);
+    };
+    
+    rafRef.current = requestAnimationFrame(animate);
+    
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [chip]);
+  
+  if (!isVisible) return null;
+  
+  return ReactDOM.createPortal(
+    <div
+      ref={elementRef}
+      className="fixed pointer-events-none z-[10000]"
+      style={{
+        left: chip.startX,
+        top: chip.startY,
+        transform: 'translate(-50%, -50%)',
+        width: '10px',
+        height: '10px',
+        borderRadius: '3px',
+        backgroundColor: '#f97316',
+        boxShadow: '0 0 6px #f97316, 0 0 12px #ea580c',
+      }}
+    />,
     document.body
   );
 }

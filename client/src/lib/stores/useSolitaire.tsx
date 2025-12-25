@@ -1078,6 +1078,46 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       }
     }
     
+    // Priority 2.5: Move between tableau columns that enables a foundation move
+    // Check if moving a card/stack reveals a card that can go to foundation
+    for (let srcCol = 0; srcCol < state.tableau.length; srcCol++) {
+      const srcColumn = state.tableau[srcCol];
+      if (srcColumn.length < 2) continue; // Need at least 2 cards
+      
+      // Check each face-up card in the column
+      for (let cardIdx = 0; cardIdx < srcColumn.length; cardIdx++) {
+        const card = srcColumn[cardIdx];
+        if (!card.faceUp) continue;
+        
+        // What card would be revealed/exposed if we move this stack?
+        const cardBelow = cardIdx > 0 ? srcColumn[cardIdx - 1] : null;
+        if (!cardBelow || !cardBelow.faceUp) continue; // Only check if card below is face-up
+        
+        // Can the card below go to foundation after we move the stack?
+        const canCardBelowGoToFoundation = get().canAutoMoveToFoundation(cardBelow);
+        if (!canCardBelowGoToFoundation) continue;
+        
+        // Now check if we can actually move this stack somewhere
+        for (let dstCol = 0; dstCol < state.tableau.length; dstCol++) {
+          if (srcCol === dstCol) continue;
+          
+          const dstColumn = state.tableau[dstCol];
+          if (dstColumn.length === 0) {
+            if (card.rank === 'K') {
+              set({ hint: { type: 'tableau', cardId: card.id, from: srcCol, to: dstCol } });
+              return;
+            }
+          } else {
+            const dstTop = dstColumn[dstColumn.length - 1];
+            if (dstTop.faceUp && canPlaceOnTableau(dstTop, card)) {
+              set({ hint: { type: 'tableau', cardId: card.id, from: srcCol, to: dstCol } });
+              return;
+            }
+          }
+        }
+      }
+    }
+    
     // Priority 3: Waste to tableau
     if (state.waste.length > 0) {
       const wasteTop = state.waste[state.waste.length - 1];
@@ -1182,6 +1222,39 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     
     // Stop if game is won or already auto-collecting
     if (state.isWon || state.isAutoCollecting) {
+      return;
+    }
+    
+    // Check if there are any cards that can actually be moved to foundations
+    // before setting isAutoCollecting (prevents UI lock when no moves available)
+    const canMoveAnyCard = () => {
+      const rankOrder = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+      
+      const checkCard = (card: Card): boolean => {
+        const foundation = state.foundations[card.suit];
+        if (card.rank === 'A' && foundation.length === 0) return true;
+        if (foundation.length > 0) {
+          const topCard = foundation[foundation.length - 1];
+          if (rankOrder.indexOf(card.rank) === rankOrder.indexOf(topCard.rank) + 1) return true;
+        }
+        return false;
+      };
+      
+      // Check tableau top cards
+      for (const column of state.tableau) {
+        if (column.length > 0 && checkCard(column[column.length - 1])) return true;
+      }
+      // Check waste
+      if (state.waste.length > 0 && checkCard(state.waste[state.waste.length - 1])) return true;
+      // Check stock (direct extraction)
+      for (const card of state.stock) {
+        if (checkCard(card)) return true;
+      }
+      return false;
+    };
+    
+    if (!canMoveAnyCard()) {
+      // No cards can be moved - don't block UI, just return
       return;
     }
     
@@ -1297,7 +1370,35 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       setTimeout(() => {
         const { card, targetSuit, sourceType, sourceIndex } = moveInfo;
         
-        // Get DOM elements - for stock cards, use the stock pile as start position
+        // Check if card can still be added to foundation (state might have changed)
+        const stateBeforeAnim = get();
+        const foundation = stateBeforeAnim.foundations[targetSuit];
+        const rankOrder = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        let canAdd = false;
+        if (card.rank === 'A') {
+          canAdd = foundation.length === 0;
+        } else if (foundation.length > 0) {
+          const topCard = foundation[foundation.length - 1];
+          canAdd = rankOrder.indexOf(card.rank) === rankOrder.indexOf(topCard.rank) + 1;
+        }
+        
+        // Skip this card if it can no longer be added
+        if (!canAdd) {
+          completedCards++;
+          if (completedCards >= totalCards) {
+            set({ isAutoCollecting: false });
+            // Retry auto-collect in case there are other cards to move
+            setTimeout(() => {
+              const checkState = get();
+              if (!checkState.isWon && !checkState.isAutoCollecting) {
+                get().triggerAutoCollect();
+              }
+            }, 100);
+          }
+          return;
+        }
+        
+        // Get DOM elements FIRST - before updating state
         let cardElement: HTMLElement | null = null;
         let startRect: DOMRect;
         
@@ -1331,6 +1432,13 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           return;
         }
         
+        // NOW update foundations - only after all DOM elements are validated
+        // Other cards checking canAdd will see this card already in foundation
+        const stateForFoundation = get();
+        const newFoundations = { ...stateForFoundation.foundations };
+        newFoundations[targetSuit] = [...newFoundations[targetSuit], card];
+        set({ foundations: newFoundations });
+        
         const endRect = foundationElement.getBoundingClientRect();
         
         // Launch flying card animation
@@ -1339,36 +1447,23 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
             movedCardIds.add(card.id);
             completedCards++;
             
-            // Update state progressively - remove card, add to foundation
+            // Update source (remove card) - foundation already updated
             const currentState = get();
             
             if (sourceType === 'tableau' && sourceIndex !== undefined) {
               const newTableau = currentState.tableau.map((col, i) => 
                 i === sourceIndex ? col.filter(c => c.id !== card.id) : col
               );
-              const newFoundations = { ...currentState.foundations };
-              if (!newFoundations[targetSuit].some(c => c.id === card.id)) {
-                newFoundations[targetSuit] = [...newFoundations[targetSuit], card];
-              }
               awardCardXP(card.id);
-              set({ tableau: newTableau, foundations: newFoundations, moves: currentState.moves + 1 });
+              set({ tableau: newTableau, moves: currentState.moves + 1 });
             } else if (sourceType === 'waste') {
               const newWaste = currentState.waste.filter(c => c.id !== card.id);
-              const newFoundations = { ...currentState.foundations };
-              if (!newFoundations[targetSuit].some(c => c.id === card.id)) {
-                newFoundations[targetSuit] = [...newFoundations[targetSuit], card];
-              }
               awardCardXP(card.id);
-              set({ waste: newWaste, foundations: newFoundations, moves: currentState.moves + 1 });
+              set({ waste: newWaste, moves: currentState.moves + 1 });
             } else if (sourceType === 'stock') {
-              // Remove card from stock
               const newStock = currentState.stock.filter(c => c.id !== card.id);
-              const newFoundations = { ...currentState.foundations };
-              if (!newFoundations[targetSuit].some(c => c.id === card.id)) {
-                newFoundations[targetSuit] = [...newFoundations[targetSuit], card];
-              }
               awardCardXP(card.id);
-              set({ stock: newStock, foundations: newFoundations, moves: currentState.moves + 1 });
+              set({ stock: newStock, moves: currentState.moves + 1 });
             }
             
             // Trigger collection item drop
@@ -1400,7 +1495,15 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
                 GameIntegration.getInstance().onGameEnd(totalScore, gameTime, finalState.totalGifts);
                 set({ isWon: true, isAutoCollecting: false });
               } else {
+                // Not won yet - check if we should continue auto-collecting
                 set({ isAutoCollecting: false });
+                // Re-trigger auto-collect after a short delay to pick up any remaining cards
+                setTimeout(() => {
+                  const checkState = get();
+                  if (!checkState.isWon && !checkState.isAutoCollecting) {
+                    get().triggerAutoCollect();
+                  }
+                }, 100);
               }
             }
           });
@@ -1415,12 +1518,21 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       }, index * STAGGER_DELAY);
     });
     
-    // Safety timeout - ensure auto-collect ends
+    // Safety timeout - ensure auto-collect ends and retries if needed
     const maxTime = cardsToMove.length * STAGGER_DELAY + FLIGHT_DURATION + 500;
     setTimeout(() => {
       const currentState = get();
       if (currentState.isAutoCollecting) {
         set({ isAutoCollecting: false });
+        // Try to continue if not won
+        if (!currentState.isWon) {
+          setTimeout(() => {
+            const checkState = get();
+            if (!checkState.isWon && !checkState.isAutoCollecting) {
+              get().triggerAutoCollect();
+            }
+          }, 100);
+        }
       }
     }, maxTime);
   }

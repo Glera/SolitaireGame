@@ -13,6 +13,7 @@ import { DonationProgress } from './DonationProgress';
 import { WinScreen } from './WinScreen';
 import { DailyQuests } from './DailyQuests';
 import { Collections, defaultCollections, type Collection } from './Collections';
+import { NoMovesModal } from './NoMovesModal';
 import { FlyingCollectionIcon, setFlyingIconCallback, setCollectionsButtonPosition, getCollectionsButtonPosition, tryCollectionDrop, setOnCardToFoundationCallback } from './FlyingCollectionIcon';
 import { FlyingCardsContainer } from './FlyingCard';
 import { CardAnimation } from './CardAnimation';
@@ -26,6 +27,8 @@ import { resetAllXP, setOnLevelUpCallback } from '../../lib/solitaire/experience
 import { LevelUpScreen } from './LevelUpScreen';
 import { PromoWidget } from './PromoWidget';
 import { Shop, type ShopItem } from './Shop';
+import { DailyRewardPopup } from './DailyRewardPopup';
+import { StreakPopup } from './StreakPopup';
 import { GAME_VERSION } from '../../version';
 import { Suit } from '../../lib/solitaire/types';
 
@@ -154,8 +157,9 @@ export function GameBoard() {
     return localStorage.getItem('solitaire_premium_subscription') === 'true';
   });
   
-  // No moves state - show new game button when no moves available
+  // No moves state - show popup first, then button if closed
   const [showNewGameButton, setShowNewGameButton] = useState(false);
+  const [noMovesShownOnce, setNoMovesShownOnce] = useState(false);
   
   const [dailyQuests, setDailyQuests] = useState<Quest[]>(() => {
     const saved = localStorage.getItem('solitaire_daily_quests');
@@ -184,6 +188,93 @@ export function GameBoard() {
   useEffect(() => {
     localStorage.setItem('solitaire_aces_collected', acesCollected.toString());
   }, [acesCollected]);
+  
+  // Monthly progress state - track completed daily quests across the month
+  const [monthlyProgress, setMonthlyProgress] = useState(() => {
+    const saved = localStorage.getItem('solitaire_monthly_progress');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [monthlyRewardClaimed, setMonthlyRewardClaimed] = useState(() => {
+    return localStorage.getItem('solitaire_monthly_reward_claimed') === 'true';
+  });
+  const MONTHLY_TARGET = 50;
+  const MONTHLY_REWARD = 50;
+  
+  // Save monthly progress to localStorage
+  useEffect(() => {
+    localStorage.setItem('solitaire_monthly_progress', monthlyProgress.toString());
+  }, [monthlyProgress]);
+  
+  useEffect(() => {
+    localStorage.setItem('solitaire_monthly_reward_claimed', monthlyRewardClaimed.toString());
+  }, [monthlyRewardClaimed]);
+  
+  // Daily login streak state
+  const [dailyStreak, setDailyStreak] = useState(() => {
+    const saved = localStorage.getItem('solitaire_daily_streak');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [lastLoginDate, setLastLoginDate] = useState(() => {
+    return localStorage.getItem('solitaire_last_login_date') || '';
+  });
+  const [showDailyReward, setShowDailyReward] = useState(false);
+  const [showStreakPopup, setShowStreakPopup] = useState(false);
+  const [pendingDailyReward, setPendingDailyReward] = useState(0); // Stars to award (max 10)
+  const [pendingStreak, setPendingStreak] = useState(0); // Actual streak day (no limit)
+  
+  // Save daily streak to localStorage
+  useEffect(() => {
+    localStorage.setItem('solitaire_daily_streak', dailyStreak.toString());
+  }, [dailyStreak]);
+  
+  useEffect(() => {
+    localStorage.setItem('solitaire_last_login_date', lastLoginDate);
+  }, [lastLoginDate]);
+  
+  // Check for daily reward on mount
+  useEffect(() => {
+    const today = new Date().toDateString();
+    if (lastLoginDate === today) {
+      // Already claimed today
+      return;
+    }
+    
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toDateString();
+    
+    let newStreak: number;
+    if (lastLoginDate === yesterdayStr) {
+      // Consecutive day - increase streak (no limit)
+      newStreak = dailyStreak + 1;
+    } else {
+      // Missed a day or first login - reset to 1
+      newStreak = 1;
+    }
+    
+    // Set pending streak (actual day number) and reward (max 10 stars)
+    setPendingStreak(newStreak);
+    setPendingDailyReward(Math.min(newStreak, 10));
+    
+    // Show streak popup first if streak >= 2, otherwise show reward directly
+    if (newStreak >= 2) {
+      setShowStreakPopup(true);
+    } else {
+      setShowDailyReward(true);
+    }
+  }, []); // Only on mount
+  
+  // Claim daily reward
+  const claimDailyReward = () => {
+    if (pendingDailyReward > 0) {
+      setTotalStars(prev => prev + pendingDailyReward);
+      setDailyStreak(pendingStreak); // Save actual streak (not limited to 10)
+      setLastLoginDate(new Date().toDateString());
+      setShowDailyReward(false);
+      setPendingDailyReward(0);
+      setPendingStreak(0);
+    }
+  };
   
   // Collections state - load progress from localStorage, but use default structure/rewards
   const [showCollections, setShowCollections] = useState(false);
@@ -254,12 +345,6 @@ export function GameBoard() {
     localStorage.setItem('solitaire_all_collections_rewarded', allCollectionsRewarded.toString());
   }, [allCollectionsRewarded]);
   
-  // Show new game button when no moves available
-  useEffect(() => {
-    if (hasNoMoves) {
-      setShowNewGameButton(true);
-    }
-  }, [hasNoMoves]);
   
   // Queue of pending collection rewards (for when player completes multiple collections in one game)
   const [pendingCollectionRewards, setPendingCollectionRewards] = useState<string[]>([]);
@@ -616,6 +701,7 @@ export function GameBoard() {
     
     // Calculate updated quests and track newly completed quests for immediate reward
     let starsToAdd = 0;
+    let questsJustCompleted = 0;
     const updatedQuests = dailyQuests.map(quest => {
       if (quest.id === 'daily-games' && !quest.completed) {
         const newCurrent = quest.current + 1;
@@ -623,6 +709,7 @@ export function GameBoard() {
         // If quest just completed, add reward immediately
         if (completed) {
           starsToAdd += quest.reward;
+          questsJustCompleted++;
         }
         return { ...quest, current: newCurrent, completed };
       }
@@ -632,12 +719,14 @@ export function GameBoard() {
         // If quest just completed, add reward immediately
         if (completed) {
           starsToAdd += quest.reward;
+          questsJustCompleted++;
         }
         return { ...quest, current: newCurrent, completed };
       }
       if (quest.id === 'daily-minimal' && !quest.completed && qualifiesForMinimal) {
         // Quest just completed, add reward immediately
         starsToAdd += quest.reward;
+        questsJustCompleted++;
         return { ...quest, current: 1, completed: true };
       }
       return quest;
@@ -645,6 +734,9 @@ export function GameBoard() {
     
     // Update daily quest progress
     setDailyQuests(updatedQuests);
+    
+    // NOTE: Monthly progress is updated via animation callback in DailyQuests component
+    // when particles fly to the monthly progress bar
     
     // Add stars immediately for completed quests (persisted via localStorage effect)
     if (starsToAdd > 0) {
@@ -712,6 +804,7 @@ export function GameBoard() {
     // No unrewarded collections - start new game
     clearNoMoves();
     setShowNewGameButton(false);
+    setNoMovesShownOnce(false);
     newGame('solvable');
   };
   
@@ -762,10 +855,26 @@ export function GameBoard() {
     // Reset player XP/level
     resetAllXP();
     
+    // Reset monthly progress
+    setMonthlyProgress(0);
+    setMonthlyRewardClaimed(false);
+    
+    // Reset daily streak
+    setDailyStreak(0);
+    setLastLoginDate('');
+    setShowDailyReward(false);
+    setShowStreakPopup(false);
+    setPendingDailyReward(0);
+    setPendingStreak(0);
+    
     // Clear all localStorage
     localStorage.removeItem('solitaire_total_stars');
     localStorage.removeItem('solitaire_daily_quests');
     localStorage.removeItem('solitaire_aces_collected');
+    localStorage.removeItem('solitaire_monthly_progress');
+    localStorage.removeItem('solitaire_monthly_reward_claimed');
+    localStorage.removeItem('solitaire_daily_streak');
+    localStorage.removeItem('solitaire_last_login_date');
     localStorage.removeItem('solitaire_collections');
     localStorage.removeItem('solitaire_rewarded_collections');
     localStorage.removeItem('solitaire_all_collections_rewarded');
@@ -800,6 +909,41 @@ export function GameBoard() {
     // Set pending level up and show screen
     setPendingLevelUp(nextLevel);
     setShowLevelUp(true);
+  };
+  
+  // Handle next day (debug) - reset daily quests and give daily reward
+  const handleNextDay = () => {
+    // Reset daily quests progress (but keep monthly progress)
+    setDailyQuests(prev => prev.map(quest => ({
+      ...quest,
+      current: 0,
+      completed: false
+    })));
+    setAcesCollected(0);
+    
+    // Calculate next streak (simulate consecutive day, no limit)
+    const newStreak = dailyStreak + 1;
+    
+    // Set pending streak and reward (max 10 stars even if streak is higher)
+    setPendingStreak(newStreak);
+    setPendingDailyReward(Math.min(newStreak, 10));
+    
+    // Show streak popup first if streak >= 2, otherwise show reward directly
+    if (newStreak >= 2) {
+      setShowStreakPopup(true);
+    } else {
+      setShowDailyReward(true);
+    }
+    
+    // Update streak and "last login" to simulate yesterday
+    // (so next "next day" click also works)
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    setLastLoginDate(yesterday.toDateString());
+    setDailyStreak(newStreak - 1); // Will be set to newStreak when claimed
+    
+    // Start new game
+    newGame('solvable');
   };
   
   // Handle shop purchase
@@ -1217,6 +1361,21 @@ export function GameBoard() {
       />
       
       
+      {/* No Moves Modal - show once, then button appears */}
+      <NoMovesModal
+        isVisible={hasNoMoves && !noMovesShownOnce}
+        onNewGame={() => {
+          clearNoMoves();
+          setShowNewGameButton(false);
+          setNoMovesShownOnce(false);
+          newGame('solvable');
+        }}
+        onClose={() => {
+          clearNoMoves();
+          setNoMovesShownOnce(true);
+          setShowNewGameButton(true);
+        }}
+      />
       
       {/* Level Up Screen */}
       <LevelUpScreen
@@ -1236,6 +1395,19 @@ export function GameBoard() {
         onReset={handleResetDailyQuests}
         progressBarRef={progressBarRef}
         onStarArrived={handleStarArrived}
+        monthlyProgress={monthlyProgress}
+        monthlyTarget={MONTHLY_TARGET}
+        monthlyReward={MONTHLY_REWARD}
+        monthlyRewardClaimed={monthlyRewardClaimed}
+        onMonthlyRewardClaim={() => {
+          if (monthlyProgress >= MONTHLY_TARGET && !monthlyRewardClaimed) {
+            setTotalStars(prev => prev + MONTHLY_REWARD);
+            setMonthlyRewardClaimed(true);
+          }
+        }}
+        onMonthlyProgressIncrement={() => {
+          setMonthlyProgress(prev => prev + 1);
+        }}
       />
       
       {/* Shop */}
@@ -1256,6 +1428,26 @@ export function GameBoard() {
           setCollectionButtonPulse(true);
           setTimeout(() => setCollectionButtonPulse(false), 150);
         }}
+      />
+      
+      {/* Streak Popup - shown before daily reward if streak >= 2 */}
+      <StreakPopup
+        isVisible={showStreakPopup && pendingStreak >= 2}
+        streakDay={pendingStreak}
+        onContinue={() => {
+          setShowStreakPopup(false);
+          setShowDailyReward(true);
+        }}
+      />
+      
+      {/* Daily Reward Popup */}
+      <DailyRewardPopup
+        isVisible={showDailyReward}
+        currentDay={pendingDailyReward}
+        previousStreak={dailyStreak}
+        onClaim={claimDailyReward}
+        progressBarRef={progressBarRef}
+        onStarArrived={handleStarArrived}
       />
       
       {/* Collections */}
@@ -1282,8 +1474,16 @@ export function GameBoard() {
               setCollectionsAfterWin(false);
               clearNoMoves();
               setShowNewGameButton(false);
+              setNoMovesShownOnce(false);
               newGame('solvable');
             }
+          } else if (collectionsAfterWin) {
+            // Collections was opened after win but no pending rewards - start new game
+            setCollectionsAfterWin(false);
+            clearNoMoves();
+            setShowNewGameButton(false);
+            setNoMovesShownOnce(false);
+            newGame('solvable');
           }
         }}
         petIcon="🐕"
@@ -1387,6 +1587,7 @@ export function GameBoard() {
             onTestWin={handleTestWin}
             onDropCollectionItem={handleDropCollectionItem}
             onTestLevelUp={handleTestLevelUp}
+            onNextDay={handleNextDay}
             onDebugClick={handleDebugClick}
             pulseKey={starPulseKey}
             onOtherPlayerStars={handleOtherPlayerStars}
@@ -1405,6 +1606,7 @@ export function GameBoard() {
               onClick={() => {
                 clearNoMoves();
                 setShowNewGameButton(false);
+                setNoMovesShownOnce(false);
                 newGame('solvable');
               }}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 rounded-full shadow-lg border border-white/20 transition-all hover:scale-105 animate-pulse"

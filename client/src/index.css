@@ -380,3 +380,19 @@ canvas {
     transform: scale(1);
   }
 }
+
+/* Collection reward icon pulse - grows then shrinks, chip launches at peak */
+@keyframes collection-reward-icon-pulse {
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(251, 146, 60, 0));
+  }
+  50% {
+    transform: scale(1.5);
+    filter: drop-shadow(0 0 12px rgba(251, 146, 60, 0.8));
+  }
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(251, 146, 60, 0));
+  }
+}
