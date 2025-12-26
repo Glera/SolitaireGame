@@ -78,3 +78,5 @@ export function RoomInfo({ roomType, gameVersion, gameMode }: RoomInfoProps) {
     </div>
   );
 }
+
+

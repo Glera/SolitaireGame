@@ -49,3 +49,5 @@ export function getRoomConfig(roomType?: RoomType): RoomConfig {
 export function getPremiumCardsCount(roomType?: RoomType): number {
   return getRoomConfig(roomType).premiumCardsCount;
 }
+
+

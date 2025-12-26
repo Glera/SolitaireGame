@@ -27,10 +27,26 @@ import { resetAllXP, setOnLevelUpCallback } from '../../lib/solitaire/experience
 import { LevelUpScreen } from './LevelUpScreen';
 import { PromoWidget } from './PromoWidget';
 import { Shop, type ShopItem } from './Shop';
-import { DailyRewardPopup } from './DailyRewardPopup';
+import { DailyRewardPopup, getRewardStars } from './DailyRewardPopup';
 import { StreakPopup } from './StreakPopup';
+import { LeaderboardPopup } from './LeaderboardPopup';
 import { GAME_VERSION } from '../../version';
 import { Suit } from '../../lib/solitaire/types';
+import { 
+  LeaderboardPlayer, 
+  SeasonInfo,
+  initializeLeaderboard, 
+  updateCurrentUserStars, 
+  simulateOtherPlayers,
+  saveCurrentPosition,
+  getPreviousPosition,
+  getSeasonInfo,
+  getSeasonStars,
+  addSeasonStars,
+  checkSeasonEnd,
+  getLeaderboardTrophies,
+  LeaderboardTrophy
+} from '../../lib/leaderboard';
 
 // Stars reward for level up (same as most expensive collection)
 const STARS_PER_LEVELUP = 50;
@@ -74,7 +90,8 @@ export function GameBoard() {
     getHint,
     clearHint,
     isDealing,
-    isAutoCollecting
+    isAutoCollecting,
+    collectAllAvailable
   } = useSolitaire();
   
   const { playSuccess } = useAudio();
@@ -231,6 +248,108 @@ export function GameBoard() {
     localStorage.setItem('solitaire_last_login_date', lastLoginDate);
   }, [lastLoginDate]);
   
+  // Leaderboard state
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardPlayers, setLeaderboardPlayers] = useState<LeaderboardPlayer[]>([]);
+  const [leaderboardOldPosition, setLeaderboardOldPosition] = useState(20);
+  const [leaderboardNewPosition, setLeaderboardNewPosition] = useState(20);
+  const [pendingLeaderboardShow, setPendingLeaderboardShow] = useState(false);
+  const [seasonInfo, setSeasonInfo] = useState<SeasonInfo>(() => getSeasonInfo());
+  const [seasonStars, setSeasonStars] = useState(() => getSeasonStars());
+  const [leaderboardTrophies, setLeaderboardTrophies] = useState<LeaderboardTrophy[]>(() => getLeaderboardTrophies());
+  const lastCheckedSeasonStarsRef = useRef(seasonStars);
+  
+  // Check for season end on mount and periodically
+  useEffect(() => {
+    const checkSeason = () => {
+      const result = checkSeasonEnd();
+      if (result.seasonEnded) {
+        // Season ended - refresh state
+        setSeasonInfo(getSeasonInfo());
+        setSeasonStars(getSeasonStars());
+        setLeaderboardTrophies(getLeaderboardTrophies());
+        const players = initializeLeaderboard(0);
+        setLeaderboardPlayers(players);
+        
+        // If trophy was awarded, show it
+        if (result.trophy) {
+          // Trophy will be shown in Collections trophies tab
+          console.log('🏆 Trophy awarded:', result.trophy);
+        }
+      }
+    };
+    
+    checkSeason();
+    const interval = setInterval(checkSeason, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Initialize leaderboard on mount
+  useEffect(() => {
+    const players = initializeLeaderboard(seasonStars);
+    setLeaderboardPlayers(players);
+    const position = players.findIndex(p => p.isCurrentUser) + 1;
+    setLeaderboardOldPosition(position);
+    setLeaderboardNewPosition(position);
+    saveCurrentPosition(position);
+    lastCheckedSeasonStarsRef.current = seasonStars;
+  }, []);
+  
+  // State for "overtaken" notification
+  const [showOvertakenNotification, setShowOvertakenNotification] = useState(false);
+  
+  // Simulate other players gaining stars periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const result = simulateOtherPlayers();
+      if (result.players.length > 0) {
+        setLeaderboardPlayers(result.players);
+        
+        // Update current position on the button
+        const currentUserIndex = result.players.findIndex(p => p.isCurrentUser);
+        if (currentUserIndex !== -1) {
+          setLeaderboardNewPosition(currentUserIndex + 1);
+        }
+        
+        // Show notification if someone overtook us
+        if (result.overtaken) {
+          setShowOvertakenNotification(true);
+          // Hide after 3 seconds
+          setTimeout(() => setShowOvertakenNotification(false), 3000);
+        }
+      }
+    }, 20000); // Every 20 seconds (more frequent for more action)
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Check for position improvement when season stars change
+  useEffect(() => {
+    if (seasonStars === lastCheckedSeasonStarsRef.current) return;
+    if (seasonStars <= lastCheckedSeasonStarsRef.current) {
+      lastCheckedSeasonStarsRef.current = seasonStars;
+      return;
+    }
+    
+    lastCheckedSeasonStarsRef.current = seasonStars;
+    
+    const result = updateCurrentUserStars(seasonStars);
+    setLeaderboardPlayers(result.players);
+    
+    if (result.positionImproved) {
+      setLeaderboardOldPosition(result.oldPosition);
+      setLeaderboardNewPosition(result.newPosition);
+      setPendingLeaderboardShow(true);
+    }
+  }, [seasonStars]);
+  
+  // Helper to add stars (updates both total and season)
+  const addStars = (amount: number) => {
+    setTotalStars(prev => prev + amount);
+    const newSeasonStars = addSeasonStars(amount);
+    setSeasonStars(newSeasonStars);
+  };
+  
   // Check for daily reward on mount
   useEffect(() => {
     const today = new Date().toDateString();
@@ -252,9 +371,9 @@ export function GameBoard() {
       newStreak = 1;
     }
     
-    // Set pending streak (actual day number) and reward (max 10 stars)
+    // Set pending streak (actual day number) and reward based on day
     setPendingStreak(newStreak);
-    setPendingDailyReward(Math.min(newStreak, 10));
+    setPendingDailyReward(getRewardStars(newStreak));
     
     // Show streak popup first if streak >= 2, otherwise show reward directly
     if (newStreak >= 2) {
@@ -267,7 +386,7 @@ export function GameBoard() {
   // Claim daily reward
   const claimDailyReward = () => {
     if (pendingDailyReward > 0) {
-      setTotalStars(prev => prev + pendingDailyReward);
+      addStars(pendingDailyReward);
       setDailyStreak(pendingStreak); // Save actual streak (not limited to 10)
       setLastLoginDate(new Date().toDateString());
       setShowDailyReward(false);
@@ -531,10 +650,8 @@ export function GameBoard() {
   
   // Register addFloatingScore function with floating score manager
   useEffect(() => {
-    console.log(`🎯 GameBoard: Registering addFloatingScore function`);
     setAddFloatingScoreFunction(addFloatingScore);
     return () => {
-      console.log(`🎯 GameBoard: Unregistering addFloatingScore function`);
       setAddFloatingScoreFunction(() => {});
     };
   }, [addFloatingScore]);
@@ -558,7 +675,7 @@ export function GameBoard() {
     if (showLevelUp && pendingLevelUp !== null && levelUpStarsAwardedRef.current !== pendingLevelUp) {
       // Add stars for level up immediately (persisted via localStorage effect)
       levelUpStarsAwardedRef.current = pendingLevelUp;
-      setTotalStars(prev => prev + STARS_PER_LEVELUP);
+      addStars(STARS_PER_LEVELUP);
       console.log(`⭐ Awarded ${STARS_PER_LEVELUP} stars for level ${pendingLevelUp}`);
     }
   }, [showLevelUp, pendingLevelUp]);
@@ -608,7 +725,7 @@ export function GameBoard() {
       playSuccess();
       setWinHandled(true);
       // Add stars for winning immediately (persisted via localStorage effect)
-      setTotalStars(prev => prev + STARS_PER_WIN);
+      addStars(STARS_PER_WIN);
       
       // Check if there are flying icons
       if (flyingIcons.length > 0) {
@@ -740,7 +857,7 @@ export function GameBoard() {
     
     // Add stars immediately for completed quests (persisted via localStorage effect)
     if (starsToAdd > 0) {
-      setTotalStars(prev => prev + starsToAdd);
+      addStars(starsToAdd);
     }
     
     // Sync displayed stars before showing daily quests
@@ -750,6 +867,34 @@ export function GameBoard() {
     // Always show daily quests screen if there was any progress to show
     setDailyQuestsAfterWin(true); // Mark that this was opened after winning
     setShowDailyQuests(true);
+  };
+  
+  // Try to show leaderboard if position improved, returns true if shown
+  const tryShowLeaderboard = (onAfterLeaderboard?: () => void): boolean => {
+    if (pendingLeaderboardShow) {
+      setPendingLeaderboardShow(false);
+      setShowLeaderboard(true);
+      // Store callback for after leaderboard closes
+      pendingAfterLeaderboardRef.current = onAfterLeaderboard || null;
+      return true;
+    }
+    return false;
+  };
+  
+  // Ref to store callback after leaderboard closes
+  const pendingAfterLeaderboardRef = useRef<(() => void) | null>(null);
+  
+  // Handle leaderboard close
+  const handleLeaderboardClose = () => {
+    // Save current position as "last viewed" for next animation
+    saveCurrentPosition(leaderboardNewPosition);
+    setShowLeaderboard(false);
+    // Execute pending callback if any
+    if (pendingAfterLeaderboardRef.current) {
+      const callback = pendingAfterLeaderboardRef.current;
+      pendingAfterLeaderboardRef.current = null;
+      callback();
+    }
   };
   
   // Handle daily quests close - check for collections, then start new game
@@ -763,8 +908,16 @@ export function GameBoard() {
     if (dailyQuestsAfterWin) {
       setDailyQuestsAfterWin(false);
       
+      // Check if leaderboard should be shown first
+      if (tryShowLeaderboard(proceedToCollectionsOrNewGame)) {
+        return; // Leaderboard will call proceedToCollectionsOrNewGame when closed
+      }
+      
       // Proceed to check collections
       proceedToCollectionsOrNewGame();
+    } else {
+      // Manual close - still check for leaderboard
+      tryShowLeaderboard();
     }
   };
   
@@ -880,6 +1033,25 @@ export function GameBoard() {
     localStorage.removeItem('solitaire_all_collections_rewarded');
     localStorage.removeItem('solitaire_trophies');
     localStorage.removeItem('solitaire_player_xp');
+    localStorage.removeItem('solitaire_leaderboard');
+    localStorage.removeItem('solitaire_leaderboard_position');
+    localStorage.removeItem('solitaire_season_info');
+    localStorage.removeItem('solitaire_season_stars');
+    localStorage.removeItem('solitaire_leaderboard_trophies');
+    
+    // Reset leaderboard state - create fresh leaderboard with low-star players
+    const newSeasonInfo = getSeasonInfo();
+    setSeasonInfo(newSeasonInfo);
+    setSeasonStars(0);
+    // Initialize leaderboard with 0 stars - this will create players with low stars
+    const freshPlayers = initializeLeaderboard(0);
+    setLeaderboardPlayers(freshPlayers);
+    const position = freshPlayers.findIndex(p => p.isCurrentUser) + 1;
+    setLeaderboardOldPosition(position);
+    setLeaderboardNewPosition(position);
+    saveCurrentPosition(position);
+    setPendingLeaderboardShow(false);
+    setLeaderboardTrophies([]);
     
     // Trigger reset of internal Collections state (like hasNewTrophy)
     setCollectionsResetKey(prev => prev + 1);
@@ -889,7 +1061,7 @@ export function GameBoard() {
   const handleTestWin = () => {
     playSuccess();
     // Add stars for winning immediately (persisted via localStorage effect)
-    setTotalStars(prev => prev + STARS_PER_WIN);
+    addStars(STARS_PER_WIN);
     
     // Check if there are flying icons
     if (flyingIcons.length > 0) {
@@ -924,9 +1096,9 @@ export function GameBoard() {
     // Calculate next streak (simulate consecutive day, no limit)
     const newStreak = dailyStreak + 1;
     
-    // Set pending streak and reward (max 10 stars even if streak is higher)
+    // Set pending streak and reward based on day
     setPendingStreak(newStreak);
-    setPendingDailyReward(Math.min(newStreak, 10));
+    setPendingDailyReward(getRewardStars(newStreak));
     
     // Show streak popup first if streak >= 2, otherwise show reward directly
     if (newStreak >= 2) {
@@ -949,7 +1121,7 @@ export function GameBoard() {
   // Handle shop purchase
   const handleShopPurchase = (item: ShopItem) => {
     // Add stars
-    setTotalStars(prev => prev + item.stars);
+    addStars(item.stars);
     
     // Collect items from collections
     let itemsToCollect = item.items;
@@ -1149,15 +1321,16 @@ export function GameBoard() {
     setStarPulseKey(prev => prev + 1);
   };
   
-  // Handle stars from other players - update both displayed and total stars
+  // Handle stars from other players - update displayed and total stars
+  // BUT NOT season stars (leaderboard) - these are not earned by the player
   const handleOtherPlayerStars = (count: number) => {
     // Guard against NaN
     const safeCount = typeof count === 'number' && !isNaN(count) ? count : 0;
     if (safeCount <= 0) return;
     
-    // Increment both displayed and total stars (persisted to localStorage via useEffect)
+    // Increment displayed and total stars only (NOT seasonStars for leaderboard)
     setDisplayedStars(prev => prev + safeCount);
-    setTotalStars(prev => prev + safeCount);
+    setTotalStars(prev => prev + safeCount); // Only totalStars, not addStars()
     // Trigger pulse animation
     setStarPulseKey(prev => prev + 1);
   };
@@ -1176,18 +1349,18 @@ export function GameBoard() {
   const hintStyle = hint ? `
     ${hint.cardId ? `
       [data-card-id="${hint.cardId}"] {
-        animation: hint-pulse 0.3s ease-in-out !important;
+        animation: hint-pulse 0.3s ease-in-out forwards !important;
       }
     ` : ''}
     ${hint.type === 'stock' ? `
       [data-stock-pile] {
-        animation: hint-pulse 0.3s ease-in-out !important;
+        animation: hint-pulse 0.3s ease-in-out forwards !important;
       }
     ` : ''}
     @keyframes hint-pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.08); }
-      100% { transform: scale(1); }
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.08); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
     }
   ` : '';
 
@@ -1236,9 +1409,33 @@ export function GameBoard() {
             position: 'relative',
                 zIndex: 2,
                 visibility: (showDailyQuests || showCollections) ? 'hidden' : 'visible',
-                pointerEvents: 'auto'
+                pointerEvents: 'auto',
+                userSelect: 'none',
+                WebkitUserSelect: 'none'
+              }}
+              onDoubleClick={(e) => {
+                // Double-click on empty area collects all available cards
+                // Check if click was on a card or pile (cards have data-card-id, piles have data-pile)
+                const target = e.target as HTMLElement;
+                const isOnCard = target.closest('[data-card-id]');
+                const isOnPile = target.closest('[data-pile]');
+                const isOnStock = target.closest('[data-stock-pile]');
+                if (!isOnCard && !isOnPile && !isOnStock && !isAutoCollecting) {
+                  collectAllAvailable();
+                }
               }}
             >
+            {/* Background layer for double-click detection */}
+            <div 
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: -1
+              }}
+            />
             {/* Top row: Foundation piles on LEFT, Stock and Waste on RIGHT - optimized for right-handed mobile users */}
               <div className="flex gap-1 items-start justify-between" style={{ width: '584px' }}>
                 <div className="flex gap-1">
@@ -1258,7 +1455,7 @@ export function GameBoard() {
             </div>
             
             {/* Bottom row: Tableau columns */}
-            <div className="flex gap-1">
+            <div className="flex gap-1" style={{ minHeight: '400px', paddingBottom: '20px' }}>
               {tableau.map((column, index) => (
                 <div key={index} className="min-h-32">
                   <TableauColumn cards={column} columnIndex={index} />
@@ -1277,7 +1474,7 @@ export function GameBoard() {
                   // Increment stars by the value each icon carries
                   const safeCount = typeof count === 'number' && !isNaN(count) ? count : 0;
                   if (safeCount <= 0) return;
-                  setTotalStars(prev => prev + safeCount);
+                  addStars(safeCount);
                   setDisplayedStars(prev => prev + safeCount);
                   // Trigger pulse animation
                   setStarPulseKey(prev => prev + 1);
@@ -1401,7 +1598,7 @@ export function GameBoard() {
         monthlyRewardClaimed={monthlyRewardClaimed}
         onMonthlyRewardClaim={() => {
           if (monthlyProgress >= MONTHLY_TARGET && !monthlyRewardClaimed) {
-            setTotalStars(prev => prev + MONTHLY_REWARD);
+            addStars(MONTHLY_REWARD);
             setMonthlyRewardClaimed(true);
           }
         }}
@@ -1413,7 +1610,10 @@ export function GameBoard() {
       {/* Shop */}
       <Shop
         isVisible={showShop}
-        onClose={() => setShowShop(false)}
+        onClose={() => {
+          setShowShop(false);
+          tryShowLeaderboard();
+        }}
         onPurchase={handleShopPurchase}
         onSubscribe={handleSubscribe}
         isSubscribed={isSubscribed}
@@ -1443,11 +1643,21 @@ export function GameBoard() {
       {/* Daily Reward Popup */}
       <DailyRewardPopup
         isVisible={showDailyReward}
-        currentDay={pendingDailyReward}
+        currentDay={pendingStreak}
         previousStreak={dailyStreak}
         onClaim={claimDailyReward}
         progressBarRef={progressBarRef}
         onStarArrived={handleStarArrived}
+      />
+      
+      {/* Leaderboard Popup */}
+      <LeaderboardPopup
+        isVisible={showLeaderboard}
+        onClose={handleLeaderboardClose}
+        players={leaderboardPlayers}
+        oldPosition={leaderboardOldPosition}
+        newPosition={leaderboardNewPosition}
+        seasonInfo={seasonInfo}
       />
       
       {/* Collections */}
@@ -1470,20 +1680,36 @@ export function GameBoard() {
               // Show next collection reward
               setTimeout(() => setShowCollections(true), 300);
             } else if (collectionsAfterWin) {
-              // No more rewards and was opened after win - start new game
+              // No more rewards and was opened after win - check leaderboard then start new game
               setCollectionsAfterWin(false);
+              const startNewGameFn = () => {
+                clearNoMoves();
+                setShowNewGameButton(false);
+                setNoMovesShownOnce(false);
+                newGame('solvable');
+              };
+              if (!tryShowLeaderboard(startNewGameFn)) {
+                startNewGameFn();
+              }
+            } else {
+              // Manual close - check leaderboard
+              tryShowLeaderboard();
+            }
+          } else if (collectionsAfterWin) {
+            // Collections was opened after win but no pending rewards - check leaderboard then start new game
+            setCollectionsAfterWin(false);
+            const startNewGameFn = () => {
               clearNoMoves();
               setShowNewGameButton(false);
               setNoMovesShownOnce(false);
               newGame('solvable');
+            };
+            if (!tryShowLeaderboard(startNewGameFn)) {
+              startNewGameFn();
             }
-          } else if (collectionsAfterWin) {
-            // Collections was opened after win but no pending rewards - start new game
-            setCollectionsAfterWin(false);
-            clearNoMoves();
-            setShowNewGameButton(false);
-            setNoMovesShownOnce(false);
-            newGame('solvable');
+          } else {
+            // Manual close - check leaderboard
+            tryShowLeaderboard();
           }
         }}
         petIcon="🐕"
@@ -1500,7 +1726,7 @@ export function GameBoard() {
           // Mark collection as rewarded
           setRewardedCollections(prev => new Set(Array.from(prev).concat(collectionId)));
           // Add stars
-          setTotalStars(prev => prev + reward);
+          addStars(reward);
           // Remove from new items - rewarded collections don't need viewing
           setNewItemsInCollections(prev => {
             const newSet = new Set(prev);
@@ -1531,7 +1757,7 @@ export function GameBoard() {
           // Mark all collections as rewarded
           setAllCollectionsRewarded(true);
           // Add stars
-          setTotalStars(prev => prev + reward);
+          addStars(reward);
           // Clear all new item notifications - everything is rewarded
           setNewItemsInCollections(new Set());
           setNewItemIds(new Set());
@@ -1550,7 +1776,7 @@ export function GameBoard() {
           
           // Calculate total reward from all collections
           const totalCollectionReward = collections.reduce((sum, c) => sum + c.reward, 0);
-          setTotalStars(prev => prev + totalCollectionReward);
+          addStars(totalCollectionReward);
           
           // Mark grand prize as not yet claimed so the animation can play
           setAllCollectionsRewarded(false);
@@ -1669,6 +1895,48 @@ export function GameBoard() {
               <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500">👑</span>
             )}
           </button>
+          
+          {/* Leaderboard Button */}
+          <button
+            onClick={() => {
+              // Update leaderboard with current season stars before showing
+              const currentSeasonStars = getSeasonStars();
+              const result = updateCurrentUserStars(currentSeasonStars);
+              setLeaderboardPlayers(result.players);
+              // Use oldPosition from last time we viewed leaderboard for animation
+              setLeaderboardOldPosition(result.oldPosition);
+              setLeaderboardNewPosition(result.newPosition);
+              setShowLeaderboard(true);
+              setShowOvertakenNotification(false); // Clear notification
+            }}
+            className={`relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-full shadow-lg border border-white/20 transition-all hover:scale-105 ${showOvertakenNotification ? 'animate-pulse ring-2 ring-red-500' : ''}`}
+          >
+            <span className="text-white font-semibold text-sm whitespace-nowrap min-w-[105px]">
+              Рейтинг {leaderboardNewPosition}/20
+            </span>
+            {leaderboardNewPosition <= 3 && (
+              <span className="text-sm">
+                {leaderboardNewPosition === 1 ? '🥇' : leaderboardNewPosition === 2 ? '🥈' : '🥉'}
+              </span>
+            )}
+            {/* Overtaken indicator */}
+            {showOvertakenNotification && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-[10px] items-center justify-center">⬇️</span>
+              </span>
+            )}
+          </button>
+          
+          {/* Overtaken notification toast */}
+          {showOvertakenNotification && (
+            <div 
+              className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-500/90 text-white text-sm px-3 py-1.5 rounded-lg shadow-lg"
+              style={{ animation: 'slideUp 0.3s ease-out' }}
+            >
+              😱 Вас обогнали в рейтинге!
+            </div>
+          )}
           
           {/* Collections Button */}
           <button

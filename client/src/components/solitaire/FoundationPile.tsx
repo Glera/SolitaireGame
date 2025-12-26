@@ -106,8 +106,8 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
     clearAllDropTargetHighlights();
   };
 
-  const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
-  const secondCard = cards.length > 1 ? cards[cards.length - 2] : null;
+  const topCard = cards && cards.length > 0 ? cards[cards.length - 1] : null;
+  const secondCard = cards && cards.length > 1 ? cards[cards.length - 2] : null;
   
   // Check if a card is flying TO this foundation (to show it early and avoid flicker)
   const incomingCard = animatingCard && 
@@ -241,7 +241,7 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
       />
       <Pile
         onDrop={handleDrop}
-        isEmpty={cards.length === 0}
+        isEmpty={!cards || cards.length === 0}
         className="bg-teal-600/20 border-teal-400/50 relative z-10"
       >
       {/* Show second card when top card is being moved to a NEW location */}

@@ -75,6 +75,7 @@ interface SolitaireStore extends GameState, DragState {
   // Auto-collect functionality
   isAutoCollecting: boolean;
   triggerAutoCollect: () => void;
+  collectAllAvailable: () => void; // Collect all available cards to foundation (double-click)
   stopAutoCollect: () => void;
   
   // No moves detection
@@ -555,10 +556,14 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     };
     
     // Reserve slot for this suit if not already reserved
-    const currentOrder = get().foundationSlotOrder;
-    if (!currentOrder.includes(suit)) {
-      const newOrder = [...currentOrder, suit];
-      set({ foundationSlotOrder: newOrder });
+    // Check with latest state to avoid race conditions when multiple cards move simultaneously
+    const latestOrder = get().foundationSlotOrder;
+    if (!latestOrder.includes(suit)) {
+      // Add suit to order - get fresh state again in case it changed
+      const freshOrder = get().foundationSlotOrder;
+      if (!freshOrder.includes(suit)) {
+        set({ foundationSlotOrder: [...freshOrder, suit] });
+      }
       
       // Wait for DOM update, then start animation
       setTimeout(() => {
@@ -910,7 +915,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     
     // Add card to foundation directly
     const newFoundations = { ...state.foundations };
-    newFoundations[suit] = [...newFoundations[suit], card];
+    newFoundations[suit] = [...(newFoundations[suit] || []), card];
     
     // Check if game is won (all 52 cards in foundations)
     const totalInFoundations = Object.values(newFoundations).reduce((sum, f) => sum + f.length, 0);
@@ -1175,6 +1180,46 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       return;
     }
     
+    // Before showing "no moves" - check if there are face-down cards that can still be revealed
+    // If player can still make tableau-to-tableau moves to reveal cards, don't show "no moves"
+    const hasFaceDownCards = state.tableau.some(col => col.some(c => !c.faceUp));
+    
+    if (hasFaceDownCards) {
+      // Check if ANY tableau-to-tableau move is possible (not just revealing moves)
+      for (let srcCol = 0; srcCol < state.tableau.length; srcCol++) {
+        const srcColumn = state.tableau[srcCol];
+        if (srcColumn.length === 0) continue;
+        
+        // Check each face-up card stack
+        for (let cardIdx = 0; cardIdx < srcColumn.length; cardIdx++) {
+          const card = srcColumn[cardIdx];
+          if (!card.faceUp) continue;
+          
+          for (let dstCol = 0; dstCol < state.tableau.length; dstCol++) {
+            if (srcCol === dstCol) continue;
+            
+            const dstColumn = state.tableau[dstCol];
+            if (dstColumn.length === 0) {
+              // Can move King to empty column (only useful if it reveals a card)
+              if (card.rank === 'K' && cardIdx > 0) {
+                // There's a move that reveals a card - don't show no moves
+                return;
+              }
+            } else {
+              const dstTop = dstColumn[dstColumn.length - 1];
+              if (dstTop.faceUp && canPlaceOnTableau(dstTop, card)) {
+                // Check if this move would reveal a face-down card
+                if (cardIdx > 0 && !srcColumn[cardIdx - 1].faceUp) {
+                  // This move reveals a card - don't show no moves
+                  return;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
     // No useful moves at all - show no moves popup
     set({ hasNoMoves: true });
   },
@@ -1313,7 +1358,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           if (suit) {
             cardsToMove.push({ card: topCard, targetSuit: suit, sourceType: 'tableau', sourceIndex: i });
             simTableau[i] = column.slice(0, -1);
-            simFoundations[suit] = [...simFoundations[suit], topCard];
+            simFoundations[suit] = [...(simFoundations[suit] || []), topCard];
             foundCard = true;
             break;
           }
@@ -1329,7 +1374,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           if (suit) {
             cardsToMove.push({ card: wasteCard, targetSuit: suit, sourceType: 'waste' });
             simWaste = simWaste.filter((_, idx) => idx !== i);
-            simFoundations[suit] = [...simFoundations[suit], wasteCard];
+            simFoundations[suit] = [...(simFoundations[suit] || []), wasteCard];
             foundCard = true;
             break;
           }
@@ -1344,7 +1389,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           if (suit) {
             cardsToMove.push({ card: { ...stockCard, faceUp: true }, targetSuit: suit, sourceType: 'stock' });
             simStock = simStock.filter((_, idx) => idx !== i);
-            simFoundations[suit] = [...simFoundations[suit], stockCard];
+            simFoundations[suit] = [...(simFoundations[suit] || []), stockCard];
             foundCard = true;
             break;
           }
@@ -1535,5 +1580,182 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         }
       }
     }, maxTime);
+  },
+  
+  // Collect all available cards to foundation (triggered by double-click)
+  // Unlike triggerAutoCollect, this works even if not all cards are revealed
+  // Uses launchFlyingCard for parallel animations (not animatingCard which is single)
+  collectAllAvailable: () => {
+    const state = get();
+    
+    if (state.isAutoCollecting || state.isWon) return;
+    
+    const rankOrder = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    
+    // Build simulation to get correct order of moves (respecting dependencies)
+    let simTableau = state.tableau.map(col => [...col]);
+    let simWaste = [...state.waste];
+    let simFoundations: Record<Suit, Card[]> = {
+      hearts: [...(state.foundations.hearts || [])],
+      diamonds: [...(state.foundations.diamonds || [])],
+      clubs: [...(state.foundations.clubs || [])],
+      spades: [...(state.foundations.spades || [])]
+    };
+    
+    // Helper to check if card can move in simulation
+    const canMoveInSim = (card: Card): boolean => {
+      const foundation = simFoundations[card.suit];
+      if (card.rank === 'A' && foundation.length === 0) return true;
+      if (foundation.length > 0) {
+        const topCard = foundation[foundation.length - 1];
+        return rankOrder.indexOf(card.rank) === rankOrder.indexOf(topCard.rank) + 1;
+      }
+      return false;
+    };
+    
+    // Find all cards in correct order
+    const cardsToMove: { card: Card; source: 'tableau' | 'waste'; columnIndex?: number }[] = [];
+    
+    let safetyCounter = 0;
+    while (safetyCounter < 30) {
+      safetyCounter++;
+      let foundCard = false;
+      
+      // Check tableau
+      for (let i = 0; i < simTableau.length; i++) {
+        const column = simTableau[i];
+        if (column.length > 0) {
+          const topCard = column[column.length - 1];
+          if (topCard.faceUp && canMoveInSim(topCard)) {
+            cardsToMove.push({ card: topCard, source: 'tableau', columnIndex: i });
+            // Remove card and flip the one underneath in simulation
+            const newColumn = column.slice(0, -1);
+            if (newColumn.length > 0 && !newColumn[newColumn.length - 1].faceUp) {
+              newColumn[newColumn.length - 1] = { ...newColumn[newColumn.length - 1], faceUp: true };
+            }
+            simTableau[i] = newColumn;
+            simFoundations[topCard.suit] = [...simFoundations[topCard.suit], topCard];
+            foundCard = true;
+            break;
+          }
+        }
+      }
+      
+      if (!foundCard && simWaste.length > 0) {
+        const topWaste = simWaste[simWaste.length - 1];
+        if (canMoveInSim(topWaste)) {
+          cardsToMove.push({ card: topWaste, source: 'waste' });
+          simWaste = simWaste.slice(0, -1);
+          simFoundations[topWaste.suit] = [...simFoundations[topWaste.suit], topWaste];
+          foundCard = true;
+        }
+      }
+      
+      if (!foundCard) break;
+    }
+    
+    if (cardsToMove.length === 0) return;
+    
+    // Animation settings
+    const FLIGHT_DURATION = 150;
+    const STAGGER_DELAY = 80;
+    
+    // Track cards that are "in flight" so we know order is maintained
+    const cardsInFlight = new Set<string>();
+    
+    // Launch parallel animations using launchFlyingCard
+    // Trust the simulation order - don't re-check canAdd (previous cards may still be flying)
+    cardsToMove.forEach((moveInfo, index) => {
+      setTimeout(() => {
+        const { card, source, columnIndex } = moveInfo;
+        
+        // Mark this card as in flight
+        cardsInFlight.add(card.id);
+        
+        // Get card element
+        const cardElement = document.querySelector(`[data-card-id="${card.id}"]`) as HTMLElement;
+        if (!cardElement) return;
+        
+        const startRect = cardElement.getBoundingClientRect();
+        
+        // Remove card from source IMMEDIATELY to prevent visual duplication
+        const stateBeforeRemove = get();
+        if (source === 'tableau' && columnIndex !== undefined) {
+          const newTableau = stateBeforeRemove.tableau.map((col, i) => {
+            if (i === columnIndex) {
+              const filtered = col.filter(c => c.id !== card.id);
+              // Flip card underneath
+              if (filtered.length > 0 && !filtered[filtered.length - 1].faceUp) {
+                filtered[filtered.length - 1] = { ...filtered[filtered.length - 1], faceUp: true };
+              }
+              return filtered;
+            }
+            return col;
+          });
+          set({ tableau: newTableau });
+        } else if (source === 'waste') {
+          const newWaste = stateBeforeRemove.waste.filter(c => c.id !== card.id);
+          set({ waste: newWaste });
+        }
+        
+        // Reserve foundation slot if needed
+        const currentOrder = get().foundationSlotOrder;
+        if (!currentOrder.includes(card.suit)) {
+          const freshOrder = get().foundationSlotOrder;
+          if (!freshOrder.includes(card.suit)) {
+            set({ foundationSlotOrder: [...freshOrder, card.suit] });
+          }
+        }
+        
+        // Wait for DOM to update with new slot
+        setTimeout(() => {
+          const foundationElement = document.querySelector(`[data-foundation-pile="${card.suit}"]`) as HTMLElement;
+          if (!foundationElement) return;
+          
+          // Trigger flying suit icon and score
+          const centerX = startRect.left + startRect.width / 2;
+          const centerY = startRect.top + startRect.height / 2;
+          import('../flyingSuitIconManager').then(({ addFlyingSuitIcon }) => {
+            addFlyingSuitIcon(card.suit, centerX, centerY);
+          });
+          import('../solitaire/scoring').then(({ CARD_POINTS }) => {
+            const points = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
+            get().addFloatingScore(points, startRect.left - 20, startRect.top + startRect.height / 2, card.rank, card.isPremium);
+          });
+          
+          const endRect = foundationElement.getBoundingClientRect();
+          
+          // Launch flying card animation (parallel capable)
+          import('../../components/solitaire/FlyingCard').then(({ launchFlyingCard }) => {
+            launchFlyingCard({ ...card, faceUp: true }, startRect, endRect, FLIGHT_DURATION, () => {
+              // Add card to foundation AFTER animation completes
+              const stateForFoundation = get();
+              const newFoundations = { ...stateForFoundation.foundations };
+              newFoundations[card.suit] = [...(newFoundations[card.suit] || []), card];
+              
+              awardCardXP(card.id);
+              set({ 
+                foundations: newFoundations,
+                moves: stateForFoundation.moves + 1 
+              });
+              
+              // Trigger collection item drop
+              import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
+                const fRect = foundationElement.getBoundingClientRect();
+                triggerCardToFoundation(fRect.left + fRect.width / 2, fRect.top + fRect.height / 2);
+              });
+              
+              // Check win
+              const winState = get();
+              const totalInFoundations = Object.values(winState.foundations).reduce((sum, f) => sum + f.length, 0);
+              if (totalInFoundations === 52 && !winState.isWon) {
+                awardWinXP();
+                set({ isWon: true });
+              }
+            });
+          });
+        }, 10);
+      }, index * STAGGER_DELAY);
+    });
   }
 }));

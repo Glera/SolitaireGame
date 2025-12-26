@@ -19,11 +19,24 @@ interface FlyingStar {
 
 interface DailyRewardPopupProps {
   isVisible: boolean;
-  currentDay: number; // 1-10
-  previousStreak: number; // 0-10, streak before today
+  currentDay: number; // 1, 2, 3... unlimited
+  previousStreak: number; // streak before today
   onClaim: () => void;
   progressBarRef?: React.RefObject<HTMLDivElement>;
   onStarArrived?: (count: number) => void;
+}
+
+// Calculate reward stars for a given day
+export function getRewardStars(day: number): number {
+  if (day < 10) {
+    return day; // Days 1-9: reward = day number
+  }
+  // Day 10+: base reward is 10 stars
+  // Every 5 days starting from 15 (15, 20, 25, 30...): reward = 15 stars
+  if (day >= 15 && day % 5 === 0) {
+    return 15;
+  }
+  return 10;
 }
 
 const MAX_FLYING_STARS = 10;
@@ -58,20 +71,20 @@ export function DailyRewardPopup({
   
   const wasReset = previousStreak === 0 || currentDay === 1;
   
-  // Calculate visible days range - show 5 days total (+-2 from current)
+  // Calculate visible days range - show 5 days: current +-2
+  // For day 1 and 2, show days 1-5
   let startDay: number, endDay: number;
-  if (currentDay <= 3) {
+  if (currentDay <= 2) {
     startDay = 1;
     endDay = 5;
-  } else if (currentDay >= 9) {
-    startDay = 6;
-    endDay = 10;
   } else {
     startDay = currentDay - 2;
     endDay = currentDay + 2;
   }
   
   const visibleDays = Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i);
+  const rewardStars = getRewardStars(currentDay);
+  const isBonusDay = currentDay >= 15 && currentDay % 5 === 0;
   
   const handleClaim = () => {
     if (isAnimating) return;
@@ -100,7 +113,7 @@ export function DailyRewardPopup({
     }
     
     // Create flying stars
-    const totalStars = currentDay;
+    const totalStars = getRewardStars(currentDay);
     const iconCount = Math.min(totalStars, MAX_FLYING_STARS);
     const starsPerIcon = Math.ceil(totalStars / iconCount);
     let remainingStars = totalStars;
@@ -195,10 +208,9 @@ export function DailyRewardPopup({
             <div className="mb-5">
               <div className="flex justify-center items-end gap-2">
                 {visibleDays.map((day) => {
-                  const isPast = day < currentDay;
                   const isCurrent = day === currentDay;
-                  // After day 10, reward stays at 10 stars
-                  const rewardStars = Math.min(day, 10);
+                  const dayReward = getRewardStars(day);
+                  const isDayBonus = day >= 15 && day % 5 === 0;
                   
                   if (isCurrent) {
                     // Current day - larger with prominent reward
@@ -206,35 +218,38 @@ export function DailyRewardPopup({
                       <div
                         key={day}
                         ref={rewardIconRef}
-                        className="relative w-20 h-28 rounded-xl flex flex-col items-center justify-center bg-gradient-to-b from-yellow-400 to-amber-500 shadow-xl shadow-yellow-500/50"
+                        className={`relative w-20 h-28 rounded-xl flex flex-col items-center justify-center shadow-xl ${
+                          isBonusDay 
+                            ? 'bg-gradient-to-b from-purple-400 to-purple-600 shadow-purple-500/50' 
+                            : 'bg-gradient-to-b from-yellow-400 to-amber-500 shadow-yellow-500/50'
+                        }`}
                       >
                         <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                          <span className="text-3xl">🎁</span>
+                          <span className="text-3xl">{isBonusDay ? '🎊' : '🎁'}</span>
                         </div>
-                        <span className="text-xs font-semibold text-amber-900 mt-2">День</span>
-                        <span className="text-2xl font-bold text-amber-900">{day}</span>
-                        <div className="flex items-center gap-1 mt-1 bg-amber-600/40 px-2 py-1 rounded-lg">
+                        <span className={`text-xs font-semibold mt-2 ${isBonusDay ? 'text-purple-200' : 'text-amber-900'}`}>День</span>
+                        <span className={`text-2xl font-bold ${isBonusDay ? 'text-white' : 'text-amber-900'}`}>{day}</span>
+                        <div className={`flex items-center gap-1 mt-1 px-2 py-1 rounded-lg ${isBonusDay ? 'bg-purple-800/40' : 'bg-amber-600/40'}`}>
                           <span className="text-2xl">⭐</span>
                           <span className="text-xl font-bold text-white">+{rewardStars}</span>
                         </div>
-                        {rewardStars === 10 && (
-                          <span className="text-[10px] text-amber-900 font-semibold mt-0.5">МАКС!</span>
-                        )}
                       </div>
                     );
                   }
                   
-                  // Past and future days - same gray style
+                  // Past and future days - gray style, with bonus indicator
                   return (
                     <div
                       key={day}
-                      className="relative w-14 h-20 rounded-xl flex flex-col items-center justify-center bg-slate-700/60 border border-slate-600/50"
+                      className={`relative w-14 h-20 rounded-xl flex flex-col items-center justify-center bg-slate-700/60 border ${
+                        isDayBonus ? 'border-purple-500/50' : 'border-slate-600/50'
+                      }`}
                     >
                       <span className="text-xs font-semibold text-slate-400">День</span>
                       <span className="text-xl font-bold text-slate-300">{day}</span>
                       <div className="flex items-center">
                         <span className="text-sm text-slate-500" style={{ filter: 'grayscale(1) opacity(0.6)' }}>⭐</span>
-                        <span className="text-sm text-slate-500">{rewardStars}</span>
+                        <span className={`text-sm ${isDayBonus ? 'text-purple-400' : 'text-slate-500'}`}>{dayReward}</span>
                       </div>
                     </div>
                   );
