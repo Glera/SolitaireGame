@@ -1,0 +1,265 @@
+import React from 'react';
+
+interface TreasureHuntIconProps {
+  keys: number;
+  isLocked: boolean;
+  requiredLevel: number;
+  isActive: boolean;
+  isPulsing?: boolean;
+  onClick: () => void;
+}
+
+export const TreasureHuntIcon: React.FC<TreasureHuntIconProps> = ({
+  keys,
+  isLocked,
+  requiredLevel,
+  isActive,
+  isPulsing = false,
+  onClick
+}) => {
+  return (
+    <button
+      onClick={onClick}
+      className={`
+        relative flex flex-col items-center justify-center
+        w-14 h-14 rounded-xl transition-all duration-300
+        ${isLocked 
+          ? 'bg-gradient-to-br from-gray-600 to-gray-800 border-2 border-gray-500 opacity-70' 
+          : isActive 
+            ? 'bg-gradient-to-br from-amber-500 to-orange-600 border-2 border-yellow-400 shadow-lg shadow-orange-500/50' 
+            : 'bg-gradient-to-br from-amber-400 to-orange-500 border-2 border-yellow-300'
+        }
+      `}
+      style={{
+        boxShadow: isActive && keys > 0 
+          ? '0 0 20px rgba(255, 200, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.3)' 
+          : 'inset 0 1px 0 rgba(255,255,255,0.2)',
+        transform: isPulsing ? 'scale(1.15)' : 'scale(1)',
+        transition: 'transform 0.15s ease-out'
+      }}
+    >
+      {/* Chest emoji */}
+      <span className="text-3xl" style={{ filter: isLocked ? 'grayscale(0.5) brightness(0.8)' : 'none' }}>
+        🎁
+      </span>
+      
+      {/* Level requirement for locked state */}
+      {isLocked && (
+        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2">
+          <span className="text-[10px] font-bold text-white bg-black/70 px-1.5 py-0.5 rounded whitespace-nowrap">
+            LVL {requiredLevel}
+          </span>
+        </div>
+      )}
+      
+      {/* Key counter */}
+      {!isLocked && (
+        <div className={`
+          absolute -top-1 -right-1 
+          min-w-[20px] h-5 px-1
+          flex items-center justify-center
+          rounded-full text-xs font-bold
+          ${keys > 0 
+            ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-amber-900 border border-yellow-300' 
+            : 'bg-gray-600 text-gray-300 border border-gray-500'
+          }
+        `}>
+          <span className="mr-0.5">🔑</span>
+          {keys}
+        </div>
+      )}
+      
+      {/* Exclamation mark when keys > 0 */}
+      {!isLocked && keys > 0 && (
+        <div className="absolute -top-2 -left-1">
+          <div className="w-5 h-5 rounded-full bg-red-500 border-2 border-white flex items-center justify-center">
+            <span className="text-white text-xs font-bold">!</span>
+          </div>
+        </div>
+      )}
+      
+      {/* Shine effect for active state */}
+      {isActive && !isLocked && (
+        <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
+          <div 
+            className="absolute inset-0 animate-pulse opacity-30"
+            style={{
+              background: 'linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.5) 50%, transparent 70%)'
+            }}
+          />
+        </div>
+      )}
+    </button>
+  );
+};
+
+// Flying key animation component - parabolic trajectory like collection icons
+interface FlyingKeyProps {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  onComplete: () => void;
+}
+
+export const FlyingKey: React.FC<FlyingKeyProps> = ({
+  startX,
+  startY,
+  endX,
+  endY,
+  onComplete
+}) => {
+  const elementRef = React.useRef<HTMLDivElement>(null);
+  const startTimeRef = React.useRef<number | null>(null);
+  const rafRef = React.useRef<number>();
+  const onCompleteRef = React.useRef(onComplete);
+  const [isVisible, setIsVisible] = React.useState(true);
+  
+  // Update ref to avoid stale closure
+  React.useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+  
+  React.useEffect(() => {
+    if (!elementRef.current) return;
+    
+    // Physics parameters for parabolic flight (same as FlyingCollectionIcon)
+    const totalDuration = 800; // ms
+    const gravity = 1200; // pixels per second^2
+    
+    // Calculate horizontal distance and direction
+    const dx = endX - startX;
+    const dy = endY - startY;
+    
+    // Time in seconds
+    const t = totalDuration / 1000;
+    const vx0 = dx / t; // Horizontal velocity (constant)
+    
+    // For vertical: endY = startY + vy0 * t + 0.5 * g * t^2
+    // vy0 = (endY - startY - 0.5 * g * t^2) / t
+    const vy0 = (dy - 0.5 * gravity * t * t) / t;
+    
+    const animate = (timestamp: number) => {
+      if (!startTimeRef.current) {
+        startTimeRef.current = timestamp;
+      }
+      
+      const elapsed = timestamp - startTimeRef.current;
+      const progress = Math.min(elapsed / totalDuration, 1);
+      const timeInSeconds = elapsed / 1000;
+      
+      // Calculate position using kinematic equations
+      const x = startX + vx0 * timeInSeconds;
+      const y = startY + vy0 * timeInSeconds + 0.5 * gravity * timeInSeconds * timeInSeconds;
+      
+      // Scale: slight pulse at start, shrink on impact
+      let scale = 1;
+      if (progress < 0.3) {
+        scale = 1 + Math.sin(progress / 0.3 * Math.PI) * 0.3; // Pulse up to 1.3
+      } else if (progress > 0.85) {
+        // Quick bounce on impact
+        const impactProgress = (progress - 0.85) / 0.15;
+        scale = 1 - impactProgress * 0.5; // Shrink to 0.5
+      }
+      
+      // Update position directly via DOM
+      if (elementRef.current) {
+        // Add slight rotation based on velocity direction
+        const currentVy = vy0 + gravity * timeInSeconds;
+        const angle = Math.atan2(currentVy, vx0) * (180 / Math.PI);
+        elementRef.current.style.left = `${x}px`;
+        elementRef.current.style.top = `${y}px`;
+        elementRef.current.style.transform = `translate(-50%, -50%) scale(${scale}) rotate(${angle * 0.3}deg)`;
+      }
+      
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate);
+      } else {
+        // Animation complete - instant disappear
+        setIsVisible(false);
+        onCompleteRef.current();
+      }
+    };
+    
+    rafRef.current = requestAnimationFrame(animate);
+    
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [startX, startY, endX, endY]);
+  
+  if (!isVisible) return null;
+  
+  return (
+    <div
+      ref={elementRef}
+      className="fixed pointer-events-none z-[9999]"
+      style={{
+        left: startX,
+        top: startY,
+        transform: 'translate(-50%, -50%)',
+        fontSize: '28px',
+        filter: 'drop-shadow(0 2px 8px rgba(255, 200, 0, 0.8))',
+        willChange: 'transform, left, top'
+      }}
+    >
+      🔑
+    </div>
+  );
+};
+
+// Manager for flying keys
+let flyingKeyId = 0;
+const flyingKeysContainer: { id: number; props: Omit<FlyingKeyProps, 'onComplete'> }[] = [];
+let updateFlyingKeys: ((keys: typeof flyingKeysContainer) => void) | null = null;
+let onFlyingKeyCompleteCallback: (() => void) | null = null;
+
+export function registerFlyingKeysUpdater(updater: (keys: typeof flyingKeysContainer) => void) {
+  updateFlyingKeys = updater;
+}
+
+export function setOnFlyingKeyCompleteCallback(callback: () => void) {
+  onFlyingKeyCompleteCallback = callback;
+}
+
+export function launchFlyingKey(startX: number, startY: number, endX: number, endY: number) {
+  const id = flyingKeyId++;
+  flyingKeysContainer.push({ id, props: { startX, startY, endX, endY } });
+  updateFlyingKeys?.([...flyingKeysContainer]);
+}
+
+export function removeFlyingKey(id: number) {
+  const index = flyingKeysContainer.findIndex(k => k.id === id);
+  if (index !== -1) {
+    flyingKeysContainer.splice(index, 1);
+    updateFlyingKeys?.([...flyingKeysContainer]);
+    // Trigger callback when key completes
+    onFlyingKeyCompleteCallback?.();
+  }
+}
+
+// Container component for flying keys
+export const FlyingKeysContainer: React.FC = () => {
+  const [keys, setKeys] = React.useState<typeof flyingKeysContainer>([]);
+  
+  React.useEffect(() => {
+    registerFlyingKeysUpdater(setKeys);
+    return () => {
+      registerFlyingKeysUpdater(() => {});
+    };
+  }, []);
+  
+  return (
+    <>
+      {keys.map(({ id, props }) => (
+        <FlyingKey
+          key={id}
+          {...props}
+          onComplete={() => removeFlyingKey(id)}
+        />
+      ))}
+    </>
+  );
+};

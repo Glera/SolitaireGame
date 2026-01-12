@@ -62,6 +62,7 @@ export const LevelUpScreen: React.FC<LevelUpScreenProps> = ({
   const [showContent, setShowContent] = useState(false);
   const [starsLaunched, setStarsLaunched] = useState(false);
   const [rewardHidden, setRewardHidden] = useState(false);
+  const [canClose, setCanClose] = useState(false);
   const rewardBadgeRef = useRef<HTMLDivElement>(null);
   const starsArrivedRef = useRef(0);
   const expectedStarsRef = useRef(0);
@@ -72,6 +73,7 @@ export const LevelUpScreen: React.FC<LevelUpScreenProps> = ({
       setShowContent(false);
       setStarsLaunched(false);
       setRewardHidden(false);
+      setCanClose(false);
       starsArrivedRef.current = 0;
       const timer = setTimeout(() => setShowContent(true), 100);
       return () => clearTimeout(timer);
@@ -79,6 +81,7 @@ export const LevelUpScreen: React.FC<LevelUpScreenProps> = ({
       setShowContent(false);
       setStarsLaunched(false);
       setRewardHidden(false);
+      setCanClose(false);
       setFlyingStars([]);
     }
   }, [isVisible]);
@@ -189,8 +192,10 @@ export const LevelUpScreen: React.FC<LevelUpScreenProps> = ({
     starsArrivedRef.current++;
     onStarArrived?.(star.value);
     
-    // When all stars have arrived, close after a brief delay
+    // When all stars have arrived, allow closing
     if (starsArrivedRef.current >= expectedStarsRef.current) {
+      setCanClose(true);
+      // Auto-close after a brief delay
       setTimeout(() => {
         onComplete();
       }, 500);
@@ -200,7 +205,10 @@ export const LevelUpScreen: React.FC<LevelUpScreenProps> = ({
   if (!isVisible) return null;
 
   return ReactDOM.createPortal(
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center">
+      <div 
+        className="fixed inset-0 z-[10000] flex items-center justify-center"
+        onClick={canClose ? onComplete : undefined}
+      >
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/70 transition-opacity duration-300"

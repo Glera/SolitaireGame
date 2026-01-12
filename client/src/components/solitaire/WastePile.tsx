@@ -5,6 +5,7 @@ import { Card as CardType } from '../../lib/solitaire/types';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 import { useTouchDrag } from '../../hooks/useTouchDrag';
+import { cardHasKey } from '../../lib/liveops/keyManager';
 
 interface WastePileProps {
   cards: CardType[];
@@ -303,6 +304,7 @@ export function WastePile({ cards }: WastePileProps) {
             card={fourthCard}
             isPlayable={false}
             isClickable={false}
+            hasKey={cardHasKey(fourthCard.id)}
           />
         </div>
       )}
@@ -360,6 +362,7 @@ export function WastePile({ cards }: WastePileProps) {
               isDragging={isTop && isTopCardBeingDragged()}
               isAnimating={isTop && isTopCardAnimating()}
               isClickable={isTop}
+              hasKey={cardHasKey(card.id)}
             />
           </div>
         );

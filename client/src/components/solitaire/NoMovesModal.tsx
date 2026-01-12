@@ -10,12 +10,18 @@ export function NoMovesModal({ isVisible, onNewGame, onClose }: NoMovesModalProp
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop - no click handler, only buttons close the modal */}
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      onClick={onClose}
+    >
+      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60" />
       
       {/* Modal */}
-      <div className="relative bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 shadow-2xl border border-slate-600 max-w-sm mx-4 animate-fade-in">
+      <div 
+        className="relative bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 shadow-2xl border border-slate-600 max-w-sm mx-4 animate-fade-in"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Icon */}
         <div className="text-center mb-4">
           <div className="text-5xl mb-2">🤔</div>

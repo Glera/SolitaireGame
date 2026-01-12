@@ -121,8 +121,12 @@ export function StreakPopup({ isVisible, streakDay, onContinue }: StreakPopupPro
       <div 
         className="fixed inset-0 z-[9998] flex items-center justify-center"
         style={{ backgroundColor: 'rgba(0, 0, 0, 0.9)' }}
+        onClick={onClose}
       >
-        <div className="bg-gradient-to-b from-orange-900/90 to-slate-900 rounded-2xl p-6 mx-4 max-w-sm w-full shadow-2xl border border-orange-500/50 animate-streak-appear">
+        <div 
+          className="bg-gradient-to-b from-orange-900/90 to-slate-900 rounded-2xl p-6 mx-4 max-w-sm w-full shadow-2xl border border-orange-500/50 animate-streak-appear"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Title */}
           <div className="text-center mb-4 mt-2">
             <h2 className="text-xl font-bold text-orange-200">Серия входов!</h2>

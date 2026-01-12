@@ -344,8 +344,8 @@ export function PromoWidget({ onPurchase, onStarArrived, onCollectionCardArrived
       {/* Promo Widget Button */}
       <button
         onClick={() => !isAnimating && setShowModal(true)}
-        className="relative flex flex-col items-center gap-1 p-2 bg-gradient-to-b from-amber-500 to-orange-600 rounded-xl shadow-lg border border-amber-400/50 hover:scale-105 transition-transform"
-        style={{ minWidth: '70px', opacity: isAnimating ? 0.5 : 1 }}
+        className="relative flex flex-col items-center justify-center w-14 h-14 bg-gradient-to-b from-amber-500 to-orange-600 rounded-xl shadow-lg border border-amber-400/50 hover:scale-105 transition-transform"
+        style={{ opacity: isAnimating ? 0.5 : 1 }}
         disabled={isAnimating}
       >
         {/* Sale badge */}
@@ -354,11 +354,13 @@ export function PromoWidget({ onPurchase, onStarArrived, onCollectionCardArrived
         </div>
         
         {/* Icon */}
-        <div className="text-2xl">🎴</div>
+        <div className="text-3xl">🎴</div>
         
         {/* Timer */}
-        <div className="text-[10px] text-white font-mono bg-black/30 px-1.5 py-0.5 rounded">
-          {formatTime(timeLeft.hours)}:{formatTime(timeLeft.minutes)}:{formatTime(timeLeft.seconds)}
+        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2">
+          <div className="text-[9px] text-white font-mono bg-black/70 px-1 py-0.5 rounded whitespace-nowrap">
+            {formatTime(timeLeft.hours)}:{formatTime(timeLeft.minutes)}:{formatTime(timeLeft.seconds)}
+          </div>
         </div>
       </button>
       

@@ -936,15 +936,27 @@ export function Collections({
   
   // Handle selecting a collection - also marks it as viewed and triggers item pulse
   const handleSelectCollection = (collection: Collection) => {
-    // Find new items in this collection to pulse them
+    // Find new items in this collection to pulse them sequentially
     const newItemsInThisCollection = collection.items
       .filter(item => newItemIds?.has(item.id))
       .map(item => item.id);
     
     if (newItemsInThisCollection.length > 0) {
-      setPulsingItems(new Set(newItemsInThisCollection));
-      // Stop pulsing after animation (2 pulses * 0.5s = 1s)
-      setTimeout(() => setPulsingItems(new Set()), 1000);
+      // Pulse items one by one with delay
+      newItemsInThisCollection.forEach((itemId, index) => {
+        setTimeout(() => {
+          setPulsingItems(prev => new Set([...prev, itemId]));
+          
+          // Remove this item from pulsing after its animation (2 pulses * 0.5s = 1s)
+          setTimeout(() => {
+            setPulsingItems(prev => {
+              const next = new Set(prev);
+              next.delete(itemId);
+              return next;
+            });
+          }, 1000);
+        }, index * 400); // 400ms delay between each item
+      });
     }
     
     setSelectedCollection(collection);

@@ -151,7 +151,10 @@ export function getCollectionsButtonPosition() {
 // Drop chance per card: calibrated so 95% chance of at least 1 drop per game (52 cards)
 // P(no drop per card)^52 = 0.05 → P(no drop per card) = 0.05^(1/52) ≈ 0.9440
 // P(drop per card) = 1 - 0.9440 ≈ 0.056 = 5.6%
-const DROP_CHANCE_PER_CARD = 0.056;
+// Drop chance per card moved to foundation
+// Target: first collection (9 items) in ~4 games
+// 52 cards/game * boost(3) * DROP_CHANCE = 2.25 items/game
+const DROP_CHANCE_PER_CARD = 0.015;
 
 // Calculate collection weight for item selection (cheaper = more likely)
 // Using squared inverse for more aggressive differentiation:
@@ -182,6 +185,54 @@ const STARTER_COLLECTION_BOOST = 20;
 // Boost multiplier for the next incomplete collection after starter (sequential progression)
 const NEXT_COLLECTION_BOOST = 8;
 
+// ============ PSEUDO-RANDOM GUARANTEED DROPS FOR STARTER COLLECTION ============
+// Track cards moved to foundation in current game session
+let cardsMovedThisGame = 0;
+const STARTER_CARDS_KEY = 'solitaire_starter_cards_moved';
+
+// Get cards moved count (persists across page reloads within a game)
+function getCardsMovedThisGame(): number {
+  const stored = localStorage.getItem(STARTER_CARDS_KEY);
+  return stored ? parseInt(stored, 10) : 0;
+}
+
+// Increment and save cards moved
+function incrementCardsMoved(): number {
+  cardsMovedThisGame = getCardsMovedThisGame() + 1;
+  localStorage.setItem(STARTER_CARDS_KEY, cardsMovedThisGame.toString());
+  return cardsMovedThisGame;
+}
+
+// Reset cards moved (called when new game starts)
+export function resetCardsMovedForCollection(): void {
+  cardsMovedThisGame = 0;
+  localStorage.setItem(STARTER_CARDS_KEY, '0');
+}
+
+// Guaranteed drop schedule for starter collection (9 items over 4 games)
+// Game 1: cards 18, 40 → 2 items
+// Game 2: cards 18, 40 → 2 items  
+// Game 3: cards 12, 28, 44 → 3 items
+// Game 4: cards 18, 40 → 2 items
+// Total: 9 items in 4 games
+function shouldGuaranteedDrop(collectedCount: number, cardNumber: number): boolean {
+  // Which "virtual game" are we in based on collected items?
+  // 0-1 collected = game 1, 2-3 = game 2, 4-6 = game 3, 7-8 = game 4
+  if (collectedCount <= 1) {
+    // Game 1 pattern: drop at cards 18, 40
+    return cardNumber === 18 || cardNumber === 40;
+  } else if (collectedCount <= 3) {
+    // Game 2 pattern: drop at cards 18, 40
+    return cardNumber === 18 || cardNumber === 40;
+  } else if (collectedCount <= 6) {
+    // Game 3 pattern: drop at cards 12, 28, 44
+    return cardNumber === 12 || cardNumber === 28 || cardNumber === 44;
+  } else {
+    // Game 4 pattern: drop at cards 18, 40
+    return cardNumber === 18 || cardNumber === 40;
+  }
+}
+
 // Find the next incomplete collection in order (by reward ascending)
 function findNextIncompleteCollection(
   collections: Array<{ id: string; reward: number; items: Array<{ collected: boolean }> }>,
@@ -208,23 +259,38 @@ export function tryCollectionDrop(
   // Check if starter collection is fully collected
   const starterCollection = collections.find(c => c.id === STARTER_COLLECTION_ID);
   const starterCollectionComplete = starterCollection?.items.every(i => i.collected) ?? true;
+  const starterCollectedCount = starterCollection?.items.filter(i => i.collected).length ?? 0;
+  
+  // Track cards moved for guaranteed drops
+  const currentCardNumber = incrementCardsMoved();
   
   // Find the next incomplete collection after starter
   const nextCollectionId = starterCollectionComplete 
     ? findNextIncompleteCollection(collections, true)
     : null;
   
-  // First, check if drop happens at all
-  // If starter collection is incomplete, increase drop chance significantly
-  // Also boost when there's an incomplete collection to work on
-  let effectiveDropChance = DROP_CHANCE_PER_CARD;
+  // ============ GUARANTEED DROP CHECK FOR STARTER COLLECTION ============
+  // If starter collection is incomplete, check for guaranteed drop
+  let guaranteedStarterDrop = false;
   if (!starterCollectionComplete) {
-    effectiveDropChance *= 3; // 3x more drops while collecting starter
-  } else if (nextCollectionId) {
-    effectiveDropChance *= 1.5; // 1.5x more drops while working on next collection
+    guaranteedStarterDrop = shouldGuaranteedDrop(starterCollectedCount, currentCardNumber);
+  }
+  
+  // First, check if drop happens at all
+  let shouldDrop = guaranteedStarterDrop;
+  
+  if (!shouldDrop) {
+    // Random drop chance
+    let effectiveDropChance = DROP_CHANCE_PER_CARD;
+    if (!starterCollectionComplete) {
+      effectiveDropChance *= 2; // Some random drops too
+    } else if (nextCollectionId) {
+      effectiveDropChance *= 1.5; // 1.5x more drops while working on next collection
+    }
+    shouldDrop = Math.random() < effectiveDropChance;
   }
     
-  if (Math.random() >= effectiveDropChance) {
+  if (!shouldDrop) {
     return null;
   }
   

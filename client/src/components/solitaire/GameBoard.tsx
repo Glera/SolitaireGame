@@ -47,6 +47,28 @@ import {
   getLeaderboardTrophies,
   LeaderboardTrophy
 } from '../../lib/leaderboard';
+import {
+  TreasureHuntEvent,
+  ChestReward,
+  getTreasureHuntEvent,
+  saveTreasureHuntEvent,
+  activateTreasureHunt,
+  isEventAvailable,
+  getRequiredLevel,
+  addKeys,
+  resetTreasureHuntEvent
+} from '../../lib/liveops/treasureHunt';
+import { 
+  distributeKeys, 
+  cardHasKey, 
+  collectKeyFromCard, 
+  setOnKeyCollectedCallback,
+  setOnKeysChangedCallback,
+  clearAllKeys 
+} from '../../lib/liveops/keyManager';
+import { TreasureHuntIcon, FlyingKeysContainer, launchFlyingKey, setOnFlyingKeyCompleteCallback } from './TreasureHuntIcon';
+import { TreasureHuntPromo } from './TreasureHuntPromo';
+import { TreasureHuntPopup } from './TreasureHuntPopup';
 
 // Stars reward for level up (same as most expensive collection)
 const STARS_PER_LEVELUP = 50;
@@ -130,33 +152,33 @@ export function GameBoard() {
     }
   }, [totalStars]);
   
-  // Default daily quests
+  // Default daily quests - designed for 1, 3, 5 games completion
   const defaultDailyQuests: Quest[] = [
     {
       id: 'daily-games',
-      title: 'Разложи пасьянсы',
-      description: 'Успешно разложи 3 пасьянса',
+      title: 'Первая победа',
+      description: 'Успешно разложи 1 пасьянс',
       current: 0,
-      target: 3,
-      reward: 10,
+      target: 1,
+      reward: 5,
       completed: false
     },
     {
       id: 'daily-aces',
       title: 'Собери тузы',
-      description: 'Собери 24 туза в основание',
+      description: 'Собери 12 тузов в основание',
       current: 0,
-      target: 24,
-      reward: 15,
+      target: 12,
+      reward: 10,
       completed: false
     },
     {
-      id: 'daily-minimal',
-      title: 'Минималист',
-      description: 'Разложи пасьянс, перелистнув колоду не более 3 раз',
+      id: 'daily-wins',
+      title: 'Мастер пасьянса',
+      description: 'Успешно разложи 5 пасьянсов',
       current: 0,
-      target: 1,
-      reward: 5,
+      target: 5,
+      reward: 15,
       completed: false
     }
   ];
@@ -180,6 +202,16 @@ export function GameBoard() {
   
   const [dailyQuests, setDailyQuests] = useState<Quest[]>(() => {
     const saved = localStorage.getItem('solitaire_daily_quests');
+    const savedDate = localStorage.getItem('solitaire_daily_quests_date');
+    const today = new Date().toDateString();
+    
+    // Check if it's a new day - reset quests
+    if (savedDate !== today) {
+      localStorage.setItem('solitaire_daily_quests_date', today);
+      localStorage.removeItem('solitaire_aces_collected'); // Reset aces too
+      return defaultDailyQuests;
+    }
+    
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -199,6 +231,7 @@ export function GameBoard() {
   // Save daily quests to localStorage when they change
   useEffect(() => {
     localStorage.setItem('solitaire_daily_quests', JSON.stringify(dailyQuests));
+    localStorage.setItem('solitaire_daily_quests_date', new Date().toDateString());
   }, [dailyQuests]);
   
   // Save aces collected to localStorage when it changes
@@ -298,6 +331,35 @@ export function GameBoard() {
   // State for "overtaken" notification
   const [showOvertakenNotification, setShowOvertakenNotification] = useState(false);
   
+  // Treasure Hunt LiveOps event state
+  const [treasureHuntEvent, setTreasureHuntEvent] = useState<TreasureHuntEvent>(() => getTreasureHuntEvent());
+  const [showTreasureHunt, setShowTreasureHunt] = useState(false);
+  const [playerLevel, setPlayerLevel] = useState(() => {
+    const saved = localStorage.getItem('solitaire_player_level');
+    return saved ? parseInt(saved, 10) : 1;
+  });
+  const treasureHuntIconRef = useRef<HTMLDivElement>(null);
+  const [treasureHuntPulse, setTreasureHuntPulse] = useState(false);
+  const [showTreasureHuntPromo, setShowTreasureHuntPromo] = useState(false);
+  const [treasureHuntPromoShown, setTreasureHuntPromoShown] = useState(() => {
+    return localStorage.getItem('solitaire_treasure_hunt_promo_shown') === 'true';
+  });
+  const [pendingTreasureHuntPromo, setPendingTreasureHuntPromo] = useState(false);
+  
+  // Setup flying key complete callback for pulse and key counter update
+  useEffect(() => {
+    setOnFlyingKeyCompleteCallback(() => {
+      // Update key counter exactly when flying key disappears
+      const updatedEvent = addKeys(1);
+      setTreasureHuntEvent(updatedEvent);
+      
+      // Pulse animation
+      setTreasureHuntPulse(true);
+      setTimeout(() => setTreasureHuntPulse(false), 150);
+    });
+    return () => setOnFlyingKeyCompleteCallback(() => {});
+  }, []);
+  
   // Simulate other players gaining stars periodically
   useEffect(() => {
     const interval = setInterval(() => {
@@ -350,7 +412,79 @@ export function GameBoard() {
     setSeasonStars(newSeasonStars);
   };
   
-  // Check for daily reward on mount
+  // Force re-render counter for key distribution updates
+  const [, forceKeyUpdate] = useState(0);
+  
+  // Register callback for key distribution updates
+  useEffect(() => {
+    setOnKeysChangedCallback(() => {
+      forceKeyUpdate(n => n + 1);
+    });
+    return () => setOnKeysChangedCallback(() => {});
+  }, []);
+  
+  // Distribute keys when game starts (after dealing animation completes)
+  useEffect(() => {
+    if (!treasureHuntEvent.active) return;
+    if (isDealing) return; // Wait for dealing to complete
+    
+    // Get face-down cards from tableau (preferred for keys)
+    const faceDownCards = tableau
+      .flat()
+      .filter(c => !c.faceUp)
+      .map(c => c.id);
+    
+    // Get face-up cards from tableau
+    const faceUpCards = tableau
+      .flat()
+      .filter(c => c.faceUp)
+      .map(c => c.id);
+    
+    // Also include waste pile top card as face-up
+    if (waste.length > 0) {
+      faceUpCards.push(waste[waste.length - 1].id);
+    }
+    
+    distributeKeys(faceDownCards, faceUpCards, treasureHuntEvent.active);
+  }, [treasureHuntEvent.active, isDealing]);
+  
+  // End initial dealing animation after cards have animated in
+  useEffect(() => {
+    if (isDealing) {
+      const timer = setTimeout(() => {
+        useSolitaire.setState({ isDealing: false, dealingCardIds: new Set() });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+  
+  // Setup key collection callback
+  useEffect(() => {
+    setOnKeyCollectedCallback((cardId, startX, startY) => {
+      const iconElement = treasureHuntIconRef.current;
+      
+      if (iconElement) {
+        const iconRect = iconElement.getBoundingClientRect();
+        
+        // Launch flying key animation from card's START position to treasure hunt icon
+        launchFlyingKey(
+          startX,
+          startY,
+          iconRect.left + iconRect.width / 2,
+          iconRect.top + iconRect.height / 2
+        );
+      }
+      
+      // Key counter update happens via onFlyingKeyCompleteCallback (synced with animation end)
+    });
+    
+    return () => setOnKeyCollectedCallback(() => {});
+  }, []);
+  
+  // Track if daily reward needs to be shown (checked on mount, shown before new game)
+  const [pendingDailyRewardCheck, setPendingDailyRewardCheck] = useState(false);
+  
+  // Check for daily reward on mount - but don't show yet, just mark as pending
   useEffect(() => {
     const today = new Date().toDateString();
     if (lastLoginDate === today) {
@@ -374,16 +508,27 @@ export function GameBoard() {
     // Set pending streak (actual day number) and reward based on day
     setPendingStreak(newStreak);
     setPendingDailyReward(getRewardStars(newStreak));
+    // Mark that we need to show daily reward before next new game
+    setPendingDailyRewardCheck(true);
+  }, []); // Only on mount
+  
+  // Function to show daily reward if pending
+  const tryShowDailyReward = (): boolean => {
+    if (!pendingDailyRewardCheck || pendingDailyReward <= 0) {
+      return false;
+    }
     
     // Show streak popup first if streak >= 2, otherwise show reward directly
-    if (newStreak >= 2) {
+    if (pendingStreak >= 2) {
       setShowStreakPopup(true);
     } else {
       setShowDailyReward(true);
     }
-  }, []); // Only on mount
+    setPendingDailyRewardCheck(false);
+    return true;
+  };
   
-  // Claim daily reward
+  // Claim daily reward and continue to next step in chain
   const claimDailyReward = () => {
     if (pendingDailyReward > 0) {
       addStars(pendingDailyReward);
@@ -392,6 +537,16 @@ export function GameBoard() {
       setShowDailyReward(false);
       setPendingDailyReward(0);
       setPendingStreak(0);
+      
+      // Continue chain - check for treasure hunt promo, then start new game
+      if (pendingTreasureHuntPromo) {
+        setShowTreasureHuntPromo(true);
+      } else {
+        clearNoMoves();
+        setShowNewGameButton(false);
+        setNoMovesShownOnce(false);
+        newGame('solvable');
+      }
     }
   };
   
@@ -484,6 +639,108 @@ export function GameBoard() {
   const [collectionsResetKey, setCollectionsResetKey] = useState(0);
   const [collectionButtonPulse, setCollectionButtonPulse] = useState(false);
   const collectionsButtonRef = useRef<HTMLButtonElement>(null);
+  
+  // Flying stars from treasure hunt chests
+  interface TreasureFlyingStar {
+    id: number;
+    value: number;
+    startX: number;
+    startY: number;
+    scatterX: number;
+    scatterY: number;
+    targetX: number;
+    targetY: number;
+    controlX: number;
+    controlY: number;
+    scatterDuration: number;
+    flyDelay: number;
+    flyDuration: number;
+  }
+  const [treasureFlyingStars, setTreasureFlyingStars] = useState<TreasureFlyingStar[]>([]);
+  
+  // Launch flying stars from chest position to progress bar
+  const launchTreasureStars = (totalStars: number, startPos: { x: number; y: number }) => {
+    // Get target position - find the star icon in progress bar
+    let targetX = window.innerWidth / 2;
+    let targetY = 50;
+    
+    if (progressBarRef?.current) {
+      const starIcon = progressBarRef.current.querySelector('[data-star-icon]');
+      if (starIcon) {
+        const rect = starIcon.getBoundingClientRect();
+        targetX = rect.left + rect.width / 2;
+        targetY = rect.top + rect.height / 2;
+      } else {
+        const rect = progressBarRef.current.getBoundingClientRect();
+        targetX = rect.left + 20;
+        targetY = rect.top + 16;
+      }
+    }
+    
+    const centerX = startPos.x;
+    const centerY = startPos.y;
+    
+    const stars: TreasureFlyingStar[] = [];
+    const MAX_FLYING_ICONS = 8;
+    const iconCount = Math.min(totalStars, MAX_FLYING_ICONS);
+    const starsPerIcon = Math.ceil(totalStars / iconCount);
+    let remainingStars = totalStars;
+    
+    const minRadius = 15;
+    const maxRadius = 40;
+    const scatterDuration = 400;
+    
+    for (let i = 0; i < iconCount; i++) {
+      const value = i === iconCount - 1 ? remainingStars : starsPerIcon;
+      remainingStars -= value;
+      
+      const angle = (i / iconCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      const radius = minRadius + Math.random() * (maxRadius - minRadius);
+      
+      const scatterX = centerX + Math.cos(angle) * radius;
+      const scatterY = centerY + Math.sin(angle) * radius;
+      
+      const midX = (scatterX + targetX) / 2;
+      const midY = (scatterY + targetY) / 2;
+      
+      const dx = targetX - scatterX;
+      const dy = targetY - scatterY;
+      const perpX = -dy;
+      const perpY = dx;
+      const len = Math.sqrt(perpX * perpX + perpY * perpY);
+      
+      const curvature = (Math.random() - 0.5) * 150;
+      const controlX = midX + (perpX / len) * curvature;
+      const controlY = midY + (perpY / len) * curvature;
+      
+      const flyDuration = 350 + Math.random() * 150;
+      const flyDelay = i * 60;
+      
+      stars.push({
+        id: Date.now() + i,
+        value,
+        startX: centerX,
+        startY: centerY,
+        scatterX,
+        scatterY,
+        targetX,
+        targetY,
+        controlX,
+        controlY,
+        scatterDuration,
+        flyDelay,
+        flyDuration
+      });
+    }
+    
+    setTreasureFlyingStars(stars);
+  };
+  
+  const handleTreasureStarArrived = (star: TreasureFlyingStar) => {
+    setTreasureFlyingStars(prev => prev.filter(s => s.id !== star.id));
+    // Pulse the progress bar
+    setStarPulseKey(k => k + 1);
+  };
   
   // Collision particles state
   interface CollisionParticle {
@@ -812,15 +1069,12 @@ export function GameBoard() {
     const newAcesTotal = acesCollected + acesInGame;
     setAcesCollected(newAcesTotal);
     
-    // Check if this game qualifies for minimal quest (3 or fewer stock passes)
-    // NOTE: stockPasses not tracked in this version, defaulting to 0
-    const qualifiesForMinimal = true;
-    
     // Calculate updated quests and track newly completed quests for immediate reward
     let starsToAdd = 0;
     let questsJustCompleted = 0;
     const updatedQuests = dailyQuests.map(quest => {
-      if (quest.id === 'daily-games' && !quest.completed) {
+      // Both 'daily-games' (1 win) and 'daily-wins' (5 wins) track completed games
+      if ((quest.id === 'daily-games' || quest.id === 'daily-wins') && !quest.completed) {
         const newCurrent = quest.current + 1;
         const completed = newCurrent >= quest.target;
         // If quest just completed, add reward immediately
@@ -839,12 +1093,6 @@ export function GameBoard() {
           questsJustCompleted++;
         }
         return { ...quest, current: newCurrent, completed };
-      }
-      if (quest.id === 'daily-minimal' && !quest.completed && qualifiesForMinimal) {
-        // Quest just completed, add reward immediately
-        starsToAdd += quest.reward;
-        questsJustCompleted++;
-        return { ...quest, current: 1, completed: true };
       }
       return quest;
     });
@@ -929,10 +1177,40 @@ export function GameBoard() {
     setDisplayedStars(actualTotal);
     
     setShowLevelUp(false);
+    
+    // Update player level and check for treasure hunt activation
+    if (pendingLevelUp !== null) {
+      setPlayerLevel(pendingLevelUp);
+      localStorage.setItem('solitaire_player_level', pendingLevelUp.toString());
+      
+      // Try to activate treasure hunt if player reached required level
+      const updatedEvent = activateTreasureHunt(pendingLevelUp);
+      if (updatedEvent) {
+        setTreasureHuntEvent(updatedEvent);
+        // Mark that promo should be shown at the end of popup chain
+        if (!treasureHuntPromoShown) {
+          setPendingTreasureHuntPromo(true);
+        }
+      }
+    }
     setPendingLevelUp(null);
     
     // Continue to daily quests
     proceedToDailyQuests();
+  };
+  
+  // Handle treasure hunt promo close - start new game
+  const handleTreasureHuntPromoClose = () => {
+    setShowTreasureHuntPromo(false);
+    setTreasureHuntPromoShown(true);
+    localStorage.setItem('solitaire_treasure_hunt_promo_shown', 'true');
+    setPendingTreasureHuntPromo(false);
+    
+    // Now start new game
+    clearNoMoves();
+    setShowNewGameButton(false);
+    setNoMovesShownOnce(false);
+    newGame('solvable');
   };
   
   // Proceed to collection rewards or start new game
@@ -954,7 +1232,18 @@ export function GameBoard() {
       return; // Don't start new game yet
     }
     
-    // No unrewarded collections - start new game
+    // No unrewarded collections - check for daily reward (new day)
+    if (tryShowDailyReward()) {
+      return; // Daily reward will continue chain when closed
+    }
+    
+    // Check for treasure hunt promo before starting new game
+    if (pendingTreasureHuntPromo) {
+      setShowTreasureHuntPromo(true);
+      return; // Promo will start new game when closed
+    }
+    
+    // Start new game
     clearNoMoves();
     setShowNewGameButton(false);
     setNoMovesShownOnce(false);
@@ -1023,6 +1312,7 @@ export function GameBoard() {
     // Clear all localStorage
     localStorage.removeItem('solitaire_total_stars');
     localStorage.removeItem('solitaire_daily_quests');
+    localStorage.removeItem('solitaire_daily_quests_date');
     localStorage.removeItem('solitaire_aces_collected');
     localStorage.removeItem('solitaire_monthly_progress');
     localStorage.removeItem('solitaire_monthly_reward_claimed');
@@ -1038,6 +1328,15 @@ export function GameBoard() {
     localStorage.removeItem('solitaire_season_info');
     localStorage.removeItem('solitaire_season_stars');
     localStorage.removeItem('solitaire_leaderboard_trophies');
+    localStorage.removeItem('solitaire_player_level');
+    
+    // Reset Treasure Hunt event
+    resetTreasureHuntEvent();
+    localStorage.removeItem('solitaire_treasure_hunt_promo_shown');
+    setTreasureHuntEvent(getTreasureHuntEvent());
+    setTreasureHuntPromoShown(false);
+    setPendingTreasureHuntPromo(false);
+    setPlayerLevel(1);
     
     // Reset leaderboard state - create fresh leaderboard with low-star players
     const newSeasonInfo = getSeasonInfo();
@@ -1464,10 +1763,14 @@ export function GameBoard() {
               </div>
             </div>
             
-            {/* Promo Widget - right side, offset down by ~half card height */}
+            {/* Promo Widget and Treasure Hunt - right side */}
             <div style={{ 
               visibility: (showDailyQuests || showCollections) ? 'hidden' : 'visible',
-              marginTop: '50px'
+              marginTop: '50px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              gap: '8px'
             }}>
               <PromoWidget 
                 onStarArrived={(count) => {
@@ -1490,6 +1793,35 @@ export function GameBoard() {
                   // Here we could add collection items logic
                 }}
               />
+              
+              {/* Treasure Hunt - only show if event is active or locked (not completed) */}
+              {(treasureHuntEvent.active || !isEventAvailable(playerLevel)) && (
+                <>
+                  {/* Debug button for adding keys */}
+                  <button
+                    onClick={() => {
+                      const updatedEvent = addKeys(1);
+                      setTreasureHuntEvent(updatedEvent);
+                    }}
+                    className="w-6 h-6 rounded bg-gray-700/80 text-white text-xs hover:bg-gray-600 mb-1"
+                    title="Debug: +1 key"
+                  >
+                    +🔑
+                  </button>
+                  
+                  {/* Treasure Hunt Icon */}
+                  <div ref={treasureHuntIconRef}>
+                    <TreasureHuntIcon
+                      keys={treasureHuntEvent.keys}
+                      isLocked={!isEventAvailable(playerLevel)}
+                      requiredLevel={getRequiredLevel()}
+                      isActive={treasureHuntEvent.active}
+                      isPulsing={treasureHuntPulse}
+                      onClick={() => setShowTreasureHunt(true)}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1660,6 +1992,123 @@ export function GameBoard() {
         seasonInfo={seasonInfo}
       />
       
+      {/* Treasure Hunt Promo (shown when event unlocks) */}
+      <TreasureHuntPromo
+        isVisible={showTreasureHuntPromo}
+        onClose={handleTreasureHuntPromoClose}
+      />
+      
+      {/* Treasure Hunt Popup */}
+      <TreasureHuntPopup
+        isVisible={showTreasureHunt}
+        onClose={() => setShowTreasureHunt(false)}
+        event={treasureHuntEvent}
+        onEventUpdate={setTreasureHuntEvent}
+        onRewardClaimed={(reward, chestPosition) => {
+          // Use chest position or screen center for animations
+          const startX = chestPosition?.x || window.innerWidth / 2;
+          const startY = chestPosition?.y || window.innerHeight / 2;
+          
+          // Handle empty chest - show "Пусто" floating text
+          if (reward.type === 'empty') {
+            addFloatingScore(0, startX, startY, 'empty');
+            return;
+          }
+          
+          // Handle reward from chest
+          if (reward.stars) {
+            addStars(reward.stars);
+            // Launch flying stars animation from chest to progress bar
+            launchTreasureStars(reward.stars, { x: startX, y: startY });
+          }
+          
+          // Handle collection items (new format with array)
+          if (reward.collectionItems && reward.collectionItems.length > 0) {
+            reward.collectionItems.forEach((collItem, idx) => {
+              const collection = collections.find(c => c.id === collItem.collectionId);
+              const itemIndex = parseInt(collItem.itemId.replace('item_', ''));
+              const item = collection?.items[itemIndex];
+              
+              if (item) {
+                // Stagger animations slightly for multiple items
+                setTimeout(() => {
+                  const drop = {
+                    id: `treasure-${Date.now()}-${idx}`,
+                    icon: item.icon,
+                    itemId: item.id,
+                    collectionId: collItem.collectionId,
+                    startX: startX + (idx * 20) - 20, // Spread out starting positions
+                    startY: startY,
+                    isDuplicate: item.collected
+                  };
+                  setFlyingIcons(prev => [...prev, drop]);
+                }, idx * 150); // 150ms delay between each
+                
+                // Add collection item by index
+                setCollections(prev => prev.map(c => {
+                  if (c.id === collItem.collectionId) {
+                    return {
+                      ...c,
+                      items: c.items.map((it, i) => 
+                        i === itemIndex ? { ...it, collected: true } : it
+                      )
+                    };
+                  }
+                  return c;
+                }));
+              }
+            });
+            setHasNewCollectionItem(true);
+          }
+          // Legacy format support (single item)
+          else if (reward.collectionId && reward.itemId) {
+            const collection = collections.find(c => c.id === reward.collectionId);
+            const itemIndex = parseInt(reward.itemId.replace('item_', ''));
+            const item = collection?.items[itemIndex];
+            
+            if (item) {
+              const drop = {
+                id: `treasure-${Date.now()}`,
+                icon: item.icon,
+                itemId: item.id,
+                collectionId: reward.collectionId,
+                startX: startX,
+                startY: startY,
+                isDuplicate: item.collected
+              };
+              setFlyingIcons(prev => [...prev, drop]);
+            }
+            
+            setCollections(prev => prev.map(c => {
+              if (c.id === reward.collectionId) {
+                return {
+                  ...c,
+                  items: c.items.map((item, idx) => 
+                    idx === itemIndex ? { ...item, collected: true } : item
+                  )
+                };
+              }
+              return c;
+            }));
+            setHasNewCollectionItem(true);
+          }
+        }}
+        isLocked={!isEventAvailable(playerLevel)}
+        requiredLevel={getRequiredLevel()}
+      />
+      
+      {/* Flying Keys Container */}
+      <FlyingKeysContainer />
+      
+      {/* Flying Stars from Treasure Hunt */}
+      {treasureFlyingStars.map(star => (
+        <TreasureFlyingStarComponent
+          key={star.id}
+          star={star}
+          onArrived={() => handleTreasureStarArrived(star)}
+        />
+      ))}
+      
       {/* Collections */}
       <Collections
         isVisible={showCollections}
@@ -1824,8 +2273,11 @@ export function GameBoard() {
       )}
       
       {/* Bottom Buttons - Daily Quests and Collections */}
-      {!showDailyQuests && !showWinScreen && !showCollections && !showShop && (
-        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2">
+      {/* Hide when any popup is open */}
+      {!showDailyQuests && !showWinScreen && !showCollections && !showShop && 
+       !showLeaderboard && !showTreasureHunt && !showTreasureHuntPromo && 
+       !showLevelUp && !showStreakPopup && !showDailyReward && (
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2">
           {/* New Game Button - shown when no moves available */}
           {showNewGameButton && (
             <button
@@ -1981,6 +2433,39 @@ export function GameBoard() {
         </div>
       )}
       
+      {/* Collections Button - visible during Treasure Hunt popup for flying icons */}
+      {/* Not clickable, just a target for flying collection items */}
+      {showTreasureHunt && (
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 pointer-events-none">
+          {/* Invisible spacers to match button row layout */}
+          <div className="px-4 py-2 opacity-0">🔄 Новая</div>
+          <div className="px-4 py-2 opacity-0">💡 Подсказка</div>
+          <div className="px-4 py-2 opacity-0">📋 Задания 0/3</div>
+          <div className="px-4 py-2 opacity-0">🛒 Магазин</div>
+          <div className="px-4 py-2 opacity-0 whitespace-nowrap min-w-[105px]">Рейтинг 20/20</div>
+          {/* Actual visible Collections button */}
+          <div
+            ref={collectionsButtonRef}
+            data-collections-button
+            className="relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 rounded-full shadow-lg border border-white/20"
+            style={collectionButtonPulse ? { 
+              animation: 'collection-pop 0.15s ease-out',
+            } : undefined}
+          >
+            <span className="text-lg">🏆</span>
+            <span className="text-white font-semibold text-sm">Коллекции</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${completedCollectionsCount === collections.length ? 'bg-green-500' : 'bg-white/20'}`}>
+              {completedCollectionsCount}/{collections.length}
+            </span>
+            {hasNewCollectionItem && !allCollectionsRewarded && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                !
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+      
       {/* Flying Collection Icons */}
       {flyingIcons.map(icon => {
         const rect = collectionsButtonRef.current?.getBoundingClientRect();
@@ -2080,6 +2565,124 @@ function CollisionParticleComponent({ particle }: { particle: { id: number; x: n
         boxShadow: `0 0 ${particle.size}px ${particle.color}`
       }}
     />,
+    document.body
+  );
+}
+
+// Flying star component for treasure hunt rewards (two-phase: scatter then fly)
+interface TreasureFlyingStarProps {
+  star: {
+    id: number;
+    value: number;
+    startX: number;
+    startY: number;
+    scatterX: number;
+    scatterY: number;
+    targetX: number;
+    targetY: number;
+    controlX: number;
+    controlY: number;
+    scatterDuration: number;
+    flyDelay: number;
+    flyDuration: number;
+  };
+  onArrived: () => void;
+}
+
+function TreasureFlyingStarComponent({ star, onArrived }: TreasureFlyingStarProps) {
+  const elementRef = useRef<HTMLDivElement>(null);
+  const [phase, setPhase] = useState<'scatter' | 'fly' | 'done'>('scatter');
+  const startTimeRef = useRef<number | null>(null);
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  
+  useEffect(() => {
+    let rafId: number;
+    
+    const animate = (timestamp: number) => {
+      if (!startTimeRef.current) {
+        startTimeRef.current = timestamp;
+      }
+      
+      const elapsed = timestamp - startTimeRef.current;
+      const currentPhase = phaseRef.current;
+      
+      if (currentPhase === 'scatter') {
+        // Phase 1: scatter from center
+        const progress = Math.min(elapsed / star.scatterDuration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // ease out
+        
+        const x = star.startX + (star.scatterX - star.startX) * eased;
+        const y = star.startY + (star.scatterY - star.startY) * eased;
+        
+        if (elementRef.current) {
+          elementRef.current.style.left = `${x}px`;
+          elementRef.current.style.top = `${y}px`;
+          elementRef.current.style.transform = `translate(-50%, -50%) scale(${0.5 + eased * 0.5})`;
+        }
+        
+        if (progress >= 1) {
+          // Wait for fly delay then start flying
+          setTimeout(() => {
+            startTimeRef.current = null;
+            setPhase('fly');
+          }, star.flyDelay);
+          return; // Stop animation until fly phase
+        }
+      } else if (currentPhase === 'fly') {
+        // Phase 2: fly to target with bezier curve
+        const progress = Math.min(elapsed / star.flyDuration, 1);
+        const eased = progress < 0.5
+          ? 2 * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 2) / 2; // ease in-out
+        
+        // Quadratic bezier
+        const t = eased;
+        const x = (1 - t) * (1 - t) * star.scatterX + 2 * (1 - t) * t * star.controlX + t * t * star.targetX;
+        const y = (1 - t) * (1 - t) * star.scatterY + 2 * (1 - t) * t * star.controlY + t * t * star.targetY;
+        
+        if (elementRef.current) {
+          elementRef.current.style.left = `${x}px`;
+          elementRef.current.style.top = `${y}px`;
+          elementRef.current.style.transform = `translate(-50%, -50%) scale(${1 - progress * 0.3})`;
+          elementRef.current.style.opacity = String(1 - progress * 0.3);
+        }
+        
+        if (progress >= 1) {
+          setPhase('done');
+          onArrived();
+          return;
+        }
+      }
+      
+      if (currentPhase !== 'done') {
+        rafId = requestAnimationFrame(animate);
+      }
+    };
+    
+    rafId = requestAnimationFrame(animate);
+    
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [star, onArrived, phase]);
+  
+  if (phase === 'done') return null;
+  
+  return ReactDOM.createPortal(
+    <div
+      ref={elementRef}
+      className="fixed pointer-events-none z-[10000]"
+      style={{
+        left: star.startX,
+        top: star.startY,
+        transform: 'translate(-50%, -50%)',
+        fontSize: '24px',
+        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
+      }}
+    >
+      ⭐
+    </div>,
     document.body
   );
 }

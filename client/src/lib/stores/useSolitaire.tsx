@@ -8,6 +8,8 @@ import { addFloatingScore } from '../solitaire/floatingScoreManager';
 import GameIntegration from '../gameIntegration';
 import { generateSolvableGame, generateUnsolvableGame } from '../solitaire/solvableGenerator';
 import { awardWinXP, awardCardXP, resetXPEarnedCards } from '../solitaire/experienceManager';
+import { resetCardsMovedForCollection } from '../../components/solitaire/FlyingCollectionIcon';
+import { collectKeyFromCard } from '../liveops/keyManager';
 
 // Track cards currently being auto-collected to prevent duplicates
 const autoCollectingCards = new Set<string>();
@@ -103,9 +105,12 @@ interface SolitaireStore extends GameState, DragState {
   getCurrentResults: () => { score: number; giftsEarned: number };
 }
 
+// Initialize game state once for reuse
+const initialGameState = initializeGame();
+
 export const useSolitaire = create<SolitaireStore>((set, get) => ({
   // Initial game state
-  ...initializeGame(),
+  ...initialGameState,
   
   // Initial drag state
   isDragging: false,
@@ -140,9 +145,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   // Hint state
   hint: null,
   
-  // Dealing animation state
-  isDealing: true, // Start with dealing animation
-  dealingCardIds: new Set<string>(), // Will be populated in newGame
+  // Dealing animation state - populate with initial cards
+  isDealing: true,
+  dealingCardIds: new Set(initialGameState.tableau.flat().map(c => c.id)),
   
   setCollisionHighlight: (enabled) => {
     set({ collisionHighlightEnabled: enabled });
@@ -161,6 +166,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     resetScoredCards(); // Reset scored cards for new game
     resetXPEarnedCards(); // Reset XP tracking for new game
     clearAutoCollectingCards(); // Reset auto-collecting cards tracker
+    resetCardsMovedForCollection(); // Reset cards counter for collection drops
     set({
       ...newGameState,
       isDragging: false,
@@ -505,6 +511,12 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         const points = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
         get().addFloatingScore(points, scoreX, scoreY, card.rank, card.isPremium);
       });
+      
+      // Check if card has a key - fly from START position (before card moves)
+      collectKeyFromCard(card.id, centerX, centerY);
+    } else {
+      // Fallback - collect key without animation position
+      collectKeyFromCard(card.id);
     }
     
     // NOW remove card from tableau AND flip the card underneath
@@ -921,12 +933,14 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     const totalInFoundations = Object.values(newFoundations).reduce((sum, f) => sum + f.length, 0);
     const isWon = totalInFoundations === 52;
     
-    // Trigger collection item drop NOW when card arrives at foundation
+    // Trigger collection item drop when card arrives at foundation
+    // Note: key collection was already triggered in autoMoveToFoundation (at card start position)
     const foundationElement = document.querySelector(`[data-foundation-pile="${suit}"]`) as HTMLElement;
     if (foundationElement) {
       const rect = foundationElement.getBoundingClientRect();
       const dropX = rect.left + rect.width / 2;
       const dropY = rect.top + rect.height / 2;
+      
       import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
         triggerCardToFoundation(dropX, dropY);
       });
@@ -1660,57 +1674,57 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     const FLIGHT_DURATION = 150;
     const STAGGER_DELAY = 80;
     
-    // Track cards that are "in flight" so we know order is maintained
-    const cardsInFlight = new Set<string>();
+    // Pre-collect all card elements and positions BEFORE any changes
+    const cardData: Map<string, { element: HTMLElement; rect: DOMRect }> = new Map();
+    cardsToMove.forEach(({ card }) => {
+      const cardElement = document.querySelector(`[data-card-id="${card.id}"]`) as HTMLElement;
+      if (cardElement) {
+        cardData.set(card.id, { 
+          element: cardElement, 
+          rect: cardElement.getBoundingClientRect() 
+        });
+      }
+    });
     
-    // Launch parallel animations using launchFlyingCard
-    // Trust the simulation order - don't re-check canAdd (previous cards may still be flying)
-    cardsToMove.forEach((moveInfo, index) => {
-      setTimeout(() => {
-        const { card, source, columnIndex } = moveInfo;
-        
-        // Mark this card as in flight
-        cardsInFlight.add(card.id);
-        
-        // Get card element
-        const cardElement = document.querySelector(`[data-card-id="${card.id}"]`) as HTMLElement;
-        if (!cardElement) return;
-        
-        const startRect = cardElement.getBoundingClientRect();
-        
-        // Remove card from source IMMEDIATELY to prevent visual duplication
-        const stateBeforeRemove = get();
-        if (source === 'tableau' && columnIndex !== undefined) {
-          const newTableau = stateBeforeRemove.tableau.map((col, i) => {
-            if (i === columnIndex) {
-              const filtered = col.filter(c => c.id !== card.id);
-              // Flip card underneath
-              if (filtered.length > 0 && !filtered[filtered.length - 1].faceUp) {
-                filtered[filtered.length - 1] = { ...filtered[filtered.length - 1], faceUp: true };
-              }
-              return filtered;
-            }
-            return col;
-          });
-          set({ tableau: newTableau });
-        } else if (source === 'waste') {
-          const newWaste = stateBeforeRemove.waste.filter(c => c.id !== card.id);
-          set({ waste: newWaste });
-        }
-        
-        // Reserve foundation slot if needed
-        const currentOrder = get().foundationSlotOrder;
-        if (!currentOrder.includes(card.suit)) {
-          const freshOrder = get().foundationSlotOrder;
-          if (!freshOrder.includes(card.suit)) {
-            set({ foundationSlotOrder: [...freshOrder, card.suit] });
-          }
-        }
-        
-        // Wait for DOM to update with new slot
+    // Reserve foundation slots for all suits FIRST (before animations start)
+    const stateForSlots = get();
+    const suitsNeeded = new Set(cardsToMove.map(m => m.card.suit));
+    let newSlotOrder = [...stateForSlots.foundationSlotOrder];
+    suitsNeeded.forEach(suit => {
+      if (!newSlotOrder.includes(suit)) {
+        newSlotOrder.push(suit);
+      }
+    });
+    if (newSlotOrder.length !== stateForSlots.foundationSlotOrder.length) {
+      set({ foundationSlotOrder: newSlotOrder });
+    }
+    
+    // Wait for foundation slots to render
+    setTimeout(() => {
+      // Launch animations with stagger - hide card visually, then animate
+      cardsToMove.forEach((moveInfo, index) => {
         setTimeout(() => {
+          const { card, source, columnIndex } = moveInfo;
+          
+          const data = cardData.get(card.id);
+          if (!data) {
+            // Card not found - skip (shouldn't happen)
+            console.warn(`Card ${card.id} data not found`);
+            return;
+          }
+          
+          const { element: cardElement, rect: startRect } = data;
+          
+          // Hide the original card visually (but keep in DOM for position reference)
+          cardElement.style.visibility = 'hidden';
+          
           const foundationElement = document.querySelector(`[data-foundation-pile="${card.suit}"]`) as HTMLElement;
-          if (!foundationElement) return;
+          if (!foundationElement) {
+            console.warn(`Foundation for ${card.suit} not found`);
+            // Still need to remove card from state and add to foundation
+            cardElement.style.visibility = 'visible';
+            return;
+          }
           
           // Trigger flying suit icon and score
           const centerX = startRect.left + startRect.width / 2;
@@ -1725,25 +1739,61 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           
           const endRect = foundationElement.getBoundingClientRect();
           
-          // Launch flying card animation (parallel capable)
+          // Launch flying card animation
           import('../../components/solitaire/FlyingCard').then(({ launchFlyingCard }) => {
             launchFlyingCard({ ...card, faceUp: true }, startRect, endRect, FLIGHT_DURATION, () => {
-              // Add card to foundation AFTER animation completes
-              const stateForFoundation = get();
-              const newFoundations = { ...stateForFoundation.foundations };
-              newFoundations[card.suit] = [...(newFoundations[card.suit] || []), card];
+              // AFTER animation completes:
+              // 1. Remove card from source
+              // 2. Add card to foundation
+              const stateAfterFlight = get();
               
-              awardCardXP(card.id);
-              set({ 
-                foundations: newFoundations,
-                moves: stateForFoundation.moves + 1 
-              });
+              // Remove from source
+              if (source === 'tableau' && columnIndex !== undefined) {
+                const newTableau = stateAfterFlight.tableau.map((col, i) => {
+                  if (i === columnIndex) {
+                    let filtered = col.filter(c => c.id !== card.id);
+                    // Flip card underneath if face down
+                    if (filtered.length > 0 && !filtered[filtered.length - 1].faceUp) {
+                      filtered = [...filtered.slice(0, -1), { ...filtered[filtered.length - 1], faceUp: true }];
+                    }
+                    return filtered;
+                  }
+                  return col;
+                });
+                
+                const newFoundations = { ...stateAfterFlight.foundations };
+                newFoundations[card.suit] = [...(newFoundations[card.suit] || []), card];
+                
+                awardCardXP(card.id);
+                set({ 
+                  tableau: newTableau,
+                  foundations: newFoundations,
+                  moves: stateAfterFlight.moves + 1 
+                });
+              } else if (source === 'waste') {
+                const newWaste = stateAfterFlight.waste.filter(c => c.id !== card.id);
+                const newFoundations = { ...stateAfterFlight.foundations };
+                newFoundations[card.suit] = [...(newFoundations[card.suit] || []), card];
+                
+                awardCardXP(card.id);
+                set({ 
+                  waste: newWaste,
+                  foundations: newFoundations,
+                  moves: stateAfterFlight.moves + 1 
+                });
+              }
               
-              // Trigger collection item drop
+              // Trigger collection item drop and key collection
+              const fRect = foundationElement.getBoundingClientRect();
+              const dropX = fRect.left + fRect.width / 2;
+              const dropY = fRect.top + fRect.height / 2;
+              
               import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
-                const fRect = foundationElement.getBoundingClientRect();
-                triggerCardToFoundation(fRect.left + fRect.width / 2, fRect.top + fRect.height / 2);
+                triggerCardToFoundation(dropX, dropY);
               });
+              
+              // Collect key if card has one
+              collectKeyFromCard(card.id, dropX, dropY);
               
               // Check win
               const winState = get();
@@ -1754,8 +1804,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
               }
             });
           });
-        }, 10);
-      }, index * STAGGER_DELAY);
-    });
+        }, index * STAGGER_DELAY);
+      });
+    }, 20);
   }
 }));

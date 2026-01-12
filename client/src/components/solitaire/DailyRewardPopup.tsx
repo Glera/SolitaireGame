@@ -190,9 +190,13 @@ export function DailyRewardPopup({
       <div 
         className="fixed inset-0 z-[9999] flex items-center justify-center"
         style={{ backgroundColor: 'rgba(0, 0, 0, 0.9)' }}
+        onClick={handleClaim}
       >
         {!hideContent && (
-          <div className="bg-gradient-to-b from-indigo-900 to-slate-900 rounded-2xl p-6 mx-4 max-w-md w-full shadow-2xl border border-indigo-500/50 animate-bounce-in">
+          <div 
+            className="bg-gradient-to-b from-indigo-900 to-slate-900 rounded-2xl p-6 mx-4 max-w-md w-full shadow-2xl border border-indigo-500/50 animate-bounce-in"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Header */}
             <div className="text-center mb-4">
               <div className="text-5xl mb-2">🌅</div>

@@ -8,6 +8,7 @@ import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 import { useTouchDrag } from '../../hooks/useTouchDrag';
 import { calculateStackOffsets } from '../../lib/solitaire/stackCompression';
 import { useGameScaleContext } from '../../contexts/GameScaleContext';
+import { cardHasKey } from '../../lib/liveops/keyManager';
 
 interface TableauColumnProps {
   cards: CardType[];
@@ -406,6 +407,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
               isPlayable={card.faceUp && index >= movableStartIndex}
               isDragging={isCardBeingDragged(index)}
               isAnimating={isCardAnimating(index)}
+              hasKey={cardHasKey(card.id)}
             />
           </div>
           );

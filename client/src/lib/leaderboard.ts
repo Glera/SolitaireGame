@@ -6,6 +6,11 @@ export interface LeaderboardPlayer {
   avatar: string;
   stars: number; // Stars earned this season
   isCurrentUser: boolean;
+  // Behavior patterns for realistic simulation
+  isActive: boolean;       // false = stopped playing (inactive)
+  activityLevel: number;   // 0-1: how often they play (0.1 = rarely, 1 = very active)
+  burstChance: number;     // 0-1: chance of making a big jump in stars
+  lastActive: number;      // timestamp of last activity
 }
 
 export interface SeasonInfo {
@@ -40,18 +45,54 @@ const LEADERBOARD_TROPHIES_KEY = 'solitaire_leaderboard_trophies';
 // Season duration: 15 days (same as donation progress)
 const SEASON_DURATION_MS = 15 * 24 * 60 * 60 * 1000;
 
-// Generate a random fake player
+// Generate a random fake player with realistic behavior patterns
 function generateFakePlayer(index: number, maxStars: number): LeaderboardPlayer {
   const name = FAKE_NAMES[Math.floor(Math.random() * FAKE_NAMES.length)];
   const avatar = AVATARS[Math.floor(Math.random() * AVATARS.length)];
   const stars = Math.floor(Math.random() * maxStars) + 5; // 5 to maxStars
+  
+  // Realistic distribution of player types:
+  // ~30% inactive (stopped playing)
+  // ~40% casual (low activity)
+  // ~20% regular (medium activity)
+  // ~10% hardcore (high activity, can burst)
+  const roll = Math.random();
+  let isActive = true;
+  let activityLevel = 0.5;
+  let burstChance = 0.1;
+  
+  if (roll < 0.3) {
+    // Inactive player - stopped playing
+    isActive = false;
+    activityLevel = 0;
+    burstChance = 0;
+  } else if (roll < 0.7) {
+    // Casual - plays occasionally
+    isActive = true;
+    activityLevel = 0.1 + Math.random() * 0.3; // 0.1-0.4
+    burstChance = 0.05; // Rarely bursts
+  } else if (roll < 0.9) {
+    // Regular - plays often
+    isActive = true;
+    activityLevel = 0.4 + Math.random() * 0.3; // 0.4-0.7
+    burstChance = 0.15; // Sometimes bursts
+  } else {
+    // Hardcore - very active, can make big jumps
+    isActive = true;
+    activityLevel = 0.7 + Math.random() * 0.3; // 0.7-1.0
+    burstChance = 0.3; // Often bursts
+  }
   
   return {
     id: `fake_${index}_${Date.now()}`,
     name,
     avatar,
     stars,
-    isCurrentUser: false
+    isCurrentUser: false,
+    isActive,
+    activityLevel,
+    burstChance,
+    lastActive: Date.now() - Math.floor(Math.random() * 24 * 60 * 60 * 1000) // Random time in last 24h
   };
 }
 
@@ -226,7 +267,11 @@ export function initializeLeaderboard(currentUserSeasonStars: number): Leaderboa
     name: 'Вы',
     avatar: '⭐',
     stars: currentUserSeasonStars,
-    isCurrentUser: true
+    isCurrentUser: true,
+    isActive: true,
+    activityLevel: 1,
+    burstChance: 0,
+    lastActive: Date.now()
   };
   
   const allPlayers = [...fakePlayers, currentUser];
@@ -299,7 +344,7 @@ export function updateCurrentUserStars(newSeasonStars: number): {
 }
 
 // Simulate other players gaining stars (called periodically)
-// Makes competition interesting - players near you are more active
+// Realistic simulation with different player behaviors
 export function simulateOtherPlayers(): {
   players: LeaderboardPlayer[];
   overtaken: boolean; // true if someone just passed you
@@ -316,79 +361,102 @@ export function simulateOtherPlayers(): {
     const userStars = players[userIndex]?.stars || 0;
     const userPosition = userIndex + 1;
     
-    // Players just behind you (positions userPosition+1 to userPosition+3)
-    // These are the "chasers" - they should be catching up
-    const chasers = players.filter((p, idx) => 
-      !p.isCurrentUser && idx > userIndex && idx <= userIndex + 3
-    );
-    
-    // Players just ahead of you (positions userPosition-1 to userPosition-3)
-    // These shouldn't run too far ahead
-    const leaders = players.filter((p, idx) => 
-      !p.isCurrentUser && idx < userIndex && idx >= Math.max(0, userIndex - 3)
-    );
-    
-    // Players far ahead (top positions) - they progress slowly
-    const topPlayers = players.filter((p, idx) => 
-      !p.isCurrentUser && idx < Math.max(0, userIndex - 3)
-    );
-    
-    // Players far behind - they progress very slowly
-    const farBehind = players.filter((p, idx) => 
-      !p.isCurrentUser && idx > userIndex + 3
-    );
-    
     let overtaken = false;
+    const now = Date.now();
     
-    // 40% chance: A chaser gains stars (creates tension!)
-    if (chasers.length > 0 && Math.random() < 0.4) {
-      const chaser = chasers[Math.floor(Math.random() * chasers.length)];
-      // They gain enough to potentially overtake you
-      const gap = userStars - chaser.stars;
-      const starsToAdd = Math.min(
-        Math.floor(Math.random() * 8) + 3, // 3-10 stars
-        gap + 5 // Don't go more than 5 stars ahead
-      );
+    // ============ DYNAMIC PLAYER BEHAVIOR ============
+    // Each player acts based on their individual characteristics
+    
+    players = players.map((player, idx) => {
+      if (player.isCurrentUser) return player;
       
-      players = players.map(p => 
-        p.id === chaser.id ? { ...p, stars: p.stars + starsToAdd } : p
-      );
+      // Ensure player has behavior fields (for backwards compatibility)
+      const isActive = player.isActive ?? true;
+      const activityLevel = player.activityLevel ?? 0.5;
+      const burstChance = player.burstChance ?? 0.1;
       
-      // Check if they overtook us
-      if (chaser.stars + starsToAdd > userStars) {
-        overtaken = true;
+      // Inactive players don't gain stars
+      if (!isActive) return player;
+      
+      // 5% chance an active player becomes inactive (quit playing)
+      if (Math.random() < 0.05) {
+        return { ...player, isActive: false, activityLevel: 0 };
       }
+      
+      // 2% chance an inactive player becomes active again (comeback)
+      if (!isActive && Math.random() < 0.02) {
+        return { 
+          ...player, 
+          isActive: true, 
+          activityLevel: 0.2 + Math.random() * 0.3, // Low-medium activity
+          lastActive: now 
+        };
+      }
+      
+      // Roll for activity based on player's activity level
+      if (Math.random() > activityLevel) {
+        return player; // This player doesn't play this tick
+      }
+      
+      // Player is active this tick - calculate stars gained
+      let starsGained = 0;
+      
+      // Check for burst (big session/win streak)
+      if (Math.random() < burstChance) {
+        // Burst! Player had a great session
+        starsGained = Math.floor(Math.random() * 30) + 20; // 20-50 stars burst
+      } else {
+        // Normal play - smaller gains
+        starsGained = Math.floor(Math.random() * 8) + 2; // 2-10 stars
+      }
+      
+      // Players near the user are slightly more motivated (keeps it interesting)
+      const distanceFromUser = Math.abs(idx - userIndex);
+      if (distanceFromUser <= 3) {
+        starsGained = Math.floor(starsGained * 1.2); // 20% boost for nearby players
+      }
+      
+      return {
+        ...player,
+        stars: player.stars + starsGained,
+        lastActive: now
+      };
+    });
+    
+    // ============ RUBBER BAND MECHANIC ============
+    // If user is far ahead in 1st place, ensure some competition
+    const secondPlace = players.find((p, idx) => !p.isCurrentUser && idx === 1);
+    const gapToSecond = userPosition === 1 && secondPlace ? userStars - secondPlace.stars : 0;
+    
+    if (userPosition === 1 && gapToSecond > 30 && secondPlace) {
+      // Make second place more aggressive
+      const catchUpStars = Math.floor(gapToSecond * 0.2) + Math.floor(Math.random() * 8);
+      players = players.map(p => 
+        p.id === secondPlace.id 
+          ? { ...p, stars: p.stars + catchUpStars, isActive: true, activityLevel: 0.8 } 
+          : p
+      );
     }
     
-    // 25% chance: A leader gains a small amount (stay reachable)
-    if (leaders.length > 0 && Math.random() < 0.25) {
-      const leader = leaders[Math.floor(Math.random() * leaders.length)];
-      const gap = leader.stars - userStars;
-      // Only add stars if gap is small, otherwise let user catch up
-      if (gap < 30) {
-        const starsToAdd = Math.floor(Math.random() * 5) + 1; // 1-5 stars
+    // ============ OCCASIONAL BIG SHAKE-UP ============
+    // 5% chance: One random player makes a huge comeback burst
+    if (Math.random() < 0.05) {
+      const eligiblePlayers = players.filter(p => !p.isCurrentUser && p.stars < userStars);
+      if (eligiblePlayers.length > 0) {
+        const luckyPlayer = eligiblePlayers[Math.floor(Math.random() * eligiblePlayers.length)];
+        const burstStars = Math.floor(Math.random() * 40) + 30; // 30-70 stars!
         players = players.map(p => 
-          p.id === leader.id ? { ...p, stars: p.stars + starsToAdd } : p
+          p.id === luckyPlayer.id 
+            ? { 
+                ...p, 
+                stars: p.stars + burstStars, 
+                isActive: true, 
+                activityLevel: Math.max(p.activityLevel ?? 0.5, 0.6),
+                lastActive: now 
+              } 
+            : p
         );
       }
-    }
-    
-    // 15% chance: Top players gain stars (but slowly)
-    if (topPlayers.length > 0 && Math.random() < 0.15) {
-      const topPlayer = topPlayers[Math.floor(Math.random() * topPlayers.length)];
-      const starsToAdd = Math.floor(Math.random() * 3) + 1; // 1-3 stars
-      players = players.map(p => 
-        p.id === topPlayer.id ? { ...p, stars: p.stars + starsToAdd } : p
-      );
-    }
-    
-    // 10% chance: Someone far behind gains stars
-    if (farBehind.length > 0 && Math.random() < 0.1) {
-      const behind = farBehind[Math.floor(Math.random() * farBehind.length)];
-      const starsToAdd = Math.floor(Math.random() * 5) + 1; // 1-5 stars
-      players = players.map(p => 
-        p.id === behind.id ? { ...p, stars: p.stars + starsToAdd } : p
-      );
     }
     
     players = sortLeaderboard(players);
@@ -398,7 +466,6 @@ export function simulateOtherPlayers(): {
     const newUserIndex = players.findIndex(p => p.isCurrentUser);
     if (newUserIndex > userIndex) {
       overtaken = true;
-      // Update saved position so we track this
       saveCurrentPosition(newUserIndex + 1);
     }
     

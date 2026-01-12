@@ -12,7 +12,7 @@ interface FloatingScoreProps {
   };
 }
 
-export function FloatingScore({ score, x, y, onComplete }: FloatingScoreProps) {
+export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingScoreProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [mounted, setMounted] = useState(false);
 
@@ -29,7 +29,10 @@ export function FloatingScore({ score, x, y, onComplete }: FloatingScoreProps) {
     return () => clearTimeout(timer);
   }, []);
 
-  if (!mounted || !isVisible || score == null) {
+  // Check if this is an "empty" chest
+  const isEmpty = breakdown?.cardRank === 'empty';
+
+  if (!mounted || !isVisible || (score == null && !isEmpty)) {
     return null;
   }
 
@@ -48,8 +51,8 @@ export function FloatingScore({ score, x, y, onComplete }: FloatingScoreProps) {
     >
       <div 
         style={{
-          color: '#f8fafc',
-          fontSize: '1.5rem',
+          color: isEmpty ? '#9ca3af' : '#f8fafc', // Gray for empty
+          fontSize: isEmpty ? '1.25rem' : '1.5rem',
           fontWeight: 900,
           textShadow: '1px 0 0 #000000, -1px 0 0 #000000, 0 1px 0 #000000, 0 -1px 0 #000000',
           transform: 'translate3d(0,0,0)',
@@ -59,7 +62,7 @@ export function FloatingScore({ score, x, y, onComplete }: FloatingScoreProps) {
           lineHeight: '1',
         }}
       >
-        +{(score ?? 0).toLocaleString()}
+        {isEmpty ? 'Пусто' : `+${(score ?? 0).toLocaleString()}`}
       </div>
     </div>,
     document.body

@@ -11,6 +11,7 @@ export interface Card {
   color: Color;
   faceUp: boolean;
   isPremium?: boolean; // Premium cards give 10x points
+  hasKey?: boolean; // Key for Treasure Hunt event
 }
 
 export interface GameState {

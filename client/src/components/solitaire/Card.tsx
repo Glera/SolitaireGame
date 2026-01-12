@@ -18,6 +18,7 @@ interface CardProps {
   isPlayable?: boolean;
   isAnimating?: boolean;
   isClickable?: boolean;
+  hasKey?: boolean;
 }
 
 export function Card({ 
@@ -34,11 +35,48 @@ export function Card({
   isDragging = false,
   isPlayable = false,
   isAnimating = false,
-  isClickable = true
+  isClickable = true,
+  hasKey = false
 }: CardProps) {
   const [isFlipping, setIsFlipping] = useState(false);
   const [showFace, setShowFace] = useState(card.faceUp);
   const prevFaceUpRef = useRef(card.faceUp);
+  const [keyAnimating, setKeyAnimating] = useState(false);
+  const [keyVisible, setKeyVisible] = useState(false);
+  const [showGlow, setShowGlow] = useState(false);
+  const prevHasKeyRef = useRef(hasKey);
+  
+  // Key drop animation
+  useEffect(() => {
+    if (hasKey && !prevHasKeyRef.current) {
+      // Key just appeared - start drop animation
+      setKeyAnimating(true);
+      setKeyVisible(true);
+      setShowGlow(false); // Glow starts hidden
+      
+      // End key animation and show glow (impact moment)
+      const glowTimer = setTimeout(() => {
+        setShowGlow(true); // Glow appears on "impact"
+      }, 350);
+      
+      const animTimer = setTimeout(() => {
+        setKeyAnimating(false);
+      }, 500);
+      
+      prevHasKeyRef.current = hasKey;
+      return () => {
+        clearTimeout(glowTimer);
+        clearTimeout(animTimer);
+      };
+    } else if (hasKey) {
+      setKeyVisible(true);
+      setShowGlow(true);
+    } else {
+      setKeyVisible(false);
+      setShowGlow(false);
+    }
+    prevHasKeyRef.current = hasKey;
+  }, [hasKey]);
   
   // Flip animation (150ms) - only when card changes from faceDown to faceUp
   useEffect(() => {
@@ -192,6 +230,37 @@ export function Card({
         {cardFront}
         {cardBack}
       </div>
+      
+      {/* Key indicator for Treasure Hunt event - show during animation on all cards, after animation only on face up */}
+      {keyVisible && (keyAnimating || showFace) && (
+        <div 
+          className="absolute left-1/2 flex items-center justify-center z-10 pointer-events-none"
+          style={{
+            top: '0px',
+            filter: 'drop-shadow(0 1px 0 rgba(0,0,0,0.7)) drop-shadow(0 0 1px rgba(0,0,0,0.5))',
+            transform: 'translateX(-50%)',
+            animation: keyAnimating 
+              ? (showFace 
+                  ? 'keyDrop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' 
+                  : 'keyDropFaceDown 0.35s ease-in forwards')
+              : 'none'
+          }}
+        >
+          <span className="text-lg">🔑</span>
+        </div>
+      )}
+      
+      {/* Golden border for cards with keys - appears on impact */}
+      {showGlow && (
+        <div 
+          className="absolute inset-0 rounded-lg pointer-events-none"
+          style={{
+            boxShadow: 'inset 0 0 0 2px rgba(255, 200, 50, 0.5), 0 0 8px rgba(255, 180, 0, 0.3)',
+            borderRadius: '0.5rem',
+            animation: keyAnimating ? 'keyPulse 0.3s ease-out' : 'none'
+          }}
+        />
+      )}
     </div>
   );
 }
