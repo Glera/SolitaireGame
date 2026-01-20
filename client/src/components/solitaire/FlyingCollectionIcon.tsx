@@ -1,6 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 
+// Rarity glow colors (matching RARITY_COLORS in Collections.tsx)
+const RARITY_GLOW_COLORS: Record<number, { main: string; secondary: string }> = {
+  1: { main: 'rgba(156, 163, 175, 1)', secondary: 'rgba(156, 163, 175, 0.6)' }, // gray
+  2: { main: 'rgba(34, 197, 94, 1)', secondary: 'rgba(34, 197, 94, 0.6)' }, // green
+  3: { main: 'rgba(59, 130, 246, 1)', secondary: 'rgba(59, 130, 246, 0.6)' }, // blue
+  4: { main: 'rgba(168, 85, 247, 1)', secondary: 'rgba(168, 85, 247, 0.6)' }, // purple
+  5: { main: 'rgba(245, 158, 11, 1)', secondary: 'rgba(245, 158, 11, 0.6)' }, // gold/orange
+};
+
 interface FlyingCollectionIconProps {
   icon: string;
   startX: number;
@@ -8,6 +17,8 @@ interface FlyingCollectionIconProps {
   endX: number;
   endY: number;
   onComplete: () => void;
+  isUnique?: boolean; // True if this is a NEW item (not duplicate)
+  rarity?: number; // 1-5 for glow color
 }
 
 export function FlyingCollectionIcon({ 
@@ -16,7 +27,9 @@ export function FlyingCollectionIcon({
   startY, 
   endX, 
   endY, 
-  onComplete 
+  onComplete,
+  isUnique = false,
+  rarity = 1
 }: FlyingCollectionIconProps) {
   const elementRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(true);
@@ -99,6 +112,9 @@ export function FlyingCollectionIcon({
   
   if (!isVisible) return null;
   
+  // Get rarity-based glow colors
+  const glowColors = RARITY_GLOW_COLORS[rarity] || RARITY_GLOW_COLORS[1];
+  
   return ReactDOM.createPortal(
     <div
       ref={elementRef}
@@ -108,10 +124,34 @@ export function FlyingCollectionIcon({
         top: startY,
         transform: 'translate(-50%, -50%)',
         fontSize: '28px',
-        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+        // Rarity-colored glow for unique items, simple shadow for duplicates
+        filter: isUnique 
+          ? `drop-shadow(0 0 8px ${glowColors.main}) drop-shadow(0 0 16px ${glowColors.main}) drop-shadow(0 0 24px ${glowColors.secondary})`
+          : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
       }}
     >
+      {/* Pulsing ring for unique items - color based on rarity */}
+      {isUnique && (
+        <div 
+          className="absolute inset-0 rounded-full"
+          style={{
+            background: `radial-gradient(circle, ${glowColors.secondary} 0%, transparent 70%)`,
+            animation: 'uniqueItemPulse 0.5s ease-in-out infinite alternate',
+            transform: 'scale(2)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       {icon}
+      {/* Add keyframes via style tag */}
+      {isUnique && (
+        <style>{`
+          @keyframes uniqueItemPulse {
+            0% { opacity: 0.6; transform: scale(1.8); }
+            100% { opacity: 1; transform: scale(2.2); }
+          }
+        `}</style>
+      )}
     </div>,
     document.body
   );
@@ -126,6 +166,7 @@ interface PendingDrop {
   startX: number;
   startY: number;
   isDuplicate?: boolean;
+  rarity?: number; // 1-5
 }
 
 let dropCallback: ((collectionId: string, itemId: string) => void) | null = null;
@@ -148,105 +189,84 @@ export function getCollectionsButtonPosition() {
   return collectionsButtonRect;
 }
 
-// Drop chance per card: calibrated so 95% chance of at least 1 drop per game (52 cards)
-// P(no drop per card)^52 = 0.05 → P(no drop per card) = 0.05^(1/52) ≈ 0.9440
-// P(drop per card) = 1 - 0.9440 ≈ 0.056 = 5.6%
-// Drop chance per card moved to foundation
-// Target: first collection (9 items) in ~4 games
-// 52 cards/game * boost(3) * DROP_CHANCE = 2.25 items/game
-const DROP_CHANCE_PER_CARD = 0.015;
+// ============ NEW DROP SYSTEM: 1-10 items per game, probability increases with progress ============
+// Storage keys
+const GAME_DROPS_KEY = 'solitaire_game_drops';
+const GAME_CARDS_KEY = 'solitaire_game_cards';
 
-// Calculate collection weight for item selection (cheaper = more likely)
-// Using squared inverse for more aggressive differentiation:
-// reward 5 → weight 100, reward 8 → weight 39, reward 50 → weight 1
-function getCollectionWeight(reward: number): number {
-  const maxReward = 50;
-  const ratio = maxReward / reward;
-  return ratio * ratio; // Square for more aggressive weighting
+// Drop parameters
+const MIN_DROPS_PER_GAME = 1;
+const MAX_DROPS_PER_GAME = 10;
+const TOTAL_CARDS_IN_GAME = 52;
+
+// Rarity weights (must match Collections.tsx RARITY_DROP_WEIGHTS)
+const RARITY_DROP_WEIGHTS: Record<number, number> = {
+  1: 100,  // Very common
+  2: 40,   // Common
+  3: 15,   // Uncommon
+  4: 4,    // Rare
+  5: 1,    // Legendary (very rare)
+};
+
+// Get current game state
+function getGameDropState(): { dropsThisGame: number; cardsPlayed: number; targetDrops: number } {
+  const drops = parseInt(localStorage.getItem(GAME_DROPS_KEY) || '0', 10);
+  const cards = parseInt(localStorage.getItem(GAME_CARDS_KEY) || '0', 10);
+  // Target drops is set at game start and persists
+  const targetStr = localStorage.getItem('solitaire_target_drops');
+  const target = targetStr ? parseInt(targetStr, 10) : MIN_DROPS_PER_GAME + Math.floor(Math.random() * (MAX_DROPS_PER_GAME - MIN_DROPS_PER_GAME + 1));
+  return { dropsThisGame: drops, cardsPlayed: cards, targetDrops: target };
+}
+
+// Update game state
+function updateGameDropState(drops: number, cards: number, target: number) {
+  localStorage.setItem(GAME_DROPS_KEY, drops.toString());
+  localStorage.setItem(GAME_CARDS_KEY, cards.toString());
+  localStorage.setItem('solitaire_target_drops', target.toString());
+}
+
+// Reset for new game
+export function resetCardsMovedForCollection(): void {
+  // Set new random target for this game (1-10 drops)
+  const targetDrops = MIN_DROPS_PER_GAME + Math.floor(Math.random() * (MAX_DROPS_PER_GAME - MIN_DROPS_PER_GAME + 1));
+  updateGameDropState(0, 0, targetDrops);
+  console.log(`🎯 New game: target ${targetDrops} collection drops`);
+}
+
+// Calculate drop probability based on progress
+// Probability increases as game progresses to ensure we hit target drops
+function calculateDropProbability(cardsPlayed: number, dropsNeeded: number, cardsRemaining: number): number {
+  if (dropsNeeded <= 0) return 0; // Already hit target
+  if (cardsRemaining <= 0) return 1; // Last chance!
+  
+  // Base probability: distribute drops evenly across remaining cards
+  // But increase as we fall behind schedule
+  const idealProgress = cardsPlayed / TOTAL_CARDS_IN_GAME;
+  const neededDropsNow = dropsNeeded;
+  
+  // Probability that ensures we're likely to get the remaining drops
+  // Using formula: P = dropsNeeded / cardsRemaining * (1 + progress bonus)
+  const baseProbability = neededDropsNow / cardsRemaining;
+  
+  // Progressive bonus: starts low, increases as game progresses
+  // At start: bonus = 0, at 80% progress: bonus = 1.5x
+  const progressBonus = 1 + (idealProgress * 1.5);
+  
+  // Final probability, capped at 80% to avoid guaranteed drops every card
+  return Math.min(baseProbability * progressBonus, 0.8);
 }
 
 // Global callback for when a card is moved to foundation
-let onCardToFoundationCallback: ((cardX: number, cardY: number) => void) | null = null;
+let onCardToFoundationCallback: ((cardX: number, cardY: number, points: number) => void) | null = null;
 
-export function setOnCardToFoundationCallback(callback: (cardX: number, cardY: number) => void) {
+export function setOnCardToFoundationCallback(callback: (cardX: number, cardY: number, points: number) => void) {
   onCardToFoundationCallback = callback;
 }
 
-export function triggerCardToFoundation(cardX: number, cardY: number) {
+export function triggerCardToFoundation(cardX: number, cardY: number, points: number = 0) {
   if (onCardToFoundationCallback) {
-    onCardToFoundationCallback(cardX, cardY);
+    onCardToFoundationCallback(cardX, cardY, points);
   }
-}
-
-// ID of the first (starter) collection that should be collected quickly
-const STARTER_COLLECTION_ID = 'nature';
-// Boost multiplier for starter collection items (makes them 20x more likely)
-const STARTER_COLLECTION_BOOST = 20;
-// Boost multiplier for the next incomplete collection after starter (sequential progression)
-const NEXT_COLLECTION_BOOST = 8;
-
-// ============ PSEUDO-RANDOM GUARANTEED DROPS FOR STARTER COLLECTION ============
-// Track cards moved to foundation in current game session
-let cardsMovedThisGame = 0;
-const STARTER_CARDS_KEY = 'solitaire_starter_cards_moved';
-
-// Get cards moved count (persists across page reloads within a game)
-function getCardsMovedThisGame(): number {
-  const stored = localStorage.getItem(STARTER_CARDS_KEY);
-  return stored ? parseInt(stored, 10) : 0;
-}
-
-// Increment and save cards moved
-function incrementCardsMoved(): number {
-  cardsMovedThisGame = getCardsMovedThisGame() + 1;
-  localStorage.setItem(STARTER_CARDS_KEY, cardsMovedThisGame.toString());
-  return cardsMovedThisGame;
-}
-
-// Reset cards moved (called when new game starts)
-export function resetCardsMovedForCollection(): void {
-  cardsMovedThisGame = 0;
-  localStorage.setItem(STARTER_CARDS_KEY, '0');
-}
-
-// Guaranteed drop schedule for starter collection (9 items over 4 games)
-// Game 1: cards 18, 40 → 2 items
-// Game 2: cards 18, 40 → 2 items  
-// Game 3: cards 12, 28, 44 → 3 items
-// Game 4: cards 18, 40 → 2 items
-// Total: 9 items in 4 games
-function shouldGuaranteedDrop(collectedCount: number, cardNumber: number): boolean {
-  // Which "virtual game" are we in based on collected items?
-  // 0-1 collected = game 1, 2-3 = game 2, 4-6 = game 3, 7-8 = game 4
-  if (collectedCount <= 1) {
-    // Game 1 pattern: drop at cards 18, 40
-    return cardNumber === 18 || cardNumber === 40;
-  } else if (collectedCount <= 3) {
-    // Game 2 pattern: drop at cards 18, 40
-    return cardNumber === 18 || cardNumber === 40;
-  } else if (collectedCount <= 6) {
-    // Game 3 pattern: drop at cards 12, 28, 44
-    return cardNumber === 12 || cardNumber === 28 || cardNumber === 44;
-  } else {
-    // Game 4 pattern: drop at cards 18, 40
-    return cardNumber === 18 || cardNumber === 40;
-  }
-}
-
-// Find the next incomplete collection in order (by reward ascending)
-function findNextIncompleteCollection(
-  collections: Array<{ id: string; reward: number; items: Array<{ collected: boolean }> }>,
-  excludeStarter: boolean
-): string | null {
-  // Sort by reward (cheapest first)
-  const sorted = [...collections].sort((a, b) => a.reward - b.reward);
-  
-  for (const collection of sorted) {
-    if (excludeStarter && collection.id === STARTER_COLLECTION_ID) continue;
-    const isComplete = collection.items.every(i => i.collected);
-    if (!isComplete) return collection.id;
-  }
-  return null;
 }
 
 // Try to drop a collection item when a card is moved to foundation
@@ -254,77 +274,55 @@ function findNextIncompleteCollection(
 export function tryCollectionDrop(
   cardX: number, 
   cardY: number,
-  collections: Array<{ id: string; reward: number; items: Array<{ id: string; icon: string; collected: boolean }> }>
+  collections: Array<{ id: string; reward: number; items: Array<{ id: string; icon: string; collected: boolean; rarity?: number }> }>
 ): { collectionId: string; itemId: string; icon: string; isDuplicate: boolean } | null {
-  // Check if starter collection is fully collected
-  const starterCollection = collections.find(c => c.id === STARTER_COLLECTION_ID);
-  const starterCollectionComplete = starterCollection?.items.every(i => i.collected) ?? true;
-  const starterCollectedCount = starterCollection?.items.filter(i => i.collected).length ?? 0;
+  // Get current game state
+  let { dropsThisGame, cardsPlayed, targetDrops } = getGameDropState();
   
-  // Track cards moved for guaranteed drops
-  const currentCardNumber = incrementCardsMoved();
+  // Increment cards played
+  cardsPlayed++;
+  const cardsRemaining = TOTAL_CARDS_IN_GAME - cardsPlayed;
+  const dropsNeeded = targetDrops - dropsThisGame;
   
-  // Find the next incomplete collection after starter
-  const nextCollectionId = starterCollectionComplete 
-    ? findNextIncompleteCollection(collections, true)
-    : null;
+  // Calculate probability based on progress
+  const dropProbability = calculateDropProbability(cardsPlayed, dropsNeeded, cardsRemaining);
   
-  // ============ GUARANTEED DROP CHECK FOR STARTER COLLECTION ============
-  // If starter collection is incomplete, check for guaranteed drop
-  let guaranteedStarterDrop = false;
-  if (!starterCollectionComplete) {
-    guaranteedStarterDrop = shouldGuaranteedDrop(starterCollectedCount, currentCardNumber);
+  // Roll for drop
+  const roll = Math.random();
+  const shouldDrop = roll < dropProbability;
+  
+  console.log(`🎲 Card ${cardsPlayed}/${TOTAL_CARDS_IN_GAME}: P=${(dropProbability*100).toFixed(1)}%, roll=${(roll*100).toFixed(1)}%, drops=${dropsThisGame}/${targetDrops} → ${shouldDrop ? 'DROP!' : 'no drop'}`);
+  
+  // Update state (even if no drop)
+  if (shouldDrop) {
+    dropsThisGame++;
   }
+  updateGameDropState(dropsThisGame, cardsPlayed, targetDrops);
   
-  // First, check if drop happens at all
-  let shouldDrop = guaranteedStarterDrop;
-  
-  if (!shouldDrop) {
-    // Random drop chance
-    let effectiveDropChance = DROP_CHANCE_PER_CARD;
-    if (!starterCollectionComplete) {
-      effectiveDropChance *= 2; // Some random drops too
-    } else if (nextCollectionId) {
-      effectiveDropChance *= 1.5; // 1.5x more drops while working on next collection
-    }
-    shouldDrop = Math.random() < effectiveDropChance;
-  }
-    
   if (!shouldDrop) {
     return null;
   }
   
-  // Drop triggered! Now select which item drops based on collection rarity
-  // All items (including already collected) can drop - duplicates maintain engagement
+  // ============ SELECT WHICH ITEM DROPS BASED ON RARITY ============
+  // Build weighted pool based on item rarity (not collection rarity)
   const allItems: Array<{
     collectionId: string;
     itemId: string;
     icon: string;
     weight: number;
     collected: boolean;
+    rarity: number;
   }> = [];
   
   for (const collection of collections) {
-    let baseWeight = getCollectionWeight(collection.reward);
-    
-    const isStarterCollection = collection.id === STARTER_COLLECTION_ID;
-    const isNextCollection = collection.id === nextCollectionId;
-    const isCollectionComplete = collection.items.every(i => i.collected);
-    
     for (const item of collection.items) {
-      let itemWeight = baseWeight;
+      // Get rarity weight (default to 1-star if rarity not set)
+      const rarity = item.rarity || 1;
+      let itemWeight = RARITY_DROP_WEIGHTS[rarity] || RARITY_DROP_WEIGHTS[1];
       
-      // Apply massive boost to uncollected starter items
-      if (isStarterCollection && !starterCollectionComplete && !item.collected) {
-        itemWeight *= STARTER_COLLECTION_BOOST;
-      }
-      // Apply boost to uncollected items from the next collection in line
-      else if (isNextCollection && !item.collected) {
-        itemWeight *= NEXT_COLLECTION_BOOST;
-      }
-      // Slight boost to uncollected items from incomplete collections
-      else if (!isCollectionComplete && !item.collected) {
-        itemWeight *= 2;
+      // Slight boost to uncollected items (1.5x)
+      if (!item.collected) {
+        itemWeight *= 1.5;
       }
       
       allItems.push({
@@ -332,7 +330,8 @@ export function tryCollectionDrop(
         itemId: item.id,
         icon: item.icon,
         weight: itemWeight,
-        collected: item.collected
+        collected: item.collected,
+        rarity: rarity
       });
     }
   }
@@ -354,6 +353,8 @@ export function tryCollectionDrop(
     }
   }
   
+  console.log(`✨ Dropped: ${selectedItem.icon} from ${selectedItem.collectionId} (${selectedItem.collected ? 'duplicate' : 'NEW!'})`);
+  
   // Trigger flying icon animation
   const buttonPos = getCollectionsButtonPosition();
   if (buttonPos && flyingIconCallback) {
@@ -364,7 +365,8 @@ export function tryCollectionDrop(
       collectionId: selectedItem.collectionId,
       startX: cardX,
       startY: cardY,
-      isDuplicate: selectedItem.collected
+      isDuplicate: selectedItem.collected,
+      rarity: selectedItem.rarity
     };
     flyingIconCallback(drop);
   }

@@ -1,15 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 
-// Collection icons for animation
-const COLLECTION_ICONS = ['🌸', '🍎', '🎾', '🍖', '🎀', '🏠', '💊', '🎪', '🐾'];
+// Pack colors by rarity
+const PACK_COLORS: Record<number, string> = {
+  1: '#9ca3af', // gray
+  2: '#22c55e', // green
+  3: '#3b82f6', // blue
+  4: '#a855f7', // purple
+  5: '#ef4444', // red
+};
 
 interface ShopItem {
   id: string;
   price: number;
   stars: number;
-  items: number;
-  guaranteed: number;
+  packRarity: number; // 0 = no pack, 1-5 = pack with that rarity
   popular?: boolean;
   bestValue?: boolean;
 }
@@ -42,19 +47,94 @@ interface ShopProps {
 }
 
 const SHOP_ITEMS: ShopItem[] = [
-  { id: 'pack-1', price: 1.99, stars: 5, items: 5, guaranteed: 0 },
-  { id: 'pack-2', price: 4.99, stars: 15, items: 15, guaranteed: 1, popular: true },
-  { id: 'pack-3', price: 9.99, stars: 35, items: 35, guaranteed: 2 },
-  { id: 'pack-4', price: 19.99, stars: 80, items: 80, guaranteed: 3, bestValue: true },
-  { id: 'pack-5', price: 49.99, stars: 200, items: 200, guaranteed: 4 },
-  { id: 'pack-6', price: 99.99, stars: 500, items: 500, guaranteed: 5 },
+  { id: 'pack-1', price: 1.99, stars: 50, packRarity: 0 },
+  { id: 'pack-2', price: 4.99, stars: 100, packRarity: 1, popular: true },
+  { id: 'pack-3', price: 9.99, stars: 200, packRarity: 2 },
+  { id: 'pack-4', price: 19.99, stars: 400, packRarity: 3, bestValue: true },
+  { id: 'pack-5', price: 49.99, stars: 800, packRarity: 4 },
+  { id: 'pack-6', price: 99.99, stars: 1500, packRarity: 5 },
 ];
 
 const SUBSCRIPTION_PRICE = 5.99;
 
 // Max flying icons
 const MAX_STAR_ICONS = 25;
-const MAX_ITEM_ICONS = 50;
+
+// Card pack SVG component
+function CardPackIcon({ color, stars }: { color: string; stars: number }) {
+  // Split stars into rows if more than 3
+  const topRow = stars > 3 ? Math.ceil(stars / 2) : stars;
+  const bottomRow = stars > 3 ? stars - topRow : 0;
+  
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: 48, height: 58 }}>
+      <svg 
+        width="36" 
+        height="48" 
+        viewBox="0 0 36 48" 
+        fill="none"
+        style={{
+          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+        }}
+      >
+        {/* Single card */}
+        <rect x="0" y="0" width="36" height="48" rx="4" fill={color} />
+        {/* Shine effect */}
+        <rect x="0" y="0" width="36" height="48" rx="4" fill="url(#shopPackShine)" />
+        {/* Gradient definition */}
+        <defs>
+          <linearGradient id="shopPackShine" x1="0" y1="0" x2="36" y2="48" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.3)" />
+            <stop offset="50%" stopColor="rgba(255,255,255,0)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.15)" />
+          </linearGradient>
+        </defs>
+      </svg>
+      {/* Rarity stars centered on the card */}
+      {stars > 0 && (
+        <div 
+          className="absolute flex flex-col items-center justify-center"
+          style={{
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          {/* Top row */}
+          <div className="flex justify-center gap-0">
+            {Array.from({ length: topRow }).map((_, i) => (
+              <span 
+                key={i} 
+                style={{ 
+                  fontSize: '10px',
+                  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
+                }}
+              >
+                ⭐
+              </span>
+            ))}
+          </div>
+          {/* Bottom row (if needed) */}
+          {bottomRow > 0 && (
+            <div className="flex justify-center gap-0 -mt-0.5">
+              {Array.from({ length: bottomRow }).map((_, i) => (
+                <span 
+                  key={i} 
+                  style={{ 
+                    fontSize: '10px',
+                    filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
+                  }}
+                >
+                  ⭐
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Flying star component
 interface FlyingStarProps {
@@ -144,95 +224,6 @@ function FlyingStar({ item, onArrived }: FlyingStarProps) {
   );
 }
 
-// Flying collection item component - two phase animation like stars
-interface FlyingCollectionItemProps {
-  item: FlyingItem;
-  onArrived: (x: number, y: number) => void;
-}
-
-function FlyingCollectionItem({ item, onArrived }: FlyingCollectionItemProps) {
-  const [phase, setPhase] = useState<'scatter' | 'fly' | 'done'>('scatter');
-  const [position, setPosition] = useState({ x: item.startX, y: item.startY });
-  const startTimeRef = useRef(Date.now());
-  const rafRef = useRef<number>();
-  const arrivedRef = useRef(false);
-
-  useEffect(() => {
-    const animate = () => {
-      const elapsed = Date.now() - startTimeRef.current;
-
-      if (phase === 'scatter') {
-        const progress = Math.min(elapsed / item.scatterDuration, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        
-        setPosition({
-          x: item.startX + (item.scatterX - item.startX) * eased,
-          y: item.startY + (item.scatterY - item.startY) * eased
-        });
-
-        if (progress >= 1) {
-          setPhase('fly');
-          startTimeRef.current = Date.now() + item.flyDelay;
-        }
-      } else if (phase === 'fly') {
-        const flyElapsed = Date.now() - startTimeRef.current;
-        if (flyElapsed < 0) {
-          rafRef.current = requestAnimationFrame(animate);
-          return;
-        }
-        
-        const progress = Math.min(flyElapsed / item.flyDuration, 1);
-        const eased = progress < 0.5 
-          ? 2 * progress * progress 
-          : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-
-        const t = eased;
-        const mt = 1 - t;
-        const x = mt * mt * item.scatterX + 2 * mt * t * item.controlX + t * t * item.targetX;
-        const y = mt * mt * item.scatterY + 2 * mt * t * item.controlY + t * t * item.targetY;
-
-        setPosition({ x, y });
-
-        if (progress >= 1) {
-          setPhase('done');
-          if (!arrivedRef.current) {
-            arrivedRef.current = true;
-            // Pass final position for particles
-            onArrived(item.targetX, item.targetY);
-          }
-          return;
-        }
-      }
-
-      if (phase !== 'done') {
-        rafRef.current = requestAnimationFrame(animate);
-      }
-    };
-
-    rafRef.current = requestAnimationFrame(animate);
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [phase, item.scatterDuration, item.flyDelay, item.flyDuration, item.startX, item.startY, item.scatterX, item.scatterY, item.controlX, item.controlY, item.targetX, item.targetY, onArrived]);
-
-  if (phase === 'done') return null;
-
-  return (
-    <div
-      className="fixed pointer-events-none z-[10010]"
-      style={{
-        left: position.x,
-        top: position.y,
-        transform: 'translate(-50%, -50%)',
-        fontSize: '32px',
-        filter: 'drop-shadow(0 0 10px rgba(168, 85, 247, 0.9))'
-      }}
-    >
-      {item.icon}
-    </div>
-  );
-}
-
 export function Shop({ 
   isVisible, 
   onClose, 
@@ -240,14 +231,12 @@ export function Shop({
   onSubscribe, 
   isSubscribed,
   onStarArrived,
-  onCollectionItemArrived
 }: ShopProps) {
   const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmType, setConfirmType] = useState<'purchase' | 'subscribe'>('purchase');
   const [isAnimating, setIsAnimating] = useState(false);
   const [flyingStars, setFlyingStars] = useState<FlyingItem[]>([]);
-  const [flyingItems, setFlyingItems] = useState<FlyingItem[]>([]);
   
   const pendingPurchaseRef = useRef<ShopItem | null>(null);
   const animationStartedRef = useRef(false);
@@ -256,11 +245,6 @@ export function Shop({
   const handleStarArrived = useCallback((value: number) => {
     onStarArrived?.(value);
   }, [onStarArrived]);
-
-  // Stable callback for collection item arrived
-  const handleItemArrived = useCallback((x: number, y: number) => {
-    onCollectionItemArrived?.(x, y);
-  }, [onCollectionItemArrived]);
 
   // Create flying stars animation
   const createFlyingStars = useCallback((totalStars: number, onComplete: () => void) => {
@@ -309,10 +293,10 @@ export function Shop({
       const controlY = midY + (perpY / len) * curvature;
       
       const flyDuration = 350 + Math.random() * 150;
-      const flyDelay = i * 60;
+      const flyDelay = i * 25;
       
       stars.push({
-        id: Date.now() + i,
+        id: Date.now() * 1000 + Math.random() * 1000 + i,
         icon: '⭐',
         value,
         startX: centerX,
@@ -331,83 +315,9 @@ export function Shop({
     
     setFlyingStars(stars);
     
-    const totalDuration = scatterDuration + (iconCount * 60) + 500 + 200;
+    const totalDuration = scatterDuration + (iconCount * 25) + 500 + 200;
     setTimeout(() => {
       setFlyingStars([]);
-      onComplete();
-    }, totalDuration);
-  }, []);
-
-  // Create flying collection items animation
-  const createFlyingItems = useCallback((totalItems: number, onComplete: () => void) => {
-    const centerX = window.innerWidth / 2;
-    const centerY = window.innerHeight / 2;
-    
-    // Find collections button - target is top edge center
-    let targetX = window.innerWidth / 2;
-    let targetY = window.innerHeight - 100;
-    const collectionsButton = document.querySelector('[data-collections-button]');
-    if (collectionsButton) {
-      const rect = collectionsButton.getBoundingClientRect();
-      targetX = rect.left + rect.width / 2;
-      targetY = rect.top; // Top edge for particle effect
-    }
-    
-    const iconCount = Math.min(totalItems, MAX_ITEM_ICONS);
-    
-    const items: FlyingItem[] = [];
-    const scatterDuration = 400;
-    const minRadius = 40;
-    const maxRadius = 100;
-    
-    for (let i = 0; i < iconCount; i++) {
-      const angle = (i / iconCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
-      const radius = minRadius + Math.random() * (maxRadius - minRadius);
-      
-      const scatterX = centerX + Math.cos(angle) * radius;
-      const scatterY = centerY + Math.sin(angle) * radius;
-      
-      const midX = (scatterX + targetX) / 2;
-      const midY = (scatterY + targetY) / 2;
-      
-      const dx = targetX - scatterX;
-      const dy = targetY - scatterY;
-      const perpX = -dy;
-      const perpY = dx;
-      const len = Math.sqrt(perpX * perpX + perpY * perpY) || 1;
-      
-      const curvature = (Math.random() - 0.5) * 150;
-      const controlX = midX + (perpX / len) * curvature;
-      const controlY = midY + (perpY / len) * curvature;
-      
-      const flyDuration = 400 + Math.random() * 150;
-      const flyDelay = i * 50;
-      
-      const icon = COLLECTION_ICONS[Math.floor(Math.random() * COLLECTION_ICONS.length)];
-      
-      items.push({
-        id: Date.now() + i + 1000,
-        icon,
-        value: 1,
-        startX: centerX,
-        startY: centerY,
-        scatterX,
-        scatterY,
-        targetX,
-        targetY,
-        controlX,
-        controlY,
-        scatterDuration,
-        flyDelay,
-        flyDuration
-      });
-    }
-    
-    setFlyingItems(items);
-    
-    const totalDuration = scatterDuration + (iconCount * 50) + 550 + 200;
-    setTimeout(() => {
-      setFlyingItems([]);
       onComplete();
     }, totalDuration);
   }, []);
@@ -437,18 +347,15 @@ export function Shop({
       // Close shop immediately so bottom buttons are visible during animation
       onClose();
       
-      // Phase 1: Stars fly to progress bar
+      // Stars fly to progress bar
       createFlyingStars(selectedItem.stars, () => {
-        // Phase 2: Collection items fly to collections button
-        createFlyingItems(selectedItem.items, () => {
-          setIsAnimating(false);
-          animationStartedRef.current = false;
-          // Actually process the purchase after animations
-          if (pendingPurchaseRef.current) {
-            onPurchase(pendingPurchaseRef.current);
-            pendingPurchaseRef.current = null;
-          }
-        });
+        setIsAnimating(false);
+        animationStartedRef.current = false;
+        // Actually process the purchase after animations
+        if (pendingPurchaseRef.current) {
+          onPurchase(pendingPurchaseRef.current);
+          pendingPurchaseRef.current = null;
+        }
       });
     } else if (confirmType === 'subscribe') {
       onSubscribe();
@@ -464,26 +371,25 @@ export function Shop({
 
   const formatPrice = (price: number) => `$${price.toFixed(2)}`;
 
-  const getItemEmoji = (guaranteed: number) => {
-    if (guaranteed >= 5) return '👑';
-    if (guaranteed >= 4) return '💎';
-    if (guaranteed >= 3) return '🌟';
-    if (guaranteed >= 2) return '✨';
-    if (guaranteed >= 1) return '⭐';
-    return '🎁';
+  const getPackName = (rarity: number) => {
+    switch (rarity) {
+      case 1: return 'Обычный пак';
+      case 2: return 'Необычный пак';
+      case 3: return 'Редкий пак';
+      case 4: return 'Эпический пак';
+      case 5: return 'Легендарный пак';
+      default: return '';
+    }
   };
 
   // Render flying animations
   const renderFlyingAnimations = () => {
-    if (flyingStars.length === 0 && flyingItems.length === 0) return null;
+    if (flyingStars.length === 0) return null;
     
     return ReactDOM.createPortal(
       <>
         {flyingStars.map(star => (
           <FlyingStar key={star.id} item={star} onArrived={handleStarArrived} />
-        ))}
-        {flyingItems.map(item => (
-          <FlyingCollectionItem key={item.id} item={item} onArrived={handleItemArrived} />
         ))}
       </>,
       document.body
@@ -522,7 +428,7 @@ export function Shop({
           {/* Header */}
           <div className="text-center mb-5">
             <h2 className="text-3xl font-bold text-white mb-1">🛒 Магазин</h2>
-            <p className="text-purple-300/80">Получи звёзды и предметы коллекций</p>
+            <p className="text-purple-300/80">Получи звёзды и паки коллекций</p>
           </div>
 
           {/* Subscription Section */}
@@ -597,24 +503,31 @@ export function Shop({
                 )}
 
                 {/* Content */}
-                <div className="text-center flex flex-col">
-                  <div className="text-2xl mb-1">{getItemEmoji(item.guaranteed)}</div>
-                  
-                  <div className="flex items-center justify-center gap-1">
-                    <span className="text-yellow-400">⭐</span>
-                    <span className="text-white font-bold">{item.stars}</span>
+                <div className="text-center flex flex-col items-center">
+                  {/* Stars amount */}
+                  <div className="flex items-center justify-center gap-1 mb-2">
+                    <span className="text-yellow-400 text-lg">⭐</span>
+                    <span className="text-white font-bold text-lg">{item.stars}</span>
                   </div>
                   
-                  <div className="text-white/60 text-xs">
-                    🎴 {item.items} шт
+                  {/* Pack icon or placeholder */}
+                  <div className="h-[58px] flex items-center justify-center mb-2">
+                    {item.packRarity > 0 ? (
+                      <CardPackIcon color={PACK_COLORS[item.packRarity]} stars={item.packRarity} />
+                    ) : (
+                      <div className="text-white/30 text-xs text-center">
+                        Только<br/>звёзды
+                      </div>
+                    )}
                   </div>
                   
-                  {/* Fixed height for unique line - always reserve space */}
-                  <div className="text-green-400 text-xs h-4">
-                    {item.guaranteed > 0 ? `+${item.guaranteed} уник.` : ''}
+                  {/* Pack name */}
+                  <div className="text-white/60 text-xs h-4 mb-1">
+                    {item.packRarity > 0 ? getPackName(item.packRarity) : ''}
                   </div>
                   
-                  <div className={`mt-1 py-1.5 px-2 rounded-lg font-bold text-sm ${
+                  {/* Price button */}
+                  <div className={`w-full py-1.5 px-2 rounded-lg font-bold text-sm ${
                     item.bestValue
                       ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
                       : item.popular
@@ -658,14 +571,15 @@ export function Shop({
               </div>
             ) : selectedItem && (
               <div className="text-center mb-4">
-                <div className="text-3xl mb-2">{getItemEmoji(selectedItem.guaranteed)}</div>
-                <p className="text-white/80">
-                  ⭐ {selectedItem.stars} звёзд + 🎴 {selectedItem.items} предметов
-                </p>
-                {selectedItem.guaranteed > 0 && (
-                  <p className="text-green-400 text-sm">
-                    {selectedItem.guaranteed} уникальных гарантированно
-                  </p>
+                <div className="flex items-center justify-center gap-1 mb-3">
+                  <span className="text-yellow-400 text-2xl">⭐</span>
+                  <span className="text-white font-bold text-2xl">{selectedItem.stars}</span>
+                </div>
+                {selectedItem.packRarity > 0 && (
+                  <div className="flex flex-col items-center mb-2">
+                    <CardPackIcon color={PACK_COLORS[selectedItem.packRarity]} stars={selectedItem.packRarity} />
+                    <p className="text-white/80 text-sm mt-1">{getPackName(selectedItem.packRarity)}</p>
+                  </div>
                 )}
                 <p className="text-purple-400 font-bold text-xl mt-2">
                   {formatPrice(selectedItem.price)}

@@ -344,21 +344,54 @@ export function PromoWidget({ onPurchase, onStarArrived, onCollectionCardArrived
       {/* Promo Widget Button */}
       <button
         onClick={() => !isAnimating && setShowModal(true)}
-        className="relative flex flex-col items-center justify-center w-14 h-14 bg-gradient-to-b from-amber-500 to-orange-600 rounded-xl shadow-lg border border-amber-400/50 hover:scale-105 transition-transform"
-        style={{ opacity: isAnimating ? 0.5 : 1 }}
+        className="relative flex flex-col items-center justify-center bg-gradient-to-b from-amber-500 to-orange-600 rounded-xl shadow-lg border-2 border-amber-400/50 hover:scale-105 transition-transform"
+        style={{ 
+          width: '70px', 
+          height: '96px',
+          opacity: isAnimating ? 0.5 : 1,
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2), 0 4px 12px rgba(0,0,0,0.3)',
+        }}
         disabled={isAnimating}
       >
-        {/* Sale badge */}
-        <div className="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+        {/* Sale badge - static */}
+        <div className="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-red-400 shadow-md z-10">
           SALE
         </div>
         
-        {/* Icon */}
-        <div className="text-3xl">🎴</div>
+        {/* Premium Pack Icon */}
+        <div className="relative flex items-center justify-center" style={{ marginTop: '-4px' }}>
+          <svg width="44" height="44" viewBox="0 0 36 36">
+            {/* Glow effect */}
+            <defs>
+              <filter id="promoGlow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="2" result="blur"/>
+                <feMerge>
+                  <feMergeNode in="blur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+              <linearGradient id="promoCardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#fcd34d"/>
+                <stop offset="50%" stopColor="#f59e0b"/>
+                <stop offset="100%" stopColor="#d97706"/>
+              </linearGradient>
+            </defs>
+            {/* Back cards (stack effect) */}
+            <rect x="10" y="4" width="18" height="24" rx="3" fill="#92400e" opacity="0.6"/>
+            <rect x="8" y="6" width="18" height="24" rx="3" fill="#b45309" opacity="0.8"/>
+            {/* Main card */}
+            <rect x="6" y="8" width="18" height="24" rx="3" fill="url(#promoCardGrad)" filter="url(#promoGlow)"/>
+            {/* Stars on card */}
+            <text x="15" y="18" textAnchor="middle" fill="#fff" fontSize="6" fontWeight="bold" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>★★</text>
+            <text x="15" y="26" textAnchor="middle" fill="#fff" fontSize="6" fontWeight="bold" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>★★★</text>
+            {/* Sparkle */}
+            <text x="28" y="10" fill="#fff" fontSize="8">✨</text>
+          </svg>
+        </div>
         
         {/* Timer */}
-        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2">
-          <div className="text-[9px] text-white font-mono bg-black/70 px-1 py-0.5 rounded whitespace-nowrap">
+        <div className="mt-1">
+          <div className="text-[9px] text-white font-mono bg-black/50 px-1.5 py-0.5 rounded whitespace-nowrap">
             {formatTime(timeLeft.hours)}:{formatTime(timeLeft.minutes)}:{formatTime(timeLeft.seconds)}
           </div>
         </div>
@@ -443,14 +476,45 @@ export function PromoWidget({ onPurchase, onStarArrived, onCollectionCardArrived
       )}
       
       {/* Flying Stars */}
-      {flyingStars.map(star => (
-        <FlyingItemComponent
-          key={star.id}
-          item={star}
-          onArrived={() => handleStarArrived(star)}
-          glow="rgba(250, 204, 21, 0.8)"
-        />
-      ))}
+      {flyingStars.map(star => {
+        // Determine star glow color based on value
+        const getStarGlow = (value: number) => {
+          if (value >= 100) {
+            // Purple for x100
+            return 'rgba(147, 51, 234, 0.9)';
+          } else if (value >= 10) {
+            // Blue for x10
+            return 'rgba(59, 130, 246, 0.9)';
+          } else {
+            // Gold (default)
+            return 'rgba(250, 204, 21, 0.8)';
+          }
+        };
+        
+        // Determine star filter based on value
+        const getStarFilter = (value: number) => {
+          if (value >= 100) {
+            // Purple star
+            return 'hue-rotate(260deg) brightness(1.2) saturate(1.5)';
+          } else if (value >= 10) {
+            // Blue star
+            return 'hue-rotate(180deg) brightness(1.2)';
+          } else {
+            // Gold (no hue rotation)
+            return '';
+          }
+        };
+        
+        return (
+          <FlyingItemComponent
+            key={star.id}
+            item={star}
+            onArrived={() => handleStarArrived(star)}
+            glow={getStarGlow(star.value)}
+            hueFilter={getStarFilter(star.value)}
+          />
+        );
+      })}
       
       {/* Flying Collection Cards */}
       {flyingCards.map(card => (
@@ -489,11 +553,13 @@ function easeInQuad(t: number): number {
 function FlyingItemComponent({ 
   item, 
   onArrived, 
-  glow 
+  glow,
+  hueFilter = ''
 }: { 
   item: FlyingItem; 
   onArrived: () => void;
   glow: string;
+  hueFilter?: string;
 }) {
   const elementRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -593,7 +659,7 @@ function FlyingItemComponent({
         left: item.startX,
         top: item.startY,
         transform: 'translate(-50%, -50%)',
-        filter: `drop-shadow(0 0 6px ${glow}) drop-shadow(0 0 12px ${glow})`
+        filter: `${hueFilter} drop-shadow(0 0 6px ${glow}) drop-shadow(0 0 12px ${glow})`
       }}
     >
       {item.icon}

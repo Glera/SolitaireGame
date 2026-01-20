@@ -102,11 +102,21 @@ export function resetAllXP(): void {
 
 // Level system: 
 // - Level 1→2: 2 games max
-// - Level 2→3: 3 games max
+// - Level 2→3: 2 games max (TEMP: same as level 2)
+// - Level 3→4: 2 games max (TEMP: same as level 2)
 // - Level N→N+1: min(N+1, 10) games max
 // One win = ~102 XP (52 cards + 50 bonus)
 const XP_PER_GAME = 102;
 const MAX_GAMES_PER_LEVEL = 10;
+
+// Helper to get games needed for a specific level transition
+function getGamesNeededForLevel(targetLevel: number): number {
+  // TEMP: Levels 2, 3, 4 all require 2 games
+  if (targetLevel <= 4) {
+    return 2;
+  }
+  return Math.min(targetLevel, MAX_GAMES_PER_LEVEL);
+}
 
 // Calculate XP needed to reach a specific level
 function getXPForLevel(level: number): number {
@@ -115,7 +125,7 @@ function getXPForLevel(level: number): number {
   let totalXP = 0;
   for (let lvl = 2; lvl <= level; lvl++) {
     // Games needed to go from lvl-1 to lvl
-    const gamesNeeded = Math.min(lvl, MAX_GAMES_PER_LEVEL);
+    const gamesNeeded = getGamesNeededForLevel(lvl);
     totalXP += gamesNeeded * XP_PER_GAME;
   }
   return totalXP;
@@ -123,7 +133,7 @@ function getXPForLevel(level: number): number {
 
 // Get XP needed to go from level to level+1
 function getXPForNextLevel(level: number): number {
-  const gamesNeeded = Math.min(level + 1, MAX_GAMES_PER_LEVEL);
+  const gamesNeeded = getGamesNeededForLevel(level + 1);
   return gamesNeeded * XP_PER_GAME;
 }
 

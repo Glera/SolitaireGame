@@ -7,7 +7,26 @@ export interface CollectionItem {
   name: string;
   icon: string;
   collected: boolean;
+  rarity: 1 | 2 | 3 | 4 | 5; // 1 = common, 5 = legendary
 }
+
+// Rarity colors for display
+export const RARITY_COLORS: Record<number, string> = {
+  1: '#9ca3af', // gray
+  2: '#22c55e', // green  
+  3: '#3b82f6', // blue
+  4: '#a855f7', // purple
+  5: '#f59e0b', // gold/orange
+};
+
+// Rarity drop weights (lower = rarer)
+export const RARITY_DROP_WEIGHTS: Record<number, number> = {
+  1: 100,  // Very common
+  2: 40,   // Common
+  3: 15,   // Uncommon
+  4: 4,    // Rare
+  5: 1,    // Legendary (very rare)
+};
 
 // Collection type
 export interface Collection {
@@ -52,161 +71,280 @@ export function saveTrophy(trophy: Trophy): void {
 }
 
 // Default collections data - sorted by reward ascending (cheapest top-left, most expensive bottom-right)
+// Rarity distribution per collection (from user):
+// 1: 8x1★, 1x2★ | 2: 7x1★, 2x2★ | 3: 6x1★, 3x2★ | 4: 4x1★, 4x2★, 1x3★ | 5: 4x1★, 4x2★, 2x3★ (10 items)
+// 6: 3x1★, 3x2★, 3x3★ | 7: 3x1★, 2x2★, 4x3★ | 8: 3x1★, 2x2★, 4x3★ | 9: 2x1★, 3x2★, 4x3★
+// 10: 1x1★, 1x2★, 2x3★, 3x4★, 2x5★ | 11: 1x2★, 1x3★, 5x4★, 2x5★ | 12: 1x2★, 1x3★, 5x4★, 2x5★
+// 13: 3x3★, 3x4★, 3x5★ | 14: 2x3★, 3x4★, 4x5★ | 15: 1x3★, 4x4★, 4x5★
 export const defaultCollections: Collection[] = [
-  // Row 1: 5, 8, 10
+  // Collection 1: Природа - 8x1★, 1x2★
   {
     id: 'nature',
     name: 'Природа',
     icon: '🌸',
-    reward: 5,
+    reward: 100,
     items: [
-      { id: 'nat-1', name: 'Солнце', icon: '☀️', collected: false },
-      { id: 'nat-2', name: 'Облако', icon: '☁️', collected: false },
-      { id: 'nat-3', name: 'Радуга', icon: '🌈', collected: false },
-      { id: 'nat-4', name: 'Звезда', icon: '⭐', collected: false },
-      { id: 'nat-5', name: 'Луна', icon: '🌙', collected: false },
-      { id: 'nat-6', name: 'Снежинка', icon: '❄️', collected: false },
-      { id: 'nat-7', name: 'Листик', icon: '🍃', collected: false },
-      { id: 'nat-8', name: 'Цветок', icon: '🌸', collected: false },
-      { id: 'nat-9', name: 'Капля', icon: '💧', collected: false },
+      { id: 'nat-1', name: 'Солнце', icon: '☀️', collected: false, rarity: 1 },
+      { id: 'nat-2', name: 'Облако', icon: '☁️', collected: false, rarity: 1 },
+      { id: 'nat-3', name: 'Радуга', icon: '🌈', collected: false, rarity: 1 },
+      { id: 'nat-4', name: 'Звезда', icon: '⭐', collected: false, rarity: 1 },
+      { id: 'nat-5', name: 'Луна', icon: '🌙', collected: false, rarity: 1 },
+      { id: 'nat-6', name: 'Снежинка', icon: '❄️', collected: false, rarity: 1 },
+      { id: 'nat-7', name: 'Листик', icon: '🍃', collected: false, rarity: 1 },
+      { id: 'nat-8', name: 'Цветок', icon: '🌸', collected: false, rarity: 1 },
+      { id: 'nat-9', name: 'Капля', icon: '💧', collected: false, rarity: 2 },
     ]
   },
+  // Collection 2: Фрукты - 7x1★, 2x2★
   {
     id: 'fruits',
     name: 'Фрукты',
     icon: '🍎',
-    reward: 8,
+    reward: 100,
     items: [
-      { id: 'fruit-1', name: 'Яблоко', icon: '🍎', collected: false },
-      { id: 'fruit-2', name: 'Банан', icon: '🍌', collected: false },
-      { id: 'fruit-3', name: 'Арбуз', icon: '🍉', collected: false },
-      { id: 'fruit-4', name: 'Клубника', icon: '🍓', collected: false },
-      { id: 'fruit-5', name: 'Виноград', icon: '🍇', collected: false },
-      { id: 'fruit-6', name: 'Груша', icon: '🍐', collected: false },
-      { id: 'fruit-7', name: 'Апельсин', icon: '🍊', collected: false },
-      { id: 'fruit-8', name: 'Вишня', icon: '🍒', collected: false },
-      { id: 'fruit-9', name: 'Персик', icon: '🍑', collected: false },
+      { id: 'fruit-1', name: 'Яблоко', icon: '🍎', collected: false, rarity: 1 },
+      { id: 'fruit-2', name: 'Банан', icon: '🍌', collected: false, rarity: 1 },
+      { id: 'fruit-3', name: 'Арбуз', icon: '🍉', collected: false, rarity: 1 },
+      { id: 'fruit-4', name: 'Клубника', icon: '🍓', collected: false, rarity: 1 },
+      { id: 'fruit-5', name: 'Виноград', icon: '🍇', collected: false, rarity: 1 },
+      { id: 'fruit-6', name: 'Груша', icon: '🍐', collected: false, rarity: 1 },
+      { id: 'fruit-7', name: 'Апельсин', icon: '🍊', collected: false, rarity: 1 },
+      { id: 'fruit-8', name: 'Вишня', icon: '🍒', collected: false, rarity: 2 },
+      { id: 'fruit-9', name: 'Персик', icon: '🍑', collected: false, rarity: 2 },
     ]
   },
+  // Collection 3: Игрушки - 6x1★, 3x2★
   {
     id: 'toys',
     name: 'Игрушки',
     icon: '🎾',
-    reward: 10,
+    reward: 150,
     items: [
-      { id: 'toys-1', name: 'Мячик', icon: '🎾', collected: false },
-      { id: 'toys-2', name: 'Косточка', icon: '🦴', collected: false },
-      { id: 'toys-3', name: 'Канат', icon: '🪢', collected: false },
-      { id: 'toys-4', name: 'Фрисби', icon: '🥏', collected: false },
-      { id: 'toys-5', name: 'Пищалка', icon: '🔔', collected: false },
-      { id: 'toys-6', name: 'Плюшевый мишка', icon: '🧸', collected: false },
-      { id: 'toys-7', name: 'Палка', icon: '🪵', collected: false },
-      { id: 'toys-8', name: 'Мяч-ёжик', icon: '🔵', collected: false },
-      { id: 'toys-9', name: 'Кольцо', icon: '⭕', collected: false },
+      { id: 'toys-1', name: 'Мячик', icon: '🎾', collected: false, rarity: 1 },
+      { id: 'toys-2', name: 'Косточка', icon: '🦴', collected: false, rarity: 1 },
+      { id: 'toys-3', name: 'Канат', icon: '🪢', collected: false, rarity: 1 },
+      { id: 'toys-4', name: 'Фрисби', icon: '🥏', collected: false, rarity: 1 },
+      { id: 'toys-5', name: 'Пищалка', icon: '🔔', collected: false, rarity: 1 },
+      { id: 'toys-6', name: 'Плюшевый мишка', icon: '🧸', collected: false, rarity: 1 },
+      { id: 'toys-7', name: 'Палка', icon: '🪵', collected: false, rarity: 2 },
+      { id: 'toys-8', name: 'Мяч-ёжик', icon: '🔵', collected: false, rarity: 2 },
+      { id: 'toys-9', name: 'Кольцо', icon: '⭕', collected: false, rarity: 2 },
     ]
   },
-  // Row 2: 15, 20, 25
+  // Collection 4: Вкусняшки - 4x1★, 4x2★, 1x3★
   {
     id: 'treats',
     name: 'Вкусняшки',
     icon: '🍖',
-    reward: 15,
+    reward: 200,
     items: [
-      { id: 'treats-1', name: 'Печенье', icon: '🍪', collected: false },
-      { id: 'treats-2', name: 'Косточка из жил', icon: '🦴', collected: false },
-      { id: 'treats-3', name: 'Мясо', icon: '🥩', collected: false },
-      { id: 'treats-4', name: 'Сыр', icon: '🧀', collected: false },
-      { id: 'treats-5', name: 'Морковка', icon: '🥕', collected: false },
-      { id: 'treats-6', name: 'Яблоко', icon: '🍎', collected: false },
-      { id: 'treats-7', name: 'Арахисовая паста', icon: '🥜', collected: false },
-      { id: 'treats-8', name: 'Лакомство', icon: '🍬', collected: false },
-      { id: 'treats-9', name: 'Сухарик', icon: '🥨', collected: false },
+      { id: 'treats-1', name: 'Печенье', icon: '🍪', collected: false, rarity: 1 },
+      { id: 'treats-2', name: 'Косточка из жил', icon: '🦴', collected: false, rarity: 1 },
+      { id: 'treats-3', name: 'Мясо', icon: '🥩', collected: false, rarity: 1 },
+      { id: 'treats-4', name: 'Сыр', icon: '🧀', collected: false, rarity: 1 },
+      { id: 'treats-5', name: 'Морковка', icon: '🥕', collected: false, rarity: 2 },
+      { id: 'treats-6', name: 'Яблоко', icon: '🍎', collected: false, rarity: 2 },
+      { id: 'treats-7', name: 'Арахисовая паста', icon: '🥜', collected: false, rarity: 2 },
+      { id: 'treats-8', name: 'Лакомство', icon: '🍬', collected: false, rarity: 2 },
+      { id: 'treats-9', name: 'Стейк', icon: '🥨', collected: false, rarity: 3 },
     ]
   },
+  // Collection 5: Аксессуары - 3x1★, 4x2★, 2x3★
   {
     id: 'accessories',
     name: 'Аксессуары',
     icon: '🎀',
-    reward: 20,
+    reward: 200,
     items: [
-      { id: 'acc-1', name: 'Ошейник', icon: '⭕', collected: false },
-      { id: 'acc-2', name: 'Поводок', icon: '🔗', collected: false },
-      { id: 'acc-3', name: 'Бантик', icon: '🎀', collected: false },
-      { id: 'acc-4', name: 'Шарфик', icon: '🧣', collected: false },
-      { id: 'acc-5', name: 'Жилетка', icon: '🦺', collected: false },
-      { id: 'acc-6', name: 'Ботиночки', icon: '👟', collected: false },
-      { id: 'acc-7', name: 'Бирка', icon: '🏷️', collected: false },
-      { id: 'acc-8', name: 'Медаль', icon: '🏅', collected: false },
-      { id: 'acc-9', name: 'Косынка', icon: '👘', collected: false },
+      { id: 'acc-1', name: 'Ошейник', icon: '⭕', collected: false, rarity: 1 },
+      { id: 'acc-2', name: 'Поводок', icon: '🔗', collected: false, rarity: 1 },
+      { id: 'acc-3', name: 'Бантик', icon: '🎀', collected: false, rarity: 1 },
+      { id: 'acc-4', name: 'Жилетка', icon: '🦺', collected: false, rarity: 2 },
+      { id: 'acc-5', name: 'Ботиночки', icon: '👟', collected: false, rarity: 2 },
+      { id: 'acc-6', name: 'Бирка', icon: '🏷️', collected: false, rarity: 2 },
+      { id: 'acc-7', name: 'Медаль', icon: '🏅', collected: false, rarity: 2 },
+      { id: 'acc-8', name: 'Косынка', icon: '👘', collected: false, rarity: 3 },
+      { id: 'acc-9', name: 'Корона', icon: '👑', collected: false, rarity: 3 },
     ]
   },
+  // Collection 6: Домашний уют - 3x1★, 3x2★, 3x3★
   {
     id: 'home',
     name: 'Домашний уют',
     icon: '🏠',
-    reward: 25,
+    reward: 200,
     items: [
-      { id: 'home-1', name: 'Лежанка', icon: '🛏️', collected: false },
-      { id: 'home-2', name: 'Миска', icon: '🥣', collected: false },
-      { id: 'home-3', name: 'Домик', icon: '🏠', collected: false },
-      { id: 'home-4', name: 'Одеяло', icon: '🛋️', collected: false },
-      { id: 'home-5', name: 'Подушка', icon: '🛏️', collected: false },
-      { id: 'home-6', name: 'Коврик', icon: '🟫', collected: false },
-      { id: 'home-7', name: 'Корзинка', icon: '🧺', collected: false },
-      { id: 'home-8', name: 'Когтеточка', icon: '🪵', collected: false },
-      { id: 'home-9', name: 'Фонтанчик', icon: '⛲', collected: false },
+      { id: 'home-1', name: 'Лежанка', icon: '🛏️', collected: false, rarity: 1 },
+      { id: 'home-2', name: 'Миска', icon: '🥣', collected: false, rarity: 1 },
+      { id: 'home-3', name: 'Домик', icon: '🏠', collected: false, rarity: 1 },
+      { id: 'home-4', name: 'Одеяло', icon: '🛋️', collected: false, rarity: 2 },
+      { id: 'home-5', name: 'Подушка', icon: '🛏️', collected: false, rarity: 2 },
+      { id: 'home-6', name: 'Коврик', icon: '🟫', collected: false, rarity: 2 },
+      { id: 'home-7', name: 'Корзинка', icon: '🧺', collected: false, rarity: 3 },
+      { id: 'home-8', name: 'Когтеточка', icon: '🪵', collected: false, rarity: 3 },
+      { id: 'home-9', name: 'Фонтанчик', icon: '⛲', collected: false, rarity: 3 },
     ]
   },
-  // Row 3: 30, 40, 50
+  // Collection 7: Времена года - 3x1★, 2x2★, 4x3★
   {
     id: 'seasons',
     name: 'Времена года',
     icon: '🍂',
-    reward: 30,
+    reward: 200,
     items: [
-      { id: 'sea-1', name: 'Подснежник', icon: '🌷', collected: false },
-      { id: 'sea-2', name: 'Тюльпан', icon: '🌷', collected: false },
-      { id: 'sea-3', name: 'Ромашка', icon: '🌼', collected: false },
-      { id: 'sea-4', name: 'Подсолнух', icon: '🌻', collected: false },
-      { id: 'sea-5', name: 'Кленовый лист', icon: '🍁', collected: false },
-      { id: 'sea-6', name: 'Жёлудь', icon: '🌰', collected: false },
-      { id: 'sea-7', name: 'Снеговик', icon: '⛄', collected: false },
-      { id: 'sea-8', name: 'Ёлка', icon: '🎄', collected: false },
-      { id: 'sea-9', name: 'Подарок', icon: '🎁', collected: false },
+      { id: 'sea-1', name: 'Подснежник', icon: '🌷', collected: false, rarity: 1 },
+      { id: 'sea-2', name: 'Тюльпан', icon: '🌷', collected: false, rarity: 1 },
+      { id: 'sea-3', name: 'Ромашка', icon: '🌼', collected: false, rarity: 1 },
+      { id: 'sea-4', name: 'Подсолнух', icon: '🌻', collected: false, rarity: 2 },
+      { id: 'sea-5', name: 'Кленовый лист', icon: '🍁', collected: false, rarity: 2 },
+      { id: 'sea-6', name: 'Жёлудь', icon: '🌰', collected: false, rarity: 3 },
+      { id: 'sea-7', name: 'Снеговик', icon: '⛄', collected: false, rarity: 3 },
+      { id: 'sea-8', name: 'Ёлка', icon: '🎄', collected: false, rarity: 3 },
+      { id: 'sea-9', name: 'Подарок', icon: '🎁', collected: false, rarity: 3 },
     ]
   },
+  // Collection 8: Приключения - 3x1★, 2x2★, 4x3★
+  {
+    id: 'adventures',
+    name: 'Приключения',
+    icon: '🏕️',
+    reward: 250,
+    items: [
+      { id: 'adv-1', name: 'Палатка', icon: '⛺', collected: false, rarity: 1 },
+      { id: 'adv-2', name: 'Костёр', icon: '🔥', collected: false, rarity: 1 },
+      { id: 'adv-3', name: 'Компас', icon: '🧭', collected: false, rarity: 1 },
+      { id: 'adv-4', name: 'Карта', icon: '🗺️', collected: false, rarity: 2 },
+      { id: 'adv-5', name: 'Рюкзак', icon: '🎒', collected: false, rarity: 2 },
+      { id: 'adv-6', name: 'Бинокль', icon: '🔭', collected: false, rarity: 3 },
+      { id: 'adv-7', name: 'Фонарик', icon: '🔦', collected: false, rarity: 3 },
+      { id: 'adv-8', name: 'Горы', icon: '🏔️', collected: false, rarity: 3 },
+      { id: 'adv-9', name: 'Лес', icon: '🌲', collected: false, rarity: 3 },
+    ]
+  },
+  // Collection 9: Друзья - 2x1★, 3x2★, 4x3★
   {
     id: 'friends',
     name: 'Друзья',
     icon: '🐕',
-    reward: 40,
+    reward: 250,
     items: [
-      { id: 'fr-1', name: 'Собака', icon: '🐕', collected: false },
-      { id: 'fr-2', name: 'Кошка', icon: '🐈', collected: false },
-      { id: 'fr-3', name: 'Хомяк', icon: '🐹', collected: false },
-      { id: 'fr-4', name: 'Попугай', icon: '🦜', collected: false },
-      { id: 'fr-5', name: 'Рыбка', icon: '🐠', collected: false },
-      { id: 'fr-6', name: 'Кролик', icon: '🐰', collected: false },
-      { id: 'fr-7', name: 'Черепаха', icon: '🐢', collected: false },
-      { id: 'fr-8', name: 'Морская свинка', icon: '🐹', collected: false },
-      { id: 'fr-9', name: 'Ёжик', icon: '🦔', collected: false },
+      { id: 'fr-1', name: 'Собака', icon: '🐕', collected: false, rarity: 1 },
+      { id: 'fr-2', name: 'Кошка', icon: '🐈', collected: false, rarity: 1 },
+      { id: 'fr-3', name: 'Хомяк', icon: '🐹', collected: false, rarity: 2 },
+      { id: 'fr-4', name: 'Попугай', icon: '🦜', collected: false, rarity: 2 },
+      { id: 'fr-5', name: 'Рыбка', icon: '🐠', collected: false, rarity: 2 },
+      { id: 'fr-6', name: 'Кролик', icon: '🐰', collected: false, rarity: 3 },
+      { id: 'fr-7', name: 'Черепаха', icon: '🐢', collected: false, rarity: 3 },
+      { id: 'fr-8', name: 'Морская свинка', icon: '🐹', collected: false, rarity: 3 },
+      { id: 'fr-9', name: 'Ёжик', icon: '🦔', collected: false, rarity: 3 },
     ]
   },
+  // Collection 10: Сердечки - 1x1★, 1x2★, 2x3★, 3x4★, 2x5★
   {
     id: 'hearts',
     name: 'Сердечки',
     icon: '❤️',
-    reward: 50,
+    reward: 300,
     items: [
-      { id: 'heart-1', name: 'Красное', icon: '❤️', collected: false },
-      { id: 'heart-2', name: 'Розовое', icon: '💗', collected: false },
-      { id: 'heart-3', name: 'Оранжевое', icon: '🧡', collected: false },
-      { id: 'heart-4', name: 'Жёлтое', icon: '💛', collected: false },
-      { id: 'heart-5', name: 'Зелёное', icon: '💚', collected: false },
-      { id: 'heart-6', name: 'Голубое', icon: '💙', collected: false },
-      { id: 'heart-7', name: 'Синее', icon: '💜', collected: false },
-      { id: 'heart-8', name: 'Фиолетовое', icon: '💜', collected: false },
-      { id: 'heart-9', name: 'Радужное', icon: '🩷', collected: false },
+      { id: 'heart-1', name: 'Красное', icon: '❤️', collected: false, rarity: 1 },
+      { id: 'heart-2', name: 'Розовое', icon: '💗', collected: false, rarity: 2 },
+      { id: 'heart-3', name: 'Оранжевое', icon: '🧡', collected: false, rarity: 3 },
+      { id: 'heart-4', name: 'Жёлтое', icon: '💛', collected: false, rarity: 3 },
+      { id: 'heart-5', name: 'Зелёное', icon: '💚', collected: false, rarity: 4 },
+      { id: 'heart-6', name: 'Голубое', icon: '💙', collected: false, rarity: 4 },
+      { id: 'heart-7', name: 'Синее', icon: '💜', collected: false, rarity: 4 },
+      { id: 'heart-8', name: 'Искрящееся', icon: '💖', collected: false, rarity: 5 },
+      { id: 'heart-9', name: 'Радужное', icon: '🩷', collected: false, rarity: 5 },
+    ]
+  },
+  // Collection 11: Космос - 1x2★, 1x3★, 5x4★, 2x5★
+  {
+    id: 'space',
+    name: 'Космос',
+    icon: '🚀',
+    reward: 300,
+    items: [
+      { id: 'space-1', name: 'Ракета', icon: '🚀', collected: false, rarity: 2 },
+      { id: 'space-2', name: 'Планета', icon: '🪐', collected: false, rarity: 3 },
+      { id: 'space-3', name: 'Спутник', icon: '🛸', collected: false, rarity: 4 },
+      { id: 'space-4', name: 'Астронавт', icon: '👨‍🚀', collected: false, rarity: 4 },
+      { id: 'space-5', name: 'Метеорит', icon: '☄️', collected: false, rarity: 4 },
+      { id: 'space-6', name: 'Телескоп', icon: '🔭', collected: false, rarity: 4 },
+      { id: 'space-7', name: 'Комета', icon: '💫', collected: false, rarity: 4 },
+      { id: 'space-8', name: 'Чёрная дыра', icon: '🌑', collected: false, rarity: 5 },
+      { id: 'space-9', name: 'Галактика', icon: '🌌', collected: false, rarity: 5 },
+    ]
+  },
+  // Collection 12: Океан - 1x2★, 1x3★, 5x4★, 2x5★
+  {
+    id: 'ocean',
+    name: 'Океан',
+    icon: '🐋',
+    reward: 350,
+    items: [
+      { id: 'ocean-1', name: 'Волна', icon: '🌊', collected: false, rarity: 2 },
+      { id: 'ocean-2', name: 'Краб', icon: '🦀', collected: false, rarity: 3 },
+      { id: 'ocean-3', name: 'Дельфин', icon: '🐬', collected: false, rarity: 4 },
+      { id: 'ocean-4', name: 'Осьминог', icon: '🐙', collected: false, rarity: 4 },
+      { id: 'ocean-5', name: 'Морская звезда', icon: '⭐', collected: false, rarity: 4 },
+      { id: 'ocean-6', name: 'Медуза', icon: '🪼', collected: false, rarity: 4 },
+      { id: 'ocean-7', name: 'Акула', icon: '🦈', collected: false, rarity: 4 },
+      { id: 'ocean-8', name: 'Кит', icon: '🐋', collected: false, rarity: 5 },
+      { id: 'ocean-9', name: 'Жемчужина', icon: '🦪', collected: false, rarity: 5 },
+    ]
+  },
+  // Collection 13: Магия - 3x3★, 3x4★, 3x5★
+  {
+    id: 'magic',
+    name: 'Магия',
+    icon: '✨',
+    reward: 350,
+    items: [
+      { id: 'magic-1', name: 'Волшебная палочка', icon: '🪄', collected: false, rarity: 3 },
+      { id: 'magic-2', name: 'Зелье', icon: '🧪', collected: false, rarity: 3 },
+      { id: 'magic-3', name: 'Книга заклинаний', icon: '📖', collected: false, rarity: 3 },
+      { id: 'magic-4', name: 'Хрустальный шар', icon: '🔮', collected: false, rarity: 4 },
+      { id: 'magic-5', name: 'Шляпа мага', icon: '🎩', collected: false, rarity: 4 },
+      { id: 'magic-6', name: 'Мантия', icon: '🧥', collected: false, rarity: 4 },
+      { id: 'magic-7', name: 'Единорог', icon: '🦄', collected: false, rarity: 5 },
+      { id: 'magic-8', name: 'Феникс', icon: '🔥', collected: false, rarity: 5 },
+      { id: 'magic-9', name: 'Философский камень', icon: '💎', collected: false, rarity: 5 },
+    ]
+  },
+  // Collection 14: Драконы - 2x3★, 3x4★, 4x5★
+  {
+    id: 'dragons',
+    name: 'Драконы',
+    icon: '🐉',
+    reward: 450,
+    items: [
+      { id: 'dragon-1', name: 'Яйцо дракона', icon: '🥚', collected: false, rarity: 3 },
+      { id: 'dragon-2', name: 'Чешуя', icon: '🔷', collected: false, rarity: 3 },
+      { id: 'dragon-3', name: 'Пламя', icon: '🔥', collected: false, rarity: 4 },
+      { id: 'dragon-4', name: 'Когти', icon: '🦖', collected: false, rarity: 4 },
+      { id: 'dragon-5', name: 'Крылья', icon: '🪽', collected: false, rarity: 4 },
+      { id: 'dragon-6', name: 'Ледяной дракон', icon: '🐲', collected: false, rarity: 5 },
+      { id: 'dragon-7', name: 'Огненный дракон', icon: '🐉', collected: false, rarity: 5 },
+      { id: 'dragon-8', name: 'Золотой дракон', icon: '✨', collected: false, rarity: 5 },
+      { id: 'dragon-9', name: 'Древний дракон', icon: '🌟', collected: false, rarity: 5 },
+    ]
+  },
+  // Collection 15: Легенды - 1x3★, 4x4★, 4x5★
+  {
+    id: 'legends',
+    name: 'Легенды',
+    icon: '👑',
+    reward: 500,
+    items: [
+      { id: 'legend-1', name: 'Меч', icon: '⚔️', collected: false, rarity: 3 },
+      { id: 'legend-2', name: 'Щит', icon: '🛡️', collected: false, rarity: 4 },
+      { id: 'legend-3', name: 'Доспехи', icon: '🦾', collected: false, rarity: 4 },
+      { id: 'legend-4', name: 'Шлем', icon: '⛑️', collected: false, rarity: 4 },
+      { id: 'legend-5', name: 'Трон', icon: '🪑', collected: false, rarity: 4 },
+      { id: 'legend-6', name: 'Корона', icon: '👑', collected: false, rarity: 5 },
+      { id: 'legend-7', name: 'Скипетр', icon: '🏆', collected: false, rarity: 5 },
+      { id: 'legend-8', name: 'Святой Грааль', icon: '🏺', collected: false, rarity: 5 },
+      { id: 'legend-9', name: 'Экскалибур', icon: '🗡️', collected: false, rarity: 5 },
     ]
   },
 ];
@@ -290,6 +428,9 @@ export function Collections({
   const [animatedProgress, setAnimatedProgress] = useState<Record<string, number>>({});
   const [rewardProgressAnimation, setRewardProgressAnimation] = useState<Record<string, number>>({}); // 0-100 for reward animation
   const [pulsingItems, setPulsingItems] = useState<Set<string>>(new Set());
+  const [revealedNewItems, setRevealedNewItems] = useState<Set<string>>(new Set()); // New items that have been revealed by animation
+  const [revealedNames, setRevealedNames] = useState<Set<string>>(new Set()); // Names revealed after icon lands
+  const [pendingNewItems, setPendingNewItems] = useState<Set<string>>(new Set()); // Items waiting for reveal animation (captured before onCollectionViewed clears them)
   const [collectingItemIndex, setCollectingItemIndex] = useState<number | null>(null); // For collection completion effect
   const [justRewardedCollectionId, setJustRewardedCollectionId] = useState<string | null>(null); // For return-to-main animation
   const [mainProgressOvershoot, setMainProgressOvershoot] = useState<Record<string, number>>({}); // Overshoot % per collection
@@ -316,6 +457,8 @@ export function Collections({
   const isAnimatingChipsRef = useRef(false); // Flag to prevent multiple animation loops
   const totalProgressBarRef = useRef<HTMLDivElement>(null);
   const collectionCardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const collectionsScrollRef = useRef<HTMLDivElement>(null);
+  const savedScrollPositionRef = useRef<number>(0);
   const prevVisibleRef = useRef(false);
   const hasAnimatedRef = useRef(false);
   
@@ -335,6 +478,7 @@ export function Collections({
   const rewardGivenRef = useRef(false);
   const rewardAnimationStartedRef = useRef(false); // Track if animation has started (to prevent double start)
   const currentAnimatingCollectionRef = useRef<string | null>(null); // Track which collection is being animated
+  const lastRewardedCollectionRef = useRef<string | null>(null); // Track the last collection that finished reward animation
   
   // Grand prize animation state
   const [grandPrizeAnimating, setGrandPrizeAnimating] = useState(false);
@@ -419,34 +563,70 @@ export function Collections({
     
     const collection = collections.find(c => c.id === pendingRewardCollectionId);
     if (collection) {
+      // IMPORTANT: If transitioning from a previous collection, add it to animation queue
+      // This happens when auto-transitioning between multiple reward collections
+      // Use lastRewardedCollectionRef because currentAnimatingCollectionRef is already null at this point
+      const previousCollectionId = lastRewardedCollectionRef.current;
+      if (previousCollectionId && previousCollectionId !== pendingRewardCollectionId) {
+        // Check if the previous collection is complete and not already in queue
+        const prevCollection = collections.find(c => c.id === previousCollectionId);
+        if (prevCollection && prevCollection.items.every(i => i.collected)) {
+          if (!pendingChipAnimationsRef.current.includes(previousCollectionId)) {
+            pendingChipAnimationsRef.current.push(previousCollectionId);
+            console.log('🔑 Auto-transition: Added previous collection to pending animations:', previousCollectionId, 'Total pending:', pendingChipAnimationsRef.current.length);
+          }
+        }
+        // Clear the ref after capturing
+        lastRewardedCollectionRef.current = null;
+      }
+      
       // Mark this collection as being animated
       currentAnimatingCollectionRef.current = pendingRewardCollectionId;
       
-// Reset reward animation state
-        setFlyingStars([]);
-        setRewardIconHidden(false);
-        setShowRewardClaimed(false);
-        setRewardProgress(0);
-        starsArrivedCountRef.current = 0;
-        expectedStarsRef.current = 0;
-        rewardGivenRef.current = false;
-        rewardAnimationStartedRef.current = false;
-        // Reset animation sets to prevent carryover from previous collection
-        // IMPORTANT: Reset visible indices BEFORE selecting collection to prevent flash
-        setCollectingItemIndex(null);
-        setAnimatingIconIndices(new Set());
-        setVisibleIconIndices(new Set());
-        
-        // Auto-select the collection
-        setSelectedCollection(collection);
+      // Reset reward animation state
+      setFlyingStars([]);
+      setRewardIconHidden(false);
+      setShowRewardClaimed(false);
+      setRewardProgress(0);
+      starsArrivedCountRef.current = 0;
+      expectedStarsRef.current = 0;
+      rewardGivenRef.current = false;
+      rewardAnimationStartedRef.current = false;
+      // Reset animation sets to prevent carryover from previous collection
+      // IMPORTANT: Reset visible indices BEFORE selecting collection to prevent flash
+      setCollectingItemIndex(null);
+      setAnimatingIconIndices(new Set());
+      setVisibleIconIndices(new Set());
+      
+      // Auto-select the collection
+      setSelectedCollection(collection);
       
       // Start animation immediately
       setTimeout(() => {
         startRewardAnimation(collection);
       }, 100);
     }
-  }, [isVisible, pendingRewardCollectionId]);
+  }, [isVisible, pendingRewardCollectionId, collections]);
   
+  // When pendingRewardCollectionId becomes null, add the last rewarded collection to animation queue
+  useEffect(() => {
+    if (!isVisible) return;
+    if (pendingRewardCollectionId) return; // Still showing rewards
+    
+    // If there's a last rewarded collection that hasn't been queued yet, add it
+    const lastRewarded = lastRewardedCollectionRef.current;
+    if (lastRewarded && !pendingChipAnimationsRef.current.includes(lastRewarded)) {
+      const lastCollection = collections.find(c => c.id === lastRewarded);
+      if (lastCollection && lastCollection.items.every(i => i.collected)) {
+        pendingChipAnimationsRef.current.push(lastRewarded);
+        console.log('🔑 End of auto-rewards: Added last collection to pending animations:', lastRewarded, 'Total pending:', pendingChipAnimationsRef.current.length);
+        // Trigger animation start check
+        setPendingChipAnimationsTrigger(prev => prev + 1);
+      }
+      lastRewardedCollectionRef.current = null;
+    }
+  }, [isVisible, pendingRewardCollectionId, collections]);
+
   // Auto-trigger grand prize when all conditions are met
   useEffect(() => {
     if (!isVisible) return;
@@ -671,6 +851,11 @@ export function Collections({
         // Don't notify parent yet - will do after trophy flies
       } else {
         setShowRewardClaimed(true);
+        // Save the collection ID for chip animation queue before clearing
+        const justRewardedId = pendingRewardCollectionId || selectedCollection?.id;
+        if (justRewardedId) {
+          lastRewardedCollectionRef.current = justRewardedId;
+        }
         // Clear the animating refs so next collection can animate
         currentAnimatingCollectionRef.current = null;
         rewardAnimationStartedRef.current = false;
@@ -752,7 +937,7 @@ export function Collections({
     saveTrophy(newTrophy);
     setTrophies(prev => [...prev, newTrophy]);
     
-    const GRAND_PRIZE_REWARD = 100;
+    const GRAND_PRIZE_REWARD = 1000;
     
     // DON'T notify parent yet - will do it after all stars arrive
     // This prevents allCollectionsRewarded from hiding icons prematurely
@@ -907,10 +1092,28 @@ export function Collections({
   const handleCloseDetailView = () => {
     const rewardedCollectionId = selectedCollection?.id;
     const wasRewarded = showRewardClaimed && rewardedCollectionId;
+    const lastViewedCollectionId = selectedCollection?.id;
     
     setSelectedCollection(null);
+    // IMPORTANT: Reset showRewardClaimed to prevent false animation triggers on next collection
+    setShowRewardClaimed(false);
     // Reset visible indices to prevent flash when next reward collection opens
     setVisibleIconIndices(new Set());
+    // Reset new item reveal state
+    setPulsingItems(new Set());
+    setRevealedNewItems(new Set());
+    setRevealedNames(new Set());
+    setPendingNewItems(new Set());
+    
+    // Scroll to show the last viewed collection after returning to collections list
+    requestAnimationFrame(() => {
+      if (lastViewedCollectionId) {
+        const collectionCard = collectionCardRefs.current[lastViewedCollectionId];
+        if (collectionCard) {
+          collectionCard.scrollIntoView({ behavior: 'instant', block: 'center' });
+        }
+      }
+    });
     
     // If reward was claimed, accumulate for later animation
     // Skip only if ALL collections are complete AND ALL are rewarded (grand prize next)
@@ -927,36 +1130,80 @@ export function Collections({
         // Accumulate rewarded collection for animation (persists across window reopens)
         if (!pendingChipAnimationsRef.current.includes(rewardedCollectionId)) {
           pendingChipAnimationsRef.current.push(rewardedCollectionId);
-          // Trigger useEffect to start animations
-          setPendingChipAnimationsTrigger(prev => prev + 1);
+          console.log('🔑 Added to pending animations:', rewardedCollectionId, 'Total pending:', pendingChipAnimationsRef.current.length);
         }
+        
+        // Calculate how many collections are pending animation (including this one)
+        const pendingCount = pendingChipAnimationsRef.current.length;
+        
+        // IMMEDIATELY set displayed count to prevent visual rollback
+        // Account for ALL pending collections, not just this one
+        const completedCount = collections.filter(c => c.items.every(i => i.collected)).length;
+        setDisplayedCompletedCount(Math.max(0, completedCount - pendingCount));
+        
+        // IMMEDIATELY mark ALL pending collections as pending animation
+        setPendingCompleteAnimation(prev => {
+          const newSet = new Set(prev);
+          pendingChipAnimationsRef.current.forEach(id => newSet.add(id));
+          return newSet;
+        });
+        
+        // Set animated progress to 0% for ALL pending collections
+        setAnimatedProgress(prev => {
+          const updated = { ...prev };
+          pendingChipAnimationsRef.current.forEach(id => {
+            updated[id] = 0;
+          });
+          return updated;
+        });
+        
+        // Trigger useEffect to check if animations should start
+        // (they won't start until selectedCollection becomes null)
+        setPendingChipAnimationsTrigger(prev => prev + 1);
       }
     }
   };
   
   // Handle selecting a collection - also marks it as viewed and triggers item pulse
   const handleSelectCollection = (collection: Collection) => {
-    // Find new items in this collection to pulse them sequentially
+    // Save scroll position before entering collection detail
+    if (collectionsScrollRef.current) {
+      savedScrollPositionRef.current = collectionsScrollRef.current.scrollTop;
+    }
+    
+    // Find new items in this collection BEFORE calling onCollectionViewed (which clears them)
     const newItemsInThisCollection = collection.items
       .filter(item => newItemIds?.has(item.id))
       .map(item => item.id);
     
+    // Store pending new items for animation (these will be hidden until revealed)
     if (newItemsInThisCollection.length > 0) {
-      // Pulse items one by one with delay
+      setPendingNewItems(new Set(newItemsInThisCollection));
+      
+      // Fly-in items one by one with short delay (overlapping animations)
       newItemsInThisCollection.forEach((itemId, index) => {
         setTimeout(() => {
+          // Reveal the item when fly-in animation starts (shows actual icon)
+          setRevealedNewItems(prev => new Set([...prev, itemId]));
           setPulsingItems(prev => new Set([...prev, itemId]));
           
-          // Remove this item from pulsing after its animation (2 pulses * 0.5s = 1s)
+          // Reveal name after icon lands (350ms into animation)
+          setTimeout(() => {
+            setRevealedNames(prev => new Set([...prev, itemId]));
+          }, 350);
+          
+          // Remove this item from animating after fly-in completes (0.5s)
           setTimeout(() => {
             setPulsingItems(prev => {
               const next = new Set(prev);
               next.delete(itemId);
               return next;
             });
-          }, 1000);
-        }, index * 400); // 400ms delay between each item
+          }, 500);
+        }, index * 250); // 250ms delay - items overlap, creating a cascade effect
       });
+    } else {
+      setPendingNewItems(new Set());
     }
     
     setSelectedCollection(collection);
@@ -984,6 +1231,7 @@ export function Collections({
       rewardGivenRef.current = false;
       rewardAnimationStartedRef.current = false;
       currentAnimatingCollectionRef.current = null;
+      lastRewardedCollectionRef.current = null;
       // Reset collecting animation state
       setCollectingItemIndex(null);
       setCollectingCollectionIndex(null);
@@ -1013,6 +1261,11 @@ export function Collections({
       setPendingCompleteAnimation(new Set());
       setShowCompleteLabel(new Set());
       setPulsingIcons(new Set());
+      // Reset new item reveal state
+      setPulsingItems(new Set());
+      setRevealedNewItems(new Set());
+      setRevealedNames(new Set());
+      setPendingNewItems(new Set());
       // Note: don't reset hasNewTrophy - keep it until user views trophies tab
     }
   }, [isVisible]);
@@ -1022,6 +1275,15 @@ export function Collections({
     // Only trigger animation when transitioning from hidden to visible
     if (isVisible && !prevVisibleRef.current) {
       hasAnimatedRef.current = false;
+      
+      // Reset scroll position when opening collections window from main screen
+      savedScrollPositionRef.current = 0;
+      // Use requestAnimationFrame to ensure DOM is rendered
+      requestAnimationFrame(() => {
+        if (collectionsScrollRef.current) {
+          collectionsScrollRef.current.scrollTop = 0;
+        }
+      });
       
       // Calculate actual progress for all collections
       const actualProgress: Record<string, number> = {};
@@ -1036,23 +1298,51 @@ export function Collections({
         : new Set<string>();
       
       if (collectionsWithNewItems.size > 0) {
-        // Start collections WITH new items at 0, others at actual progress
+        // Calculate initial progress for each collection
+        // Collections with new items start from progress BEFORE new items were added
+        // Collections without new items show actual progress
         const initialProgress: Record<string, number> = {};
+        let firstCollectionWithNewItems: string | null = null;
+        
         collections.forEach(c => {
           if (collectionsWithNewItems.has(c.id)) {
-            initialProgress[c.id] = 0; // Will animate
+            // Count how many new items are in this collection
+            const newItemsCount = c.items.filter(i => i.collected && newItemIds?.has(i.id)).length;
+            const collectedBeforeNew = c.items.filter(i => i.collected).length - newItemsCount;
+            initialProgress[c.id] = (collectedBeforeNew / c.items.length) * 100;
+            
+            // Track first collection with new items for scrolling
+            if (!firstCollectionWithNewItems) {
+              firstCollectionWithNewItems = c.id;
+            }
           } else {
-            initialProgress[c.id] = actualProgress[c.id]; // Show immediately
+            // No new items - show actual progress
+            initialProgress[c.id] = actualProgress[c.id];
           }
         });
         setAnimatedProgress(initialProgress);
         
-        // After a brief delay, animate to actual progress
+        // Scroll to first collection with new items after DOM updates
+        // Only scroll if it's not one of the first 4 collections (already visible)
+        if (firstCollectionWithNewItems) {
+          const collectionIndex = collections.findIndex(c => c.id === firstCollectionWithNewItems);
+          // Only scroll if collection is below the initially visible area (index >= 4)
+          if (collectionIndex >= 4) {
+            setTimeout(() => {
+              const collectionCard = collectionCardRefs.current[firstCollectionWithNewItems!];
+              if (collectionCard) {
+                collectionCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }, 100);
+          }
+        }
+        
+        // After window appears and settles, animate to actual progress
         const timer = setTimeout(() => {
           if (hasAnimatedRef.current) return;
           hasAnimatedRef.current = true;
           setAnimatedProgress(actualProgress);
-        }, 100);
+        }, 400); // Longer delay for window to settle
         
         prevVisibleRef.current = true;
         return () => clearTimeout(timer);
@@ -1066,7 +1356,7 @@ export function Collections({
     if (!isVisible) {
       prevVisibleRef.current = false;
     }
-  }, [isVisible, collections, newItemsInCollections]);
+  }, [isVisible, collections, newItemsInCollections, newItemIds]);
   
   // Keep ref in sync with state
   useEffect(() => {
@@ -1077,33 +1367,67 @@ export function Collections({
   useEffect(() => {
     if (!isVisible || activeTab !== 'collections') return;
     if (pendingRewardCollectionId) return; // Still showing reward screens
+    if (selectedCollection) return; // Still viewing a collection detail
     if (pendingChipAnimationsRef.current.length === 0) return; // No animations pending
     if (isAnimatingChipsRef.current) return; // Already animating
+    if (chipAnimationQueue.length > 0) return; // Queue already has items
     
-    // IMMEDIATELY set displayed count to prevent visual glitch
-    const actualCompleted = collections.filter(c => c.items.every(i => i.collected)).length;
-    const pendingCount = pendingChipAnimationsRef.current.length;
-    setDisplayedCompletedCount(Math.max(0, actualCompleted - pendingCount));
+    // Set displayed count if not already set (may be set in handleCloseDetailView)
+    // This prevents visual rollback when returning from reward screen
+    setDisplayedCompletedCount(prev => {
+      if (prev !== null) return prev; // Already set, don't change
+      const actualCompleted = collections.filter(c => c.items.every(i => i.collected)).length;
+      const pendingCount = pendingChipAnimationsRef.current.length;
+      return Math.max(0, actualCompleted - pendingCount);
+    });
     
     // Small delay to ensure we're on main screen
     const timer = setTimeout(() => {
       if (pendingChipAnimationsRef.current.length === 0) return;
+      if (isAnimatingChipsRef.current) return; // Double-check
+      if (chipAnimationQueue.length > 0) return; // Double-check
       
       // Move pending animations to queue and start
       const animationsToRun = [...pendingChipAnimationsRef.current];
       pendingChipAnimationsRef.current = [];
+      
+      console.log('🎯 Starting animation queue with', animationsToRun.length, 'collections:', animationsToRun);
       
       // Mark all as pending complete animation
       animationsToRun.forEach(id => {
         setPendingCompleteAnimation(prev => new Set(prev).add(id));
       });
       
+      // Set animated progress to 0 for all pending collections
+      setAnimatedProgress(prev => {
+        const updated = { ...prev };
+        animationsToRun.forEach(id => {
+          updated[id] = 0;
+        });
+        return updated;
+      });
+      
+      // Scroll to the FIRST collection after a brief delay
+      // Only scroll if it's not one of the first 4 collections (already visible)
+      setTimeout(() => {
+        const firstId = animationsToRun[0];
+        if (firstId) {
+          const collectionIndex = collections.findIndex(c => c.id === firstId);
+          if (collectionIndex >= 4) {
+            const collectionCard = collectionCardRefs.current[firstId];
+            if (collectionCard) {
+              collectionCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+        }
+      }, 50);
+      
       // Start animation queue
       setChipAnimationQueue(animationsToRun);
     }, 100);
     
     return () => clearTimeout(timer);
-  }, [isVisible, activeTab, pendingRewardCollectionId, pendingChipAnimationsTrigger, collections]);
+  }, [isVisible, activeTab, pendingRewardCollectionId, selectedCollection, pendingChipAnimationsTrigger, collections, chipAnimationQueue.length]);
   
   // Process chip animation queue - launch chips one by one with delay
   useEffect(() => {
@@ -1141,50 +1465,60 @@ export function Collections({
       
       const collectionId = currentQueue[index];
       
-      // Step 1: Animate progress bar from current to 100% (no text shown during animation)
-      setRewardProgressAnimation(prev => ({ ...prev, [collectionId]: 0 }));
+      // Scroll to this collection before animating (only if not in first 4 visible)
+      const collectionIndex = collections.findIndex(c => c.id === collectionId);
+      if (collectionIndex >= 4) {
+        const collectionCard = collectionCardRefs.current[collectionId];
+        if (collectionCard) {
+          collectionCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
       
-      // Animate progress bar over 400ms
-      const progressDuration = 400;
-      const progressSteps = 20;
-      const stepDuration = progressDuration / progressSteps;
-      let currentStep = 0;
+      // Small delay to let scroll complete before animation
+      setTimeout(() => {
+        // Step 1: Animate progress bar from 0% to 100%
+        // Get current progress (should be 0 as set in handleCloseDetailView)
+        const startProgress = animatedProgress[collectionId] ?? 0;
+        
+        // Animate progress bar over 550ms (~30% faster than 800ms)
+        const progressDuration = 550;
+        const progressSteps = 28;
+        const stepDuration = progressDuration / progressSteps;
+        let currentStep = 0;
       
       const progressInterval = setInterval(() => {
         currentStep++;
-        const progress = Math.min((currentStep / progressSteps) * 100, 100);
-        setRewardProgressAnimation(prev => ({ ...prev, [collectionId]: progress }));
+        // Animate from startProgress to 100%
+        const progress = startProgress + ((100 - startProgress) * (currentStep / progressSteps));
+        setAnimatedProgress(prev => ({ ...prev, [collectionId]: Math.min(progress, 100) }));
         
         if (currentStep >= progressSteps) {
           clearInterval(progressInterval);
           
-          // Step 2: When progress bar reaches 100% - simultaneously:
-          // - Change background color
-          // - Show "Собрано" label
-          // - Launch chip
-          setPendingCompleteAnimation(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(collectionId);
-            return newSet;
-          });
-          setShowCompleteLabel(prev => new Set(prev).add(collectionId));
-          
-          // Clear progress animation to show label
-          setRewardProgressAnimation(prev => {
-            const newState = { ...prev };
-            delete newState[collectionId];
-            return newState;
-          });
-          
-          // Launch chip immediately
-          launchChipToTotalProgress(collectionId);
-          
-          // Process next item after chip animation completes (~1 second)
+          // Small pause at 100% so user can see full progress bar
           setTimeout(() => {
-            processQueue(index + 1);
-          }, 1000);
+            // Step 2: When progress bar reaches 100% - simultaneously:
+            // - Change background color
+            // - Show "Собрано" label
+            // - Launch chip
+            setPendingCompleteAnimation(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(collectionId);
+              return newSet;
+            });
+            setShowCompleteLabel(prev => new Set(prev).add(collectionId));
+            
+            // Launch chip immediately
+            launchChipToTotalProgress(collectionId);
+            
+            // Process next item after chip animation completes (~1 second)
+            setTimeout(() => {
+              processQueue(index + 1);
+            }, 1000);
+          }, 300); // 300ms pause at 100%
         }
       }, stepDuration);
+      }, 300); // delay for scroll to complete
     };
     
     // Start processing after a small delay to ensure DOM is ready
@@ -1263,6 +1597,79 @@ export function Collections({
     const progress = getCollectionProgress(selectedCollection);
     const isComplete = isCollectionComplete(selectedCollection);
     
+    // Find current collection index for navigation
+    const currentIndex = collections.findIndex(c => c.id === selectedCollection.id);
+    const hasPrevious = currentIndex > 0;
+    const hasNext = currentIndex < collections.length - 1;
+    
+    // Helper function to trigger new item animation when navigating
+    const triggerNewItemAnimation = (collection: Collection) => {
+      // Reset animation state first
+      setPulsingItems(new Set());
+      setRevealedNewItems(new Set());
+      setRevealedNames(new Set());
+      setPendingNewItems(new Set());
+      
+      // Find new items in this collection
+      const newItemsInThisCollection = collection.items
+        .filter(item => newItemIds?.has(item.id))
+        .map(item => item.id);
+      
+      // Store pending new items for animation (these will be hidden until revealed)
+      if (newItemsInThisCollection.length > 0) {
+        setPendingNewItems(new Set(newItemsInThisCollection));
+        
+        // Fly-in items one by one with short delay (overlapping animations)
+        newItemsInThisCollection.forEach((itemId, index) => {
+          setTimeout(() => {
+            // Reveal the item when fly-in animation starts (shows actual icon)
+            setRevealedNewItems(prev => new Set([...prev, itemId]));
+            setPulsingItems(prev => new Set([...prev, itemId]));
+            
+            // Reveal name after icon lands (350ms into animation)
+            setTimeout(() => {
+              setRevealedNames(prev => new Set([...prev, itemId]));
+            }, 350);
+            
+            // Remove this item from animating after fly-in completes (0.5s)
+            setTimeout(() => {
+              setPulsingItems(prev => {
+                const next = new Set(prev);
+                next.delete(itemId);
+                return next;
+              });
+            }, 500);
+          }, index * 250); // 250ms delay - items overlap, creating a cascade effect
+        });
+      }
+    };
+    
+    const navigateToPrevious = () => {
+      if (hasPrevious) {
+        const prevCollection = collections[currentIndex - 1];
+        // Trigger animation for new items
+        triggerNewItemAnimation(prevCollection);
+        setSelectedCollection(prevCollection);
+        // Mark as viewed if has new items
+        if (onCollectionViewed && newItemsInCollections?.has(prevCollection.id)) {
+          onCollectionViewed(prevCollection.id);
+        }
+      }
+    };
+    
+    const navigateToNext = () => {
+      if (hasNext) {
+        const nextCollection = collections[currentIndex + 1];
+        // Trigger animation for new items
+        triggerNewItemAnimation(nextCollection);
+        setSelectedCollection(nextCollection);
+        // Mark as viewed if has new items
+        if (onCollectionViewed && newItemsInCollections?.has(nextCollection.id)) {
+          onCollectionViewed(nextCollection.id);
+        }
+      }
+    };
+    
     return ReactDOM.createPortal(
       <div 
         className="fixed inset-0 z-[9997] flex items-center justify-center"
@@ -1275,10 +1682,34 @@ export function Collections({
         }}
         onClick={handleCloseDetailView}
       >
-        <div 
-          className="bg-gradient-to-b from-indigo-900 to-slate-900 text-white p-5 rounded-2xl shadow-2xl max-w-md w-full border border-indigo-500/30"
-          onClick={e => e.stopPropagation()}
-        >
+        {/* Wrapper for modal + navigation arrows */}
+        <div className="relative max-w-md w-full">
+          {/* Left navigation arrow - positioned at left edge of modal */}
+          {hasPrevious && (
+            <button
+              onClick={(e) => { e.stopPropagation(); navigateToPrevious(); }}
+              className="absolute -left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white/80 hover:text-white transition-all z-10"
+              style={{ fontSize: '20px' }}
+            >
+              ‹
+            </button>
+          )}
+          
+          {/* Right navigation arrow - positioned at right edge of modal */}
+          {hasNext && (
+            <button
+              onClick={(e) => { e.stopPropagation(); navigateToNext(); }}
+              className="absolute -right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white/80 hover:text-white transition-all z-10"
+              style={{ fontSize: '20px' }}
+            >
+              ›
+            </button>
+          )}
+          
+          <div 
+            className="bg-gradient-to-b from-indigo-900 to-slate-900 text-white p-5 rounded-2xl shadow-2xl w-full border border-indigo-500/30"
+            onClick={e => e.stopPropagation()}
+          >
           {/* Header with title */}
           <div className="flex items-center justify-between mb-3">
             <button 
@@ -1341,53 +1772,112 @@ export function Collections({
           </div>
           
           {/* Items Grid */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2 pt-2 justify-items-center">
             {selectedCollection.items.map((item, index) => {
               const isPulsing = pulsingItems.has(item.id);
               const isCollecting = collectingItemIndex === index;
               // Hide icons if this collection is pending reward and icon not yet revealed by animation
               const isPendingReward = pendingRewardCollectionId === selectedCollection.id;
               const isIconVisible = isPendingReward ? visibleIconIndices.has(index) : true;
+              // Determine item states for animation
+              const isPendingReveal = pendingNewItems.has(item.id);
+              const isRevealed = revealedNewItems.has(item.id);
+              const isNameRevealed = revealedNames.has(item.id);
+              const shouldShowIcon = item.collected && (!isPendingReveal || isRevealed);
+              const isCollected = item.collected && (!isPendingReveal || isRevealed);
+              const rarityColor = RARITY_COLORS[item.rarity];
+              
               return (
                 <div 
                   key={item.id}
-                  className={`rounded-xl p-3 text-center ${
-                    item.collected 
-                      ? 'bg-indigo-600/30 border border-indigo-400/40' 
-                      : 'bg-slate-700/30 border border-slate-600/30'
-                  } ${isPulsing ? 'animate-new-item-pulse' : ''}`}
+                  className="relative rounded-xl p-3 flex flex-col items-center justify-center"
                   style={{
+                    width: '110px',
+                    height: '135px',
+                    background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%)',
+                    border: `2px solid ${isCollected ? rarityColor : 'rgba(100, 116, 139, 0.4)'}`,
+                    boxShadow: isCollected 
+                      ? `0 0 15px ${rarityColor}40, inset 0 1px 0 rgba(255,255,255,0.1)`
+                      : '0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
                     // Hidden until animation starts, animation handles opacity
                     ...(!isIconVisible && !isCollecting ? { opacity: 0 } : {}),
-                    ...(isPulsing ? { 
-                      animation: 'new-item-pulse 0.5s ease-in-out 1 forwards'
-                    } : {}),
                     ...(isCollecting ? {
                       animation: 'collection-item-pop 0.5s ease-out forwards',
-                      boxShadow: '0 0 20px rgba(139, 92, 246, 0.8)',
-                      borderColor: 'rgba(139, 92, 246, 0.8)',
+                      boxShadow: `0 0 25px ${rarityColor}80`,
                       zIndex: 10
                     } : {})
                   }}
                 >
-                  <div 
-                    className={`text-3xl mb-1 ${!item.collected && 'opacity-40'}`}
-                    style={animatingIconIndices.has(index) ? {
-                      animation: 'collection-icon-pop 1s ease-out 0s forwards'
-                    } : undefined}
-                  >
-                    {item.collected ? item.icon : '❓'}
-                  </div>
-                  <div className={`text-xs leading-tight ${item.collected ? 'text-white/80' : 'text-white/40'}`}>
-                    {item.name}
-                  </div>
-                  {item.collected && (
-                    <div className="text-green-400 text-xs mt-1">✓</div>
+                  {shouldShowIcon ? (
+                    <>
+                      {/* Item icon */}
+                      <div 
+                        className="text-5xl"
+                        style={{
+                          filter: `drop-shadow(0 0 6px ${rarityColor}60)`,
+                          ...(animatingIconIndices.has(index) ? {
+                            animation: 'collection-icon-pop 1s ease-out 0s forwards'
+                          } : {}),
+                          ...(isPulsing ? {
+                            animation: 'new-item-icon-fly-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards'
+                          } : {})
+                        }}
+                      >
+                        {item.icon}
+                      </div>
+                      {/* Rarity stars - below icon */}
+                      <div className="flex gap-0.5 mt-1">
+                        {Array.from({ length: item.rarity }).map((_, i) => (
+                          <span 
+                            key={i} 
+                            className="text-base"
+                            style={{ 
+                              color: rarityColor,
+                              filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'
+                            }}
+                          >
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                      {/* Item name */}
+                      <div 
+                        className="text-[11px] leading-tight text-white/80 text-center mt-0.5 transition-opacity duration-200"
+                        style={{ opacity: (isPendingReveal && !isNameRevealed) ? 0 : 1 }}
+                      >
+                        {item.name}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Uncollected - question mark */}
+                      <span className="text-5xl opacity-30">❓</span>
+                      {/* Rarity stars for uncollected items */}
+                      <div className="flex gap-0.5 mt-1">
+                        {Array.from({ length: item.rarity }).map((_, i) => (
+                          <span 
+                            key={i} 
+                            className="text-base opacity-40"
+                            style={{ 
+                              color: rarityColor,
+                              filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'
+                            }}
+                          >
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                      {/* Item name for uncollected */}
+                      <div className="text-[11px] leading-tight text-white/40 text-center mt-0.5">
+                        {item.name}
+                      </div>
+                    </>
                   )}
                 </div>
               );
             })}
           </div>
+        </div>
         </div>
         
         {/* Flying stars for collection detail view */}
@@ -1487,12 +1977,14 @@ export function Collections({
         paddingTop: '50px',
         paddingBottom: '55px',
         paddingLeft: '16px',
-        paddingRight: '16px'
+        paddingRight: '16px',
+        animation: 'fadeIn 0.2s ease-out'
       }}
       onClick={onClose}
     >
       <div 
         className="bg-gradient-to-b from-indigo-900 to-slate-900 text-white p-5 rounded-2xl shadow-2xl max-w-md w-full border border-indigo-500/30"
+        style={{ animation: 'fadeIn 0.2s ease-out' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header with Tabs */}
@@ -1554,7 +2046,7 @@ export function Collections({
         </div>
         
         {/* Tab Content Container - Fixed height for both tabs */}
-        <div style={{ height: '420px' }}>
+        <div style={{ height: '500px' }}>
           {/* Collections Tab Content */}
           {activeTab === 'collections' && (
             <div className="h-full flex flex-col">
@@ -1610,7 +2102,7 @@ export function Collections({
                         filter: grandPrizePulsePhase === 'stars' ? 'drop-shadow(0 0 8px rgba(250, 204, 21, 0.8))' : 'none'
                       }}
                     >
-                      <div className="text-base font-bold text-yellow-400">100 ⭐</div>
+                      <div className="text-base font-bold text-yellow-400">1000 ⭐</div>
                     </div>
                   </div>
                 ) : (
@@ -1630,7 +2122,7 @@ export function Collections({
               const isGrandPrizeMode = grandPrizeAnimating || (collectingCollectionIndex !== null) || isPendingGrandPrize;
               
               return (
-            <div className="grid grid-cols-3 gap-2 overflow-y-auto flex-1">
+            <div ref={collectionsScrollRef} className="grid grid-cols-2 gap-3 overflow-y-auto flex-1">
               {collections.map((collection, index) => {
                 const progress = getCollectionProgress(collection);
                 const isComplete = isCollectionComplete(collection);
@@ -1656,7 +2148,7 @@ export function Collections({
                     key={collection.id}
                     ref={el => collectionCardRefs.current[collection.id] = el}
                     onClick={() => handleSelectCollection(collection)}
-                    className={`relative rounded-xl p-2 text-center hover:brightness-110 transition-all duration-300 ${
+                    className={`relative rounded-xl p-3 text-center hover:brightness-110 transition-all duration-300 ${
                       showAsComplete 
                         ? 'bg-green-900/30 border border-green-500/40' 
                         : 'bg-slate-700/50 border border-slate-600/30 hover:border-indigo-400/50'
@@ -1674,43 +2166,46 @@ export function Collections({
                   >
                     {/* New items indicator */}
                     {hasNew && !isComplete && (
-                      <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold animate-pulse">
+                      <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold animate-pulse">
                         !
                       </span>
                     )}
                     
                     <div 
-                      className="text-2xl mb-1"
+                      className="text-4xl mb-2"
                       style={animatingCollectionIndices.has(index) ? {
                         animation: 'collection-icon-pop 1s ease-out 0s forwards'
                       } : undefined}
                     >
                       {collection.icon}
                     </div>
-                    <div className="text-[10px] text-white/80 truncate">{collection.name}</div>
+                    <div className="text-sm text-white/90 font-medium truncate">{collection.name}</div>
                     
                     {/* Fixed height container for progress/complete label to prevent layout shift */}
-                    <div className="h-[24px] flex flex-col justify-center">
+                    <div className="h-[32px] flex flex-col justify-center mt-1">
                       {showAsComplete && showLabel && !isRewardAnimating ? (
                         <div 
-                          className="text-green-400 text-[10px] font-semibold"
+                          className="text-green-400 text-sm font-semibold"
                         >
                           ✓ Собрано
                         </div>
                       ) : showProgressBar ? (
                         <>
-                          <div className="h-1.5 bg-slate-600 rounded-full overflow-hidden mt-1">
+                          {/* Progress bar with count overlay */}
+                          <div className="relative h-4 bg-slate-600 rounded-full overflow-hidden mt-1">
                             <div 
-                              className={`h-full rounded-full bg-gradient-to-r ${isRewardAnimating ? 'from-green-500 to-emerald-500' : 'from-indigo-500 to-purple-500'} transition-all duration-100 ease-out`}
+                              className={`h-full rounded-full bg-gradient-to-r ${isRewardAnimating ? 'from-green-500 to-emerald-500' : 'from-indigo-500 to-purple-500'} transition-all duration-700 ease-out`}
                               style={{ width: `${isRewardAnimating ? rewardProgress : Math.min(displayProgress + overshoot, 100)}%` }}
                             />
+                            {/* Count text centered on progress bar */}
+                            {!isRewardAnimating && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-[10px] font-semibold text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+                                  {progress.collected}/{progress.total}
+                                </span>
+                              </div>
+                            )}
                           </div>
-                          {/* Hide text during reward animation */}
-                          {!isRewardAnimating && (
-                            <div className="text-[10px] mt-0.5 text-white/50">
-                              {progress.collected}/{progress.total}
-                            </div>
-                          )}
                         </>
                       ) : (
                         <div className="h-full" />
@@ -1967,6 +2462,20 @@ function CollectionFlyingStar({ star, onArrived }: { star: FlyingStar; onArrived
   
   if (!isVisible) return null;
   
+  // Determine star color based on value
+  const getStarStyle = (value: number) => {
+    if (value >= 100) {
+      // Purple star for x100
+      return 'hue-rotate(260deg) brightness(1.2) saturate(1.5) drop-shadow(0 0 8px rgba(147, 51, 234, 0.9))';
+    } else if (value >= 10) {
+      // Blue star for x10
+      return 'hue-rotate(180deg) brightness(1.2) drop-shadow(0 0 8px rgba(59, 130, 246, 0.9))';
+    } else {
+      // Gold star (default)
+      return 'drop-shadow(0 0 4px rgba(250, 204, 21, 0.8))';
+    }
+  };
+  
   return (
     <div
       ref={elementRef}
@@ -1975,7 +2484,7 @@ function CollectionFlyingStar({ star, onArrived }: { star: FlyingStar; onArrived
         left: star.startX,
         top: star.startY,
         transform: 'translate(-50%, -50%)',
-        filter: 'drop-shadow(0 0 4px rgba(250, 204, 21, 0.8))'
+        filter: getStarStyle(star.value)
       }}
     >
       ⭐

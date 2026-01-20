@@ -6,7 +6,7 @@ import { clearAllDropTargetHighlights } from '../solitaire/styleManager';
 import { calculateCardPoints, calculateCardPointsRaw, resetScoredCards } from '../solitaire/scoring';
 import { addFloatingScore } from '../solitaire/floatingScoreManager';
 import GameIntegration from '../gameIntegration';
-import { generateSolvableGame, generateUnsolvableGame } from '../solitaire/solvableGenerator';
+import { generateSolvableGame, generateUnsolvableGame, markFirstWin } from '../solitaire/solvableGenerator';
 import { awardWinXP, awardCardXP, resetXPEarnedCards } from '../solitaire/experienceManager';
 import { resetCardsMovedForCollection } from '../../components/solitaire/FlyingCollectionIcon';
 import { collectKeyFromCard } from '../liveops/keyManager';
@@ -355,8 +355,12 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           const rect = foundationElement.getBoundingClientRect();
           const dropX = rect.left + rect.width / 2;
           const dropY = rect.top + rect.height / 2;
-          import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
-            triggerCardToFoundation(dropX, dropY);
+          const card = state.draggedCards[0];
+          import('../solitaire/scoring').then(({ CARD_POINTS }) => {
+            const points = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
+            import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
+              triggerCardToFoundation(dropX, dropY, points);
+            });
           });
         }
       }
@@ -374,8 +378,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       
       // Check if game is won and notify lobby
       if (newGameState.isWon && !get().isWon) {
-        // Award XP for winning
+        // Award XP for winning and mark first win
         awardWinXP();
+        markFirstWin();
         
         const gameTime = newGameState.startTime ? 
           Math.floor((Date.now() - newGameState.startTime.getTime()) / 1000) : 0;
@@ -941,8 +946,11 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       const dropX = rect.left + rect.width / 2;
       const dropY = rect.top + rect.height / 2;
       
-      import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
-        triggerCardToFoundation(dropX, dropY);
+      import('../solitaire/scoring').then(({ CARD_POINTS }) => {
+        const points = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
+        import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
+          triggerCardToFoundation(dropX, dropY, points);
+        });
       });
     }
     
@@ -958,8 +966,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     
     // Check if game is won and notify lobby
     if (isWon && !state.isWon) {
-      // Award XP for winning
+      // Award XP for winning and mark first win
       awardWinXP();
+      markFirstWin();
       
       const gameTime = state.startTime ? 
         Math.floor((Date.now() - state.startTime.getTime()) / 1000) : 0;
@@ -1525,17 +1534,15 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
               set({ stock: newStock, moves: currentState.moves + 1 });
             }
             
-            // Trigger collection item drop
+            // Trigger collection item drop and add points
             const dropX = endRect.left + endRect.width / 2;
             const dropY = endRect.top + endRect.height / 2;
-            import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
-              triggerCardToFoundation(dropX, dropY);
-            });
-            
-            // Add points silently
             import('../solitaire/scoring').then(({ CARD_POINTS }) => {
               const points = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
               get().addPointsToProgress(points);
+              import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
+                triggerCardToFoundation(dropX, dropY, points);
+              });
             });
             
             // Check if all done
@@ -1545,6 +1552,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
               
               if (totalInFoundations === 52 && !finalState.isWon) {
                 awardWinXP();
+                markFirstWin();
                 const gameTime = finalState.startTime ? 
                   Math.floor((Date.now() - finalState.startTime.getTime()) / 1000) : 0;
                 let totalScore = 0;
@@ -1574,6 +1582,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         import('../flyingSuitIconManager').then(({ addFlyingSuitIcon }) => {
           addFlyingSuitIcon(card.suit, centerX, centerY);
         });
+        
+        // Collect key if card has one (IMPORTANT: was missing!)
+        collectKeyFromCard(card.id, centerX, centerY);
       }, index * STAGGER_DELAY);
     });
     
@@ -1788,8 +1799,11 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
               const dropX = fRect.left + fRect.width / 2;
               const dropY = fRect.top + fRect.height / 2;
               
-              import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
-                triggerCardToFoundation(dropX, dropY);
+              import('../solitaire/scoring').then(({ CARD_POINTS }) => {
+                const points = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
+                import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
+                  triggerCardToFoundation(dropX, dropY, points);
+                });
               });
               
               // Collect key if card has one
@@ -1800,6 +1814,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
               const totalInFoundations = Object.values(winState.foundations).reduce((sum, f) => sum + f.length, 0);
               if (totalInFoundations === 52 && !winState.isWon) {
                 awardWinXP();
+                markFirstWin();
                 set({ isWon: true });
               }
             });

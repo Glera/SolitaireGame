@@ -28,15 +28,10 @@ interface DailyRewardPopupProps {
 
 // Calculate reward stars for a given day
 export function getRewardStars(day: number): number {
-  if (day < 10) {
-    return day; // Days 1-9: reward = day number
+  if (day <= 10) {
+    return day * 10; // Days 1-10: 10, 20, 30, ... 100
   }
-  // Day 10+: base reward is 10 stars
-  // Every 5 days starting from 15 (15, 20, 25, 30...): reward = 15 stars
-  if (day >= 15 && day % 5 === 0) {
-    return 15;
-  }
-  return 10;
+  return 100; // Day 11+: always 100
 }
 
 const MAX_FLYING_STARS = 10;
@@ -84,7 +79,7 @@ export function DailyRewardPopup({
   
   const visibleDays = Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i);
   const rewardStars = getRewardStars(currentDay);
-  const isBonusDay = currentDay >= 15 && currentDay % 5 === 0;
+  const isBonusDay = currentDay >= 10; // Max reward day (100 stars)
   
   const handleClaim = () => {
     if (isAnimating) return;
@@ -214,7 +209,7 @@ export function DailyRewardPopup({
                 {visibleDays.map((day) => {
                   const isCurrent = day === currentDay;
                   const dayReward = getRewardStars(day);
-                  const isDayBonus = day >= 15 && day % 5 === 0;
+                  const isDayBonus = day >= 10; // Max reward day (100 stars)
                   
                   if (isCurrent) {
                     // Current day - larger with prominent reward
@@ -399,6 +394,20 @@ function DailyRewardFlyingStar({ star, onArrived }: { star: FlyingStar; onArrive
   
   if (!isVisible) return null;
   
+  // Determine star color based on value
+  const getStarStyle = (value: number) => {
+    if (value >= 100) {
+      // Purple star for x100
+      return 'hue-rotate(260deg) brightness(1.2) saturate(1.5) drop-shadow(0 0 8px rgba(147, 51, 234, 0.9))';
+    } else if (value >= 10) {
+      // Blue star for x10
+      return 'hue-rotate(180deg) brightness(1.2) drop-shadow(0 0 8px rgba(59, 130, 246, 0.9))';
+    } else {
+      // Gold star (default)
+      return 'drop-shadow(0 0 8px rgba(250, 204, 21, 0.9))';
+    }
+  };
+  
   return ReactDOM.createPortal(
     <div
       ref={elementRef}
@@ -407,7 +416,7 @@ function DailyRewardFlyingStar({ star, onArrived }: { star: FlyingStar; onArrive
         left: star.startX,
         top: star.startY,
         transform: 'translate(-50%, -50%)',
-        filter: 'drop-shadow(0 0 8px rgba(250, 204, 21, 0.9))'
+        filter: getStarStyle(star.value)
       }}
     >
       ⭐

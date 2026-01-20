@@ -1,23 +1,18 @@
 // Treasure Hunt LiveOps Event
 // Keys are collected from cards, used to open chests with rewards
 
+import { PackRarity } from './pointsEvent';
+
 export interface TreasureChest {
   id: string;
   opened: boolean;
   reward: ChestReward | null;
 }
 
-export interface CollectionItemReward {
-  collectionId: string;
-  itemId: string;
-}
-
 export interface ChestReward {
-  type: 'stars' | 'collection_item' | 'big_win' | 'empty';
+  type: 'stars' | 'pack' | 'big_win' | 'empty';
   stars?: number;
-  collectionId?: string;  // Legacy single item
-  itemId?: string;        // Legacy single item
-  collectionItems?: CollectionItemReward[];  // Multiple items support
+  packRarity?: PackRarity; // Pack rarity (1-5)
   isBigWin?: boolean;
 }
 
@@ -45,17 +40,28 @@ const EVENT_DURATION_HOURS = 48; // 2 days
 const TOTAL_ROOMS = 10;
 const MIN_CHESTS = 5;
 const MAX_CHESTS = 10;
-const REQUIRED_LEVEL = 2;
+const REQUIRED_LEVEL = 3;
 
-// Collection IDs for random rewards (must match Collections.tsx)
-const COLLECTION_IDS = ['nature', 'fruits', 'toys', 'treats', 'accessories', 'home', 'seasons', 'friends', 'hearts'];
-
-// Generate a random collection item
-function generateCollectionItem(): CollectionItemReward {
-  return {
-    collectionId: COLLECTION_IDS[Math.floor(Math.random() * COLLECTION_IDS.length)],
-    itemId: `item_${Math.floor(Math.random() * 9)}` // 9 items per collection
-  };
+// Generate a random pack rarity based on room number (higher rooms = better chance for rare packs)
+function generatePackRarity(roomNumber: number): PackRarity {
+  const roll = Math.random();
+  
+  // Base chances adjusted by room number
+  // Room 0: mostly gray/green, Room 9: chance for purple/red
+  const purpleChance = 0.02 + roomNumber * 0.02; // 2-20%
+  const blueChance = 0.08 + roomNumber * 0.02;   // 8-26%
+  const greenChance = 0.25 + roomNumber * 0.02;  // 25-43%
+  
+  if (roll < purpleChance * 0.3) {
+    return 5; // Legendary (red)
+  } else if (roll < purpleChance) {
+    return 4; // Epic (purple)
+  } else if (roll < purpleChance + blueChance) {
+    return 3; // Rare (blue)
+  } else if (roll < purpleChance + blueChance + greenChance) {
+    return 2; // Uncommon (green)
+  }
+  return 1; // Common (gray)
 }
 
 // Generate rewards for a room
@@ -63,46 +69,30 @@ function generateRoomRewards(roomNumber: number, chestCount: number): ChestRewar
   const rewards: ChestReward[] = [];
   
   // Balanced chances - total ~70% for rewards, ~30% empty
-  const bigWinChance = 0.05 + (roomNumber * 0.01); // 5-15% - rare big win
-  const multiItemChance = 0.08 + (roomNumber * 0.01); // 8-18% - multiple items (more visible)
-  const collectionChance = 0.15 + (roomNumber * 0.01); // 15-25% - single item
-  const starsChance = 0.20; // 20% - stars
+  const bigWinChance = 0.05 + (roomNumber * 0.01); // 5-15% - rare big win (stars + pack)
+  const packChance = 0.20 + (roomNumber * 0.01);    // 20-30% - collection pack
+  const starsChance = 0.25; // 25% - stars
   // Rest is empty (~30-40%)
   
   for (let i = 0; i < chestCount; i++) {
     const roll = Math.random();
     
     if (roll < bigWinChance) {
-      // Big win - moderate stars + 2 collection items
-      const items: CollectionItemReward[] = [
-        generateCollectionItem(),
-        generateCollectionItem()
-      ];
+      // Big win - stars + a good pack (blue or better)
+      const minRarity = Math.min(5, 3 + Math.floor(roomNumber / 3)) as PackRarity; // 3-5
       rewards.push({
         type: 'big_win',
-        stars: 15 + roomNumber * 3, // 15-45 stars (less than before)
-        collectionItems: items,
+        stars: 15 + roomNumber * 3, // 15-45 stars
+        packRarity: minRarity,
         isBigWin: true
       });
-    } else if (roll < bigWinChance + multiItemChance) {
-      // Multiple collection items (2-3)
-      const itemCount = Math.floor(Math.random() * 2) + 2; // 2-3 items
-      const items: CollectionItemReward[] = [];
-      for (let j = 0; j < itemCount; j++) {
-        items.push(generateCollectionItem());
-      }
+    } else if (roll < bigWinChance + packChance) {
+      // Collection pack
       rewards.push({
-        type: 'collection_item',
-        collectionItems: items
+        type: 'pack',
+        packRarity: generatePackRarity(roomNumber)
       });
-    } else if (roll < bigWinChance + multiItemChance + collectionChance) {
-      // Single collection item
-      const item = generateCollectionItem();
-      rewards.push({
-        type: 'collection_item',
-        collectionItems: [item]
-      });
-    } else if (roll < bigWinChance + multiItemChance + collectionChance + starsChance) {
+    } else if (roll < bigWinChance + packChance + starsChance) {
       // Stars - small amounts
       const starAmount = Math.random() < 0.7 
         ? 3 + Math.floor(Math.random() * 5) // 70%: 3-7 stars (small)
@@ -157,17 +147,77 @@ function generateRooms(): TreasureRoom[] {
   return rooms;
 }
 
+// Check if event rewards need migration (old format without packRarity)
+function needsMigration(event: TreasureHuntEvent): boolean {
+  // Check if any unopened chest could have pack rewards but doesn't
+  for (const room of event.rooms) {
+    for (const chest of room.chests) {
+      if (!chest.opened) {
+        // Old rewards didn't have 'pack' or 'big_win' types with packRarity
+        // If we find a chest with old-style rewards, we need migration
+        if (chest.reward.type === 'stars' || chest.reward.type === 'empty') {
+          continue; // These are valid old and new format
+        }
+        // If type is pack or big_win but no packRarity, needs migration
+        if ((chest.reward.type === 'pack' || chest.reward.type === 'big_win') && !chest.reward.packRarity) {
+          return true;
+        }
+      }
+    }
+  }
+  // Also migrate if no chests have pack/big_win rewards at all (old format)
+  let hasPackReward = false;
+  for (const room of event.rooms) {
+    for (const chest of room.chests) {
+      if (chest.reward.type === 'pack' || chest.reward.type === 'big_win') {
+        hasPackReward = true;
+        break;
+      }
+    }
+    if (hasPackReward) break;
+  }
+  return !hasPackReward;
+}
+
+// Migrate event to new reward format
+function migrateEventRewards(event: TreasureHuntEvent): TreasureHuntEvent {
+  console.log('🔄 Migrating Treasure Hunt rewards to new format...');
+  
+  // Regenerate rewards for all unopened chests
+  for (let roomIdx = 0; roomIdx < event.rooms.length; roomIdx++) {
+    const room = event.rooms[roomIdx];
+    const newRewards = generateRoomRewards(roomIdx, room.chests.length);
+    
+    for (let chestIdx = 0; chestIdx < room.chests.length; chestIdx++) {
+      const chest = room.chests[chestIdx];
+      if (!chest.opened) {
+        // Replace reward with new format
+        chest.reward = newRewards[chestIdx];
+      }
+    }
+  }
+  
+  saveTreasureHuntEvent(event);
+  console.log('✅ Treasure Hunt rewards migrated!');
+  return event;
+}
+
 // Initialize or load event
 export function getTreasureHuntEvent(): TreasureHuntEvent {
   const stored = localStorage.getItem(STORAGE_KEY);
   
   if (stored) {
-    const event = JSON.parse(stored) as TreasureHuntEvent;
+    let event = JSON.parse(stored) as TreasureHuntEvent;
     
     // Check if event expired
     if (event.endTime && Date.now() > event.endTime) {
       // Event expired, create new one
       return createNewEvent();
+    }
+    
+    // Migrate old events to new reward format
+    if (needsMigration(event)) {
+      event = migrateEventRewards(event);
     }
     
     return event;
@@ -327,24 +377,21 @@ export function isEventComplete(event: TreasureHuntEvent): boolean {
 }
 
 // Claim grand prize
-export function claimGrandPrize(): { event: TreasureHuntEvent; stars: number; collectionItems: { collectionId: string; itemId: string }[] } {
+export function claimGrandPrize(): { event: TreasureHuntEvent; stars: number; packRarity: PackRarity } {
   const event = getTreasureHuntEvent();
   
   if (!isEventComplete(event) || event.grandPrizeClaimed) {
-    return { event, stars: 0, collectionItems: [] };
+    return { event, stars: 0, packRarity: 1 };
   }
   
   event.grandPrizeClaimed = true;
   saveTreasureHuntEvent(event);
   
-  // Grand prize: 200 stars + random collection items
+  // Grand prize: 200 stars + legendary pack
   return {
     event,
     stars: 200,
-    collectionItems: [
-      { collectionId: COLLECTION_IDS[0], itemId: 'item_0' },
-      { collectionId: COLLECTION_IDS[1], itemId: 'item_1' },
-    ]
+    packRarity: 5 // Legendary (red) pack
   };
 }
 

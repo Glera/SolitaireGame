@@ -9,6 +9,7 @@ interface Quest {
   target: number;
   reward: number;
   completed: boolean;
+  rewardClaimed?: boolean; // True if reward animation has already played
 }
 
 interface FlyingStar {
@@ -54,6 +55,7 @@ interface DailyQuestsProps {
   onReset?: () => void;
   progressBarRef?: React.RefObject<HTMLDivElement>;
   onStarArrived?: (count?: number) => void; // count defaults to 1
+  onQuestRewardClaimed?: (questId: string) => void; // Called when quest reward animation completes
   // Monthly progress
   monthlyProgress?: number;
   monthlyTarget?: number;
@@ -70,9 +72,10 @@ export function DailyQuests({
   onReset, 
   progressBarRef, 
   onStarArrived,
+  onQuestRewardClaimed,
   monthlyProgress = 0,
   monthlyTarget = 50,
-  monthlyReward = 50,
+  monthlyReward = 500,
   onMonthlyRewardClaim,
   monthlyRewardClaimed = false,
   onMonthlyProgressIncrement
@@ -98,6 +101,23 @@ export function DailyQuests({
   
   // Store previous values to detect changes
   const prevValuesRef = useRef<Record<string, number>>({});
+  // Track if prevValuesRef has been initialized (happens once on mount)
+  const initializedRef = useRef(false);
+  // Track previous visibility to detect open/close transitions
+  const wasVisibleRef = useRef(false);
+  // Store quests snapshot when window opens (for consistent animation)
+  const questsSnapshotRef = useRef<Quest[]>([]);
+  
+  // Initialize prevValuesRef on mount with current quest values
+  // This prevents false "new progress" detection after page reload
+  useEffect(() => {
+    if (!initializedRef.current && quests.length > 0) {
+      initializedRef.current = true;
+      quests.forEach(q => {
+        prevValuesRef.current[q.id] = q.current;
+      });
+    }
+  }, [quests]);
   
   // Queue for sequential quest animations
   const questQueueRef = useRef<Quest[]>([]);
@@ -153,88 +173,105 @@ export function DailyQuests({
     timersRef.current.push(numberTimer);
   };
   
-  // Reset state synchronously when becoming visible
+  // Reset state and start animations only when window OPENS (not on every quest change)
   useEffect(() => {
-    if (isVisible) {
-      // Reset everything first
-      setIsReady(false);
-      setFlyingStars([]);
-      setFlyingChips([]);
-      setHiddenRewardIcons({});
-      setTextPulseKey({});
-      setMonthlyBarPulse(false);
-      setMonthlyTextPulse(false);
-      setMonthlyOvershoot(0);
-      starsArrivedCount.current = {};
-      expectedStarsCount.current = {};
-      questQueueRef.current = [];
-      isAnimatingQuestRef.current = false;
-      timersRef.current.forEach(t => clearTimeout(t));
-      timersRef.current = [];
+    // Only run when transitioning from invisible to visible
+    const justOpened = isVisible && !wasVisibleRef.current;
+    wasVisibleRef.current = isVisible;
+    
+    if (!justOpened) {
+      return;
+    }
+    
+    // Capture quests snapshot at window open time
+    questsSnapshotRef.current = [...quests];
+    const currentQuests = questsSnapshotRef.current;
+    
+    // Reset everything first
+    setIsReady(false);
+    setFlyingStars([]);
+    setFlyingChips([]);
+    setHiddenRewardIcons({});
+    setTextPulseKey({});
+    setMonthlyBarPulse(false);
+    setMonthlyTextPulse(false);
+    setMonthlyOvershoot(0);
+    starsArrivedCount.current = {};
+    expectedStarsCount.current = {};
+    questQueueRef.current = [];
+    isAnimatingQuestRef.current = false;
+    timersRef.current.forEach(t => clearTimeout(t));
+    timersRef.current = [];
+    
+    // Determine which quests had progress (comparing to stored previous values)
+    // Skip quests that already had their reward claimed
+    const questsWithProgress: Quest[] = [];
+    currentQuests.forEach(q => {
+      // Skip if reward was already claimed (prevents re-animation after page reload)
+      if (q.rewardClaimed) return;
       
-      // Determine which quests had progress (comparing to stored previous values)
-      const questsWithProgress: Quest[] = [];
-      quests.forEach(q => {
-        const prevValue = prevValuesRef.current[q.id] ?? 0;
-        if (q.current > prevValue) {
-          questsWithProgress.push(q);
+      const prevValue = prevValuesRef.current[q.id] ?? q.current;
+      if (q.current > prevValue) {
+        questsWithProgress.push(q);
+      }
+    });
+    
+    // Set initial values and completed labels
+    const initialProgress: Record<string, number> = {};
+    const initialDisplay: Record<string, number> = {};
+    const initialCompletedLabels: Record<string, boolean> = {};
+    
+    currentQuests.forEach(q => {
+      const prevValue = prevValuesRef.current[q.id] ?? q.current;
+      const hadProgress = questsWithProgress.some(qp => qp.id === q.id);
+      
+      if (hadProgress) {
+        // Quest has new progress - start from previous value for animation
+        initialProgress[q.id] = prevValue;
+        initialDisplay[q.id] = prevValue;
+      } else {
+        // Quest has no new progress - show current state immediately
+        initialProgress[q.id] = q.current;
+        initialDisplay[q.id] = q.current;
+        // Show completed label immediately for already completed quests
+        if (q.completed) {
+          initialCompletedLabels[q.id] = true;
         }
-      });
-      
-      // Set initial values and completed labels
-      const initialProgress: Record<string, number> = {};
-      const initialDisplay: Record<string, number> = {};
-      const initialCompletedLabels: Record<string, boolean> = {};
-      
-      quests.forEach(q => {
-        const prevValue = prevValuesRef.current[q.id] ?? 0;
-        const hadProgress = questsWithProgress.some(qp => qp.id === q.id);
-        
-        if (hadProgress) {
-          // Quest has new progress - start from previous value for animation
-          initialProgress[q.id] = prevValue;
-          initialDisplay[q.id] = prevValue;
-        } else {
-          // Quest has no new progress - show current state immediately
-          initialProgress[q.id] = q.current;
-          initialDisplay[q.id] = q.current;
-          // Show completed label immediately for already completed quests
-          if (q.completed) {
-            initialCompletedLabels[q.id] = true;
-          }
-        }
-      });
-      
-      setAnimatedProgress(initialProgress);
-      setDisplayedCount(initialDisplay);
-      setShowCompletedLabel(initialCompletedLabels);
-      
-      // Update stored previous values for next time
-      quests.forEach(q => {
-        prevValuesRef.current[q.id] = q.current;
-      });
-      
-      // Show the modal after state is set
-      requestAnimationFrame(() => {
-        setIsReady(true);
-        setIsAnimating(true);
-      });
-      
-      // Build queue of quests that need animation
-      questQueueRef.current = questsWithProgress.slice();
-      
-      // Start animating after initial delay
+      }
+    });
+    
+    setAnimatedProgress(initialProgress);
+    setDisplayedCount(initialDisplay);
+    setShowCompletedLabel(initialCompletedLabels);
+    
+    // Update stored previous values for next time
+    currentQuests.forEach(q => {
+      prevValuesRef.current[q.id] = q.current;
+    });
+    
+    // Show the modal after state is set
+    requestAnimationFrame(() => {
+      setIsReady(true);
+      setIsAnimating(true);
+    });
+    
+    // Build queue of quests that need animation
+    questQueueRef.current = questsWithProgress.slice();
+    
+    // Start animating after initial delay (only if there are quests to animate)
+    if (questsWithProgress.length > 0) {
       const startTimer = setTimeout(() => {
         animateNextQuest();
       }, 400);
       timersRef.current.push(startTimer);
-      
-      return () => {
-        timersRef.current.forEach(t => clearTimeout(t));
-        timersRef.current = [];
-      };
     }
-  }, [isVisible, quests]);
+    
+    return () => {
+      timersRef.current.forEach(t => clearTimeout(t));
+      timersRef.current = [];
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible]); // Only depend on visibility, not quests - quests changes during animation shouldn't restart
   
   const launchStarsForQuest = (quest: Quest) => {
     const rewardIconEl = rewardIconRefs.current[quest.id];
@@ -365,6 +402,9 @@ export function DailyQuests({
   };
   
   const handleChipArrived = (chip: FlyingChip) => {
+    // Mark quest reward as claimed (prevents re-animation after page reload)
+    onQuestRewardClaimed?.(chip.questId);
+    
     // Update monthly progress with pulse effect
     onMonthlyProgressIncrement?.();
     
@@ -707,6 +747,20 @@ function QuestFlyingStar({ star, onArrived }: { star: FlyingStar; onArrived: () 
   
   if (!isVisible) return null;
   
+  // Determine star color based on value
+  const getStarStyle = (value: number) => {
+    if (value >= 100) {
+      // Purple star for x100
+      return 'hue-rotate(260deg) brightness(1.2) saturate(1.5) drop-shadow(0 0 8px rgba(147, 51, 234, 0.9))';
+    } else if (value >= 10) {
+      // Blue star for x10
+      return 'hue-rotate(180deg) brightness(1.2) drop-shadow(0 0 8px rgba(59, 130, 246, 0.9))';
+    } else {
+      // Gold star (default)
+      return 'drop-shadow(0 0 4px rgba(250, 204, 21, 0.8))';
+    }
+  };
+  
   // Render via portal to ensure it's above everything
   return ReactDOM.createPortal(
     <div
@@ -716,7 +770,7 @@ function QuestFlyingStar({ star, onArrived }: { star: FlyingStar; onArrived: () 
         left: star.startX,
         top: star.startY,
         transform: 'translate(-50%, -50%)',
-        filter: 'drop-shadow(0 0 4px rgba(250, 204, 21, 0.8))'
+        filter: getStarStyle(star.value)
       }}
     >
       ⭐

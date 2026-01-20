@@ -10,7 +10,8 @@ interface LeaderboardPopupProps {
   seasonInfo: SeasonInfo;
 }
 
-const ROW_HEIGHT = 48; // Height of each player row (p-2 = 8px*2 + content ~32px) + gap (space-y-1 = 4px)
+// Fallback height until we measure real row spacing from the DOM
+const DEFAULT_ROW_HEIGHT = 52;
 
 export function LeaderboardPopup({ 
   isVisible, 
@@ -22,15 +23,17 @@ export function LeaderboardPopup({
 }: LeaderboardPopupProps) {
   const positionChange = oldPosition - newPosition;
   const hasPositionImproved = positionChange > 0;
-  const initialOffset = hasPositionImproved ? positionChange * ROW_HEIGHT : 0;
   
   const [showList, setShowList] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState('');
-  const [animationPhase, setAnimationPhase] = useState<'waiting' | 'ready' | 'moving' | 'complete'>('waiting');
+  // Start with 'ready' so offset is applied from the very first render
+  const [animationPhase, setAnimationPhase] = useState<'ready' | 'moving' | 'complete'>('ready');
   const [isLoading, setIsLoading] = useState(true);
+  const rowHeightRef = useRef(DEFAULT_ROW_HEIGHT);
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRowRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
+  const initialOffset = hasPositionImproved ? positionChange * rowHeightRef.current : 0;
   
   // Update timer every minute
   useEffect(() => {
@@ -49,34 +52,24 @@ export function LeaderboardPopup({
   // Reset state when popup closes
   useEffect(() => {
     if (!isVisible) {
-      setAnimationPhase('waiting');
+      setAnimationPhase('ready'); // Reset to 'ready' so offset is applied on next open
       setShowList(false);
       setIsLoading(true);
       hasStartedRef.current = false;
     }
   }, [isVisible]);
   
-  // Calculate scroll position to center a player
-  const getScrollForPosition = (position: number, container: HTMLDivElement) => {
-    const containerHeight = container.clientHeight;
-    const playerTop = (position - 1) * ROW_HEIGHT;
-    // Center the player in the container, with slight upward bias (-20px) for better visual
-    const targetScroll = playerTop - (containerHeight / 2) + (ROW_HEIGHT / 2) - 20;
-    const maxScroll = Math.max(0, container.scrollHeight - containerHeight);
-    return Math.max(0, Math.min(targetScroll, maxScroll));
-  };
-  
   // Animate scroll with exact duration to sync with CSS transition
   const animateScroll = (container: HTMLDivElement, from: number, to: number, duration: number) => {
     const startTime = performance.now();
     
-    // Ease-out function matching CSS ease-out
-    const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+    // Ease-out function matching CSS cubic-bezier(0.25, 1, 0.5, 1)
+    const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
     
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      const easedProgress = easeOut(progress);
+      const easedProgress = easeOutQuart(progress);
       
       const currentScroll = from + (to - from) * easedProgress;
       container.scrollTop = currentScroll;
@@ -89,62 +82,123 @@ export function LeaderboardPopup({
     requestAnimationFrame(animate);
   };
   
-  // Handle animation sequence with CSS transitions
+  // Handle animation sequence
   useEffect(() => {
     if (!isVisible || hasStartedRef.current) return;
     
     hasStartedRef.current = true;
-    
-    // Show list immediately
     setShowList(true);
-    setAnimationPhase('waiting');
     
-    // Use requestAnimationFrame for smoother initialization
+    // Wait for DOM to be ready
     requestAnimationFrame(() => {
-      // Wait a frame for DOM to be ready
       requestAnimationFrame(() => {
         const container = containerRef.current;
-        
-        if (container) {
-          if (hasPositionImproved) {
-            // Scroll to OLD position instantly for animation
-            const oldPositionScroll = getScrollForPosition(oldPosition, container);
-            container.scrollTop = oldPositionScroll;
-          } else {
-            // No position change - scroll to current position
-            const currentPositionScroll = getScrollForPosition(newPosition, container);
-            container.scrollTop = currentPositionScroll;
-          }
+        const playerRow = playerRowRef.current;
+        if (!container || !playerRow) {
+          setIsLoading(false);
+          setAnimationPhase('complete');
+          return;
         }
         
-        // Remove loading state
-        setIsLoading(false);
+        // Calculate row height (row + vertical spacing) from the actual DOM
+        const measureRowHeight = () => {
+          const rows = container.querySelectorAll<HTMLElement>('[data-player-row]');
+          if (rows.length >= 2) {
+            const first = rows[0];
+            const second = rows[1];
+            const gap = Math.max(0, second.offsetTop - first.offsetTop - first.offsetHeight);
+            return first.offsetHeight + gap;
+          }
+          if (rows.length === 1) {
+            return rows[0].offsetHeight + 4; // space-y-1 fallback
+          }
+          return rowHeightRef.current;
+        };
+        
+        const measuredRowHeight = measureRowHeight();
+        rowHeightRef.current = measuredRowHeight;
+        const containerHeight = container.clientHeight;
+        
+        if (!hasPositionImproved) {
+          // No improvement - scroll directly to current position
+          const targetScroll = Math.max(
+            0,
+            (newPosition - 1) * measuredRowHeight - containerHeight / 2 + measuredRowHeight / 2
+          );
+          container.scrollTop = targetScroll;
+          setIsLoading(false);
+          setAnimationPhase('complete');
+          return;
+        }
+        
+        // Has position improved - setup initial state with offset
+        // Set phase to 'ready' - this applies transform to user row
         setAnimationPhase('ready');
         
-        // Start movement animation quickly
-        if (hasPositionImproved) {
-          const transitionDuration = Math.min(500 + positionChange * 80, 1200);
+        // Wait for React to apply marginTop (double RAF for safety)
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            // Scroll to show user at OLD position (center of screen)
+          const oldPositionScroll = Math.max(0, (oldPosition - 1) * measuredRowHeight - containerHeight / 2 + measuredRowHeight / 2);
+          container.scrollTop = oldPositionScroll;
           
-          // Short pause to show old position, then animate
-          setTimeout(() => {
+          const startOffset = hasPositionImproved ? positionChange * measuredRowHeight : 0;
+          console.log('📍 Initial state: oldPosition:', oldPosition, 'scroll:', oldPositionScroll, 'offset:', startOffset);
+          
+          // Start animation as soon as готово
+          requestAnimationFrame(() => {
+            setIsLoading(false);
             setAnimationPhase('moving');
-            
-            // Animate scroll in sync with CSS transition
-            const container = containerRef.current;
-            if (container) {
-              const fromScroll = container.scrollTop;
-              const toScroll = getScrollForPosition(newPosition, container);
-              animateScroll(container, fromScroll, toScroll, transitionDuration);
-            }
-            
-            // Mark complete after transition
-            setTimeout(() => {
-              setAnimationPhase('complete');
-            }, transitionDuration);
-          }, 300);
-        } else {
-          setAnimationPhase('complete');
-        }
+
+            // Мгновенный старт полёта: одна фаза
+            const movePhaseDuration = 1500;
+
+            const newPositionScroll = Math.max(
+              0,
+              (newPosition - 1) * measuredRowHeight - containerHeight / 2 + measuredRowHeight / 2
+            );
+
+              // Анимация: один непрерывный полёт с ростом + синхронный скролл
+            const runAnimation = async () => {
+              try {
+                const lowerOffset = startOffset + measuredRowHeight * 0.1; // лёгкое смещение вниз в начале
+                const startScrollTop = container.scrollTop;
+                animateScroll(container, startScrollTop, newPositionScroll, movePhaseDuration);
+
+                await playerRow.animate(
+                  [
+                    { transform: `translateY(${lowerOffset}px) scale(0.98)` },
+                    { transform: 'translateY(0px) scale(1.08)' }
+                  ],
+                  {
+                    duration: movePhaseDuration,
+                    easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+                    fill: 'forwards'
+                  }
+                ).finished;
+
+                // Быстрый возврат к норме при посадке
+                await playerRow.animate([
+                  { transform: 'translateY(0px) scale(1.08)' },
+                  { transform: 'translateY(0px) scale(1.0)' },
+                ], {
+                  duration: 140,
+                  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                  fill: 'forwards'
+                }).finished;
+              } catch (e) {
+                console.error('Animation interrupted', e);
+              } finally {
+                setAnimationPhase('complete');
+              }
+            };
+
+            runAnimation();
+
+            console.log('🚀 Animating from pos', oldPosition, 'to', newPosition);
+          });
+        });
+        });
       });
     });
   }, [isVisible, hasPositionImproved, positionChange, oldPosition, newPosition, initialOffset]);
@@ -211,9 +265,9 @@ export function LeaderboardPopup({
           ref={containerRef} 
           className="flex-1 space-y-1 overflow-y-auto custom-scrollbar pr-1 relative"
         >
-          {/* Loading overlay */}
+          {/* Loading overlay - completely opaque to hide list until ready */}
           {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 z-20">
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-20">
               <div className="flex flex-col items-center gap-2">
                 <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
                 <span className="text-amber-300/80 text-sm">Загрузка...</span>
@@ -227,43 +281,37 @@ export function LeaderboardPopup({
             const isUser = player.isCurrentUser;
             
             // Calculate offset for current user
-            // waiting/ready = at old position (offset applied)
-            // moving/complete = at new position (no offset, with transition)
-            const shouldOffsetUser = isUser && hasPositionImproved && (animationPhase === 'waiting' || animationPhase === 'ready');
+            // 'ready' = at old position (offset applied)
+            // 'moving'/'complete' = at new position
+            const shouldOffsetUser = isUser && hasPositionImproved && animationPhase === 'ready';
             const isUserMoving = isUser && animationPhase === 'moving';
             const transitionDuration = Math.min(500 + positionChange * 80, 1200);
             
-            // Elements between newPosition and oldPosition need to shift up to fill the gap
-            // then shift back down when user's plaque arrives
-            const isBetweenPositions = !isUser && hasPositionImproved && position > newPosition && position <= oldPosition;
-            const shouldOffsetOther = isBetweenPositions && (animationPhase === 'waiting' || animationPhase === 'ready');
-            const isOtherMoving = isBetweenPositions && animationPhase === 'moving';
+            // DISABLED: Elements between positions - let's see if this fixes the issue
+            const isBetweenPositions = false; // !isUser && hasPositionImproved && position > newPosition && position <= oldPosition;
+            const shouldOffsetOther = false; // isBetweenPositions && animationPhase === 'ready';
+            const isOtherMoving = false; // isBetweenPositions && animationPhase === 'moving';
             
-            // Calculate transform
-            let transform = 'translateY(0)';
-            if (shouldOffsetUser) {
-              transform = `translateY(${initialOffset}px)`;
-            } else if (shouldOffsetOther) {
-              transform = `translateY(-${ROW_HEIGHT}px)`; // Shift up to fill gap
-            }
+            // Calculate margin offset - ONLY for user (using margin instead of transform)
+            const startOffset = shouldOffsetUser ? initialOffset : 0;
             
             return (
               <div
                 key={player.id}
                 ref={isUser ? playerRowRef : null}
+                data-player-row
                 className={getPositionStyle(isUser, position)}
                 style={{
-                  // Don't apply fadeInSlide animation during position change - it conflicts with translateY!
-                  animation: (isUser || isBetweenPositions) ? undefined : `fadeInSlide 0.15s ease-out ${Math.min(index * 0.015, 0.2)}s both`,
-                  // Apply calculated transform
-                  transform,
-                  // CSS transition for smooth movement - cubic-bezier matches JS easeOut
-                  transition: (isUserMoving || isOtherMoving) ? `transform ${transitionDuration}ms cubic-bezier(0.33, 1, 0.68, 1)` : undefined,
+                  // Don't apply fadeInSlide animation for user
+                  animation: isUser ? 'none' : `fadeInSlide 0.15s ease-out ${Math.min(index * 0.015, 0.2)}s both`,
+                  // Overlay move for current user so другие не двигаются
+                  transform: isUser && shouldOffsetUser ? `translateY(${startOffset}px)` : undefined,
+                  willChange: isUser ? 'transform' : undefined,
+                  // No transitions - WAAPI will handle animation
+                  transition: 'none',
                   // Keep player above others during animation
-                  zIndex: isUser && (shouldOffsetUser || isUserMoving) ? 10 : undefined,
-                  position: isUser ? 'relative' : undefined,
-                  // Glow during movement
-                  boxShadow: isUserMoving ? '0 0 20px rgba(234, 179, 8, 0.5)' : undefined
+                  zIndex: isUser ? 10 : undefined,
+                  position: isUser ? 'relative' : undefined
                 }}
               >
                 {/* Position */}

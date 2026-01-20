@@ -342,10 +342,18 @@ export const TreasureHuntPopup: React.FC<TreasureHuntPopupProps> = ({
           />
         </div>
         
-        {/* No keys hint */}
+        {/* No keys hint - shown over the chests area */}
         {showNoKeysHint && (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-slate-800/95 text-amber-200 px-4 py-3 rounded-xl shadow-lg border border-amber-500/30 text-center animate-[fadeIn_0.3s_ease-out]">
-            <p className="font-bold mb-1">🔑 Нужен ключ!</p>
+          <div 
+            className="absolute bg-slate-900/95 text-amber-200 px-5 py-4 rounded-xl shadow-2xl border-2 border-amber-500/50 text-center z-30"
+            style={{
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%) scale(1)',
+              animation: 'noKeysPulse 0.3s ease-out',
+            }}
+          >
+            <p className="font-bold text-lg mb-1">🔑 Нужен ключ!</p>
             <p className="text-sm text-slate-300">Собирай карты с ключами в пасьянсе</p>
           </div>
         )}
@@ -542,6 +550,12 @@ styleSheet.textContent = `
   @keyframes fadeIn {
     from { opacity: 0; transform: translateX(-50%) translateY(10px); }
     to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  
+  @keyframes noKeysPulse {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+    50% { transform: translate(-50%, -50%) scale(1.05); }
+    100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   }
 `;
 document.head.appendChild(styleSheet);

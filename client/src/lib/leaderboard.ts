@@ -49,42 +49,59 @@ const SEASON_DURATION_MS = 15 * 24 * 60 * 60 * 1000;
 function generateFakePlayer(index: number, maxStars: number): LeaderboardPlayer {
   const name = FAKE_NAMES[Math.floor(Math.random() * FAKE_NAMES.length)];
   const avatar = AVATARS[Math.floor(Math.random() * AVATARS.length)];
-  const stars = Math.floor(Math.random() * maxStars) + 5; // 5 to maxStars
   
   // Realistic distribution of player types:
-  // ~30% inactive (stopped playing)
-  // ~40% casual (low activity)
-  // ~20% regular (medium activity)
-  // ~10% hardcore (high activity, can burst)
+  // ~15% ghost (registered but never played - 0 stars)
+  // ~25% churned (played once/twice then quit - very low stars)
+  // ~30% casual (plays occasionally - low-medium stars)
+  // ~20% regular (plays often - medium-high stars)
+  // ~10% hardcore (very active - high stars, can burst)
   const roll = Math.random();
   let isActive = true;
   let activityLevel = 0.5;
   let burstChance = 0.1;
+  let stars = 0;
   
-  if (roll < 0.3) {
-    // Inactive player - stopped playing
+  if (roll < 0.15) {
+    // Ghost player - registered but never really played
     isActive = false;
     activityLevel = 0;
     burstChance = 0;
-  } else if (roll < 0.7) {
-    // Casual - plays occasionally
-    isActive = true;
-    activityLevel = 0.1 + Math.random() * 0.3; // 0.1-0.4
-    burstChance = 0.05; // Rarely bursts
-  } else if (roll < 0.9) {
-    // Regular - plays often
-    isActive = true;
-    activityLevel = 0.4 + Math.random() * 0.3; // 0.4-0.7
-    burstChance = 0.15; // Sometimes bursts
+    stars = 0; // Zero stars!
+  } else if (roll < 0.40) {
+    // Churned player - tried the game, quit early
+    isActive = false;
+    activityLevel = 0;
+    burstChance = 0;
+    // Very low stars: 1-15% of max, exponential distribution favoring low end
+    const lowRoll = Math.pow(Math.random(), 2); // Square for exponential bias toward 0
+    stars = Math.floor(lowRoll * maxStars * 0.15) + Math.floor(Math.random() * 5);
+  } else if (roll < 0.70) {
+    // Casual - plays occasionally, inconsistent
+    isActive = Math.random() > 0.3; // 70% chance still active
+    activityLevel = 0.05 + Math.random() * 0.15; // 0.05-0.2 (very low activity)
+    burstChance = 0.02; // Rarely bursts
+    // Low-medium stars: 5-40% of max, slight exponential bias
+    const casualRoll = Math.pow(Math.random(), 1.3);
+    stars = Math.floor(casualRoll * maxStars * 0.4) + Math.floor(Math.random() * 10);
+  } else if (roll < 0.90) {
+    // Regular - plays fairly often
+    isActive = Math.random() > 0.1; // 90% chance still active
+    activityLevel = 0.2 + Math.random() * 0.3; // 0.2-0.5
+    burstChance = 0.1; // Sometimes bursts
+    // Medium-high stars: 20-70% of max
+    stars = Math.floor(maxStars * 0.2 + Math.random() * maxStars * 0.5);
   } else {
-    // Hardcore - very active, can make big jumps
-    isActive = true;
-    activityLevel = 0.7 + Math.random() * 0.3; // 0.7-1.0
-    burstChance = 0.3; // Often bursts
+    // Hardcore - very active, dominates
+    isActive = true; // Always active
+    activityLevel = 0.5 + Math.random() * 0.5; // 0.5-1.0
+    burstChance = 0.25; // Often bursts
+    // High stars: 50-100% of max
+    stars = Math.floor(maxStars * 0.5 + Math.random() * maxStars * 0.5);
   }
   
   return {
-    id: `fake_${index}_${Date.now()}`,
+    id: `fake_${index}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
     name,
     avatar,
     stars,
@@ -92,7 +109,7 @@ function generateFakePlayer(index: number, maxStars: number): LeaderboardPlayer 
     isActive,
     activityLevel,
     burstChance,
-    lastActive: Date.now() - Math.floor(Math.random() * 24 * 60 * 60 * 1000) // Random time in last 24h
+    lastActive: Date.now() - Math.floor(Math.random() * 72 * 60 * 60 * 1000) // Random time in last 72h
   };
 }
 
@@ -375,26 +392,47 @@ export function simulateOtherPlayers(): {
       const activityLevel = player.activityLevel ?? 0.5;
       const burstChance = player.burstChance ?? 0.1;
       
-      // Inactive players don't gain stars
-      if (!isActive) return player;
+      // Ghost players (0 stars, never played) - 1% chance to finally start playing
+      if (player.stars === 0 && !isActive) {
+        if (Math.random() < 0.01) {
+          // Ghost finally starts playing!
+          return {
+            ...player,
+            isActive: true,
+            activityLevel: 0.1 + Math.random() * 0.2, // Usually casual
+            burstChance: 0.05,
+            stars: Math.floor(Math.random() * 5) + 3, // First session: 3-8 stars
+            lastActive: now
+          };
+        }
+        return player; // Still a ghost
+      }
       
-      // 5% chance an active player becomes inactive (quit playing)
-      if (Math.random() < 0.05) {
+      // Inactive players (churned) - very rare comeback (0.5%)
+      if (!isActive) {
+        if (Math.random() < 0.005) {
+          // Comeback! But usually short-lived
+          return { 
+            ...player, 
+            isActive: true, 
+            activityLevel: 0.1 + Math.random() * 0.15, // Low activity on return
+            burstChance: 0.03,
+            lastActive: now 
+          };
+        }
+        return player; // Still inactive
+      }
+      
+      // Active players can become inactive
+      // Higher activity players are less likely to quit
+      const quitChance = 0.08 * (1 - activityLevel); // 0-8% based on activity
+      if (Math.random() < quitChance) {
         return { ...player, isActive: false, activityLevel: 0 };
       }
       
-      // 2% chance an inactive player becomes active again (comeback)
-      if (!isActive && Math.random() < 0.02) {
-        return { 
-          ...player, 
-          isActive: true, 
-          activityLevel: 0.2 + Math.random() * 0.3, // Low-medium activity
-          lastActive: now 
-        };
-      }
-      
       // Roll for activity based on player's activity level
-      if (Math.random() > activityLevel) {
+      // Add some randomness - even active players don't play every tick
+      if (Math.random() > activityLevel * 0.7) {
         return player; // This player doesn't play this tick
       }
       
@@ -404,16 +442,29 @@ export function simulateOtherPlayers(): {
       // Check for burst (big session/win streak)
       if (Math.random() < burstChance) {
         // Burst! Player had a great session
-        starsGained = Math.floor(Math.random() * 30) + 20; // 20-50 stars burst
+        // Burst size scales with activity level
+        const burstSize = activityLevel > 0.5 ? 
+          Math.floor(Math.random() * 35) + 15 : // Active: 15-50 stars
+          Math.floor(Math.random() * 15) + 8;   // Casual: 8-23 stars
+        starsGained = burstSize;
       } else {
-        // Normal play - smaller gains
-        starsGained = Math.floor(Math.random() * 8) + 2; // 2-10 stars
+        // Normal play - gains scale with activity level
+        if (activityLevel < 0.2) {
+          // Casual: 1-4 stars (they win rarely)
+          starsGained = Math.floor(Math.random() * 4) + 1;
+        } else if (activityLevel < 0.5) {
+          // Regular: 2-8 stars
+          starsGained = Math.floor(Math.random() * 7) + 2;
+        } else {
+          // Active: 3-12 stars
+          starsGained = Math.floor(Math.random() * 10) + 3;
+        }
       }
       
-      // Players near the user are slightly more motivated (keeps it interesting)
-      const distanceFromUser = Math.abs(idx - userIndex);
-      if (distanceFromUser <= 3) {
-        starsGained = Math.floor(starsGained * 1.2); // 20% boost for nearby players
+      // Players just behind the user are slightly more motivated
+      const distanceFromUser = idx - userIndex;
+      if (distanceFromUser > 0 && distanceFromUser <= 3) {
+        starsGained = Math.floor(starsGained * 1.15); // 15% boost for chasers
       }
       
       return {
@@ -425,33 +476,49 @@ export function simulateOtherPlayers(): {
     
     // ============ RUBBER BAND MECHANIC ============
     // If user is far ahead in 1st place, ensure some competition
-    const secondPlace = players.find((p, idx) => !p.isCurrentUser && idx === 1);
-    const gapToSecond = userPosition === 1 && secondPlace ? userStars - secondPlace.stars : 0;
+    const sortedNonUser = players.filter(p => !p.isCurrentUser).sort((a, b) => b.stars - a.stars);
+    const topChaser = sortedNonUser[0];
+    const gapToChaser = topChaser ? userStars - topChaser.stars : 0;
     
-    if (userPosition === 1 && gapToSecond > 30 && secondPlace) {
-      // Make second place more aggressive
-      const catchUpStars = Math.floor(gapToSecond * 0.2) + Math.floor(Math.random() * 8);
+    if (userPosition === 1 && gapToChaser > 40 && topChaser) {
+      // Make top chaser more aggressive
+      const catchUpStars = Math.floor(gapToChaser * 0.15) + Math.floor(Math.random() * 10);
       players = players.map(p => 
-        p.id === secondPlace.id 
-          ? { ...p, stars: p.stars + catchUpStars, isActive: true, activityLevel: 0.8 } 
+        p.id === topChaser.id 
+          ? { ...p, stars: p.stars + catchUpStars, isActive: true, activityLevel: Math.max(p.activityLevel, 0.6) } 
           : p
       );
     }
     
-    // ============ OCCASIONAL BIG SHAKE-UP ============
-    // 5% chance: One random player makes a huge comeback burst
-    if (Math.random() < 0.05) {
-      const eligiblePlayers = players.filter(p => !p.isCurrentUser && p.stars < userStars);
-      if (eligiblePlayers.length > 0) {
-        const luckyPlayer = eligiblePlayers[Math.floor(Math.random() * eligiblePlayers.length)];
-        const burstStars = Math.floor(Math.random() * 40) + 30; // 30-70 stars!
+    // ============ OCCASIONAL EVENTS ============
+    // 3% chance: One random active player has a great day
+    if (Math.random() < 0.03) {
+      const activePlayers = players.filter(p => !p.isCurrentUser && p.isActive && p.stars > 0);
+      if (activePlayers.length > 0) {
+        const luckyPlayer = activePlayers[Math.floor(Math.random() * activePlayers.length)];
+        const burstStars = Math.floor(Math.random() * 30) + 20; // 20-50 stars
         players = players.map(p => 
           p.id === luckyPlayer.id 
+            ? { ...p, stars: p.stars + burstStars, lastActive: now } 
+            : p
+        );
+      }
+    }
+    
+    // 1% chance: A dormant player with some stars comes back strong
+    if (Math.random() < 0.01) {
+      const dormantPlayers = players.filter(p => !p.isCurrentUser && !p.isActive && p.stars > 10);
+      if (dormantPlayers.length > 0) {
+        const returningPlayer = dormantPlayers[Math.floor(Math.random() * dormantPlayers.length)];
+        const comebackStars = Math.floor(Math.random() * 25) + 15; // 15-40 stars
+        players = players.map(p => 
+          p.id === returningPlayer.id 
             ? { 
                 ...p, 
-                stars: p.stars + burstStars, 
+                stars: p.stars + comebackStars, 
                 isActive: true, 
-                activityLevel: Math.max(p.activityLevel ?? 0.5, 0.6),
+                activityLevel: 0.3 + Math.random() * 0.3,
+                burstChance: 0.1,
                 lastActive: now 
               } 
             : p

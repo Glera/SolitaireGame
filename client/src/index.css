@@ -46,6 +46,24 @@
   }
 }
 
+/* Simple fade in animation */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Pop in animation - scales from center */
+@keyframes popIn {
+  from { 
+    opacity: 0; 
+    transform: scale(0.9);
+  }
+  to { 
+    opacity: 1; 
+    transform: scale(1);
+  }
+}
+
 /* Card flip animation */
 @keyframes slideIn {
   from {
@@ -221,19 +239,21 @@ canvas {
   animation: collection-pop 0.15s ease-out;
 }
 
-/* New collection item pulse animation */
-@keyframes new-item-pulse {
+/* New collection item icon fly-in animation - icon flies into position */
+@keyframes new-item-icon-fly-in {
   0% {
-    transform: scale(1);
-    box-shadow: 0 0 0px rgba(250, 204, 21, 0);
+    transform: translateY(-40px) scale(0.5);
+    opacity: 0;
   }
   50% {
-    transform: scale(1.1);
-    box-shadow: 0 0 20px rgba(250, 204, 21, 0.8);
+    transform: translateY(4px) scale(1.1);
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(-2px) scale(1.05);
   }
   100% {
-    transform: scale(1);
-    box-shadow: 0 0 0px rgba(250, 204, 21, 0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -400,39 +420,35 @@ canvas {
 /* Key drop animation for Treasure Hunt - face up cards (with bounce) */
 @keyframes keyDrop {
   0% {
-    transform: translateX(-50%) translateY(-40px);
+    transform: translateY(-40px);
     opacity: 0;
   }
   30% {
     opacity: 1;
   }
   70% {
-    transform: translateX(-50%) translateY(5px);
+    transform: translateY(5px);
   }
   85% {
-    transform: translateX(-50%) translateY(-5px);
+    transform: translateY(-3px);
   }
   100% {
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
   }
 }
 
-/* Key drop animation for face down cards - no bounce, disappears on contact */
+/* Key drop animation for face down cards - no bounce, appears and stays */
 @keyframes keyDropFaceDown {
   0% {
-    transform: translateX(-50%) translateY(-40px);
+    transform: translateY(-40px);
     opacity: 0;
   }
   30% {
     opacity: 1;
   }
-  90% {
-    transform: translateX(-50%) translateY(0);
-    opacity: 1;
-  }
   100% {
-    transform: translateX(-50%) translateY(0);
-    opacity: 0;
+    transform: translateY(0);
+    opacity: 1;
   }
 }
 

@@ -231,14 +231,14 @@ export function Card({
         {cardBack}
       </div>
       
-      {/* Key indicator for Treasure Hunt event - show during animation on all cards, after animation only on face up */}
-      {keyVisible && (keyAnimating || showFace) && (
+      {/* Key indicator for Treasure Hunt event - show on all cards with keys (face up or face down) */}
+      {keyVisible && (
         <div 
-          className="absolute left-1/2 flex items-center justify-center z-10 pointer-events-none"
+          className="absolute flex items-center justify-center z-10 pointer-events-none"
           style={{
-            top: '0px',
+            left: '2px',
+            bottom: '2px',
             filter: 'drop-shadow(0 1px 0 rgba(0,0,0,0.7)) drop-shadow(0 0 1px rgba(0,0,0,0.5))',
-            transform: 'translateX(-50%)',
             animation: keyAnimating 
               ? (showFace 
                   ? 'keyDrop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' 
@@ -246,7 +246,7 @@ export function Card({
               : 'none'
           }}
         >
-          <span className="text-lg">🔑</span>
+          <span style={{ fontSize: '0.8rem' }}>🔑</span>
         </div>
       )}
       

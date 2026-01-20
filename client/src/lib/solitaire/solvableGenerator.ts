@@ -9,17 +9,41 @@ const RANK_VALUES: { [key in Rank]: number } = {
   '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13
 };
 
+// Check if this is the very first game (no wins yet)
+function isFirstGame(): boolean {
+  return localStorage.getItem('solitaire_first_win') !== 'true';
+}
+
+// Mark that first win happened (called externally after win)
+export function markFirstWin(): void {
+  localStorage.setItem('solitaire_first_win', 'true');
+}
+
+// Reset first win flag (for testing/reset)
+export function resetFirstWinFlag(): void {
+  localStorage.removeItem('solitaire_first_win');
+}
+
 /**
- * Generates an EASY and DYNAMIC solvable solitaire game
+ * Generates a GUARANTEED SOLVABLE solitaire game
  * Strategy:
- * - Aces and low cards are more accessible (top of tableau or early in stock)
- * - Cards are arranged to create more immediate moves
- * - Less "digging" through stock required
+ * - All 4 aces placed on top of tableau columns (guaranteed immediate moves)
+ * - Twos and low cards are easily accessible
+ * - Strict solvability check (must solve ALL 52 cards)
+ * - Many attempts to find perfect layout
  */
 export function generateSolvableGame(): GameState {
+  console.log('🎲 Generating guaranteed solvable layout...');
+  return generateGuaranteedSolvableLayout();
+}
+
+/**
+ * OLD: Generates an EASY and DYNAMIC solvable solitaire game (backup)
+ */
+function generateOldSolvableGame(): GameState {
   const roomType = getRoomFromURL();
   
-  console.log('🎲 Starting EASY solvable game generation...');
+  console.log('🎲 Starting EASY solvable game generation (old method)...');
   
   const maxAttempts = 300;
   let attempts = 0;
@@ -760,4 +784,321 @@ function selectPremiumCards(allCards: Card[], count: number): Set<string> {
   return premiumIds;
 }
 
+/**
+ * Generate a GUARANTEED SOLVABLE layout
+ * Strategy:
+ * - Place all 4 aces on top of tableau columns (guaranteed immediate moves)
+ * - Place 2s right below aces where possible
+ * - Very strict solvability check (must solve 100%)
+ * - Many attempts to find perfect game
+ */
+function generateGuaranteedSolvableLayout(): GameState {
+  const roomType = getRoomFromURL();
+  
+  const maxAttempts = 500; // Many attempts to find perfect layout
+  let attempts = 0;
+  let bestGame: { tableau: Card[][], stock: Card[], score: number } | null = null;
+  
+  while (attempts < maxAttempts) {
+    attempts++;
+    
+    // Create all 52 cards
+    const allCards: Card[] = [];
+    SUITS.forEach(suit => {
+      const color: Color = (suit === 'hearts' || suit === 'diamonds') ? 'red' : 'black';
+      RANKS.forEach(rank => {
+        allCards.push({
+          id: `${suit}-${rank}`,
+          suit,
+          rank,
+          color,
+          faceUp: false
+        });
+      });
+    });
+    
+    // Separate aces and other cards
+    const aces = allCards.filter(c => c.rank === 'A');
+    const twos = allCards.filter(c => c.rank === '2');
+    const otherCards = allCards.filter(c => c.rank !== 'A' && c.rank !== '2');
+    
+    // Shuffle aces and twos randomly
+    for (let i = aces.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [aces[i], aces[j]] = [aces[j], aces[i]];
+    }
+    for (let i = twos.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [twos[i], twos[j]] = [twos[j], twos[i]];
+    }
+    
+    // Shuffle other cards
+    for (let i = otherCards.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [otherCards[i], otherCards[j]] = [otherCards[j], otherCards[i]];
+    }
+    
+    // Build tableau with aces guaranteed on top
+    const tableau: Card[][] = [[], [], [], [], [], [], []];
+    const columnSizes = [1, 2, 3, 4, 5, 6, 7];
+    
+    let otherCardIndex = 0;
+    let twosIndex = 0;
+    
+    // Fill columns - aces will be placed on top of columns 0, 1, 2, 3
+    for (let col = 0; col < 7; col++) {
+      const size = columnSizes[col];
+      
+      for (let row = 0; row < size; row++) {
+        const isTop = row === size - 1;
+        
+        if (isTop && col < 4) {
+          // Place ace on top of first 4 columns
+          const ace = aces[col];
+          ace.faceUp = true;
+          tableau[col].push(ace);
+        } else if (isTop) {
+          // For columns 4, 5, 6 - try to place a 2 or low card on top
+          if (twosIndex < twos.length && Math.random() > 0.3) {
+            const two = twos[twosIndex++];
+            two.faceUp = true;
+            tableau[col].push(two);
+          } else if (otherCardIndex < otherCards.length) {
+            const card = otherCards[otherCardIndex++];
+            card.faceUp = true;
+            tableau[col].push(card);
+          }
+        } else {
+          // Fill non-top positions with other cards (face down)
+          if (otherCardIndex < otherCards.length) {
+            const card = otherCards[otherCardIndex++];
+            card.faceUp = false;
+            tableau[col].push(card);
+          } else if (twosIndex < twos.length) {
+            const card = twos[twosIndex++];
+            card.faceUp = false;
+            tableau[col].push(card);
+          }
+        }
+      }
+    }
+    
+    // Put remaining cards in stock (face down)
+    const usedIds = new Set(tableau.flat().map(c => c.id));
+    const stockCards = allCards.filter(c => !usedIds.has(c.id));
+    
+    // Shuffle stock but bias twos to appear early
+    const stockTwos = stockCards.filter(c => c.rank === '2');
+    const stockOthers = stockCards.filter(c => c.rank !== '2');
+    
+    // Interleave: some twos early, then others
+    const orderedStock: Card[] = [];
+    let twoIdx = 0;
+    let otherIdx = 0;
+    
+    while (twoIdx < stockTwos.length || otherIdx < stockOthers.length) {
+      // Add a two every 3-5 cards if available
+      if (twoIdx < stockTwos.length && (otherIdx % 4 === 0 || otherIdx >= stockOthers.length)) {
+        orderedStock.push(stockTwos[twoIdx++]);
+      } else if (otherIdx < stockOthers.length) {
+        orderedStock.push(stockOthers[otherIdx++]);
+      }
+    }
+    
+    const stock = orderedStock.map(c => ({ ...c, faceUp: false }));
+    
+    // Check solvability with STRICT requirement (must solve ALL 52 cards)
+    if (checkSolvabilityStrict(tableau, stock)) {
+      // Score this layout
+      let score = 100; // Base score for having all aces on top
+      
+      // Bonus for twos being accessible
+      tableau.forEach(col => {
+        const topCard = col[col.length - 1];
+        if (topCard?.rank === '2') score += 40;
+        if (topCard?.rank === '3') score += 20;
+      });
+      
+      // Bonus if twos are early in stock
+      stock.slice(0, 10).forEach(card => {
+        if (card.rank === '2') score += 25;
+        if (card.rank === '3') score += 15;
+      });
+      
+      if (!bestGame || score > bestGame.score) {
+        bestGame = { tableau, stock, score };
+        
+        // If score is excellent (aces on top + good twos), use immediately
+        if (score >= 180) {
+          console.log(`🌟 Found excellent first game layout (score: ${score}) in ${attempts} attempts!`);
+          break;
+        }
+      }
+    }
+  }
+  
+  if (bestGame) {
+    console.log(`✅ Using best first game layout with score ${bestGame.score} after ${attempts} attempts`);
+    return {
+      tableau: bestGame.tableau,
+      foundations: { hearts: [], diamonds: [], clubs: [], spades: [] },
+      stock: bestGame.stock,
+      waste: [],
+      isWon: false,
+      moves: 0,
+      startTime: new Date(),
+      totalGifts: 0,
+      roomType,
+      gameMode: 'solvable'
+    };
+  }
+  
+  // Fallback to regular solvable game (should rarely happen)
+  console.warn('⚠️ Could not find perfect first game, falling back to regular generation');
+  return generateBasicSolvableGame();
+}
 
+/**
+ * Strict solvability check - requires ALL 52 cards to be solved
+ * Used for first game to ensure victory
+ */
+function checkSolvabilityStrict(tableau: Card[][], stock: Card[]): boolean {
+  // Create deep copies
+  const simTableau = tableau.map(col => col.map(c => ({ ...c })));
+  const simStock = stock.map(c => ({ ...c }));
+  const simWaste: Card[] = [];
+  const simFoundations: { [key in Suit]: Card[] } = {
+    hearts: [], diamonds: [], clubs: [], spades: []
+  };
+  
+  const maxIterations = 2000;
+  let iterations = 0;
+  const maxStockCycles = 4;
+  let stockCycles = 0;
+  
+  while (iterations < maxIterations) {
+    iterations++;
+    let madeProgress = false;
+    
+    // Try to move cards to foundations
+    for (let colIdx = 0; colIdx < simTableau.length; colIdx++) {
+      const col = simTableau[colIdx];
+      if (col.length === 0) continue;
+      
+      const topCard = col[col.length - 1];
+      if (!topCard.faceUp) continue;
+      
+      if (canMoveToFoundation(topCard, simFoundations)) {
+        simFoundations[topCard.suit].push(col.pop()!);
+        if (col.length > 0 && !col[col.length - 1].faceUp) {
+          col[col.length - 1].faceUp = true;
+        }
+        madeProgress = true;
+      }
+    }
+    
+    // Try waste to foundations
+    if (simWaste.length > 0) {
+      const topWaste = simWaste[simWaste.length - 1];
+      if (canMoveToFoundation(topWaste, simFoundations)) {
+        simFoundations[topWaste.suit].push(simWaste.pop()!);
+        madeProgress = true;
+      }
+    }
+    
+    // Try tableau moves
+    for (let fromIdx = 0; fromIdx < simTableau.length; fromIdx++) {
+      if (madeProgress) break;
+      
+      const fromCol = simTableau[fromIdx];
+      if (fromCol.length === 0) continue;
+      
+      let stackStart = fromCol.length - 1;
+      while (stackStart > 0 && 
+             fromCol[stackStart - 1].faceUp &&
+             canPlaceOnTableau(fromCol[stackStart], fromCol[stackStart - 1])) {
+        stackStart--;
+      }
+      
+      const movingCard = fromCol[stackStart];
+      if (!movingCard.faceUp) continue;
+      
+      for (let toIdx = 0; toIdx < simTableau.length; toIdx++) {
+        if (fromIdx === toIdx) continue;
+        
+        const toCol = simTableau[toIdx];
+        
+        if (toCol.length === 0) {
+          if (movingCard.rank === 'K' && stackStart > 0) {
+            const stack = fromCol.splice(stackStart);
+            toCol.push(...stack);
+            if (fromCol.length > 0 && !fromCol[fromCol.length - 1].faceUp) {
+              fromCol[fromCol.length - 1].faceUp = true;
+            }
+            madeProgress = true;
+            break;
+          }
+        } else {
+          const topCard = toCol[toCol.length - 1];
+          if (topCard.faceUp && canPlaceOnTableau(movingCard, topCard)) {
+            const stack = fromCol.splice(stackStart);
+            toCol.push(...stack);
+            if (fromCol.length > 0 && !fromCol[fromCol.length - 1].faceUp) {
+              fromCol[fromCol.length - 1].faceUp = true;
+            }
+            madeProgress = true;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Try waste to tableau
+    if (!madeProgress && simWaste.length > 0) {
+      const wasteCard = simWaste[simWaste.length - 1];
+      
+      for (let toIdx = 0; toIdx < simTableau.length; toIdx++) {
+        const toCol = simTableau[toIdx];
+        
+        if (toCol.length === 0) {
+          if (wasteCard.rank === 'K') {
+            toCol.push(simWaste.pop()!);
+            madeProgress = true;
+            break;
+          }
+        } else {
+          const topCard = toCol[toCol.length - 1];
+          if (topCard.faceUp && canPlaceOnTableau(wasteCard, topCard)) {
+            toCol.push(simWaste.pop()!);
+            madeProgress = true;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Draw from stock
+    if (!madeProgress && simStock.length > 0) {
+      const card = simStock.shift()!;
+      card.faceUp = true;
+      simWaste.push(card);
+      madeProgress = true;
+    } else if (!madeProgress && simWaste.length > 0) {
+      stockCycles++;
+      if (stockCycles <= maxStockCycles) {
+        while (simWaste.length > 0) {
+          const card = simWaste.pop()!;
+          card.faceUp = false;
+          simStock.unshift(card);
+        }
+        madeProgress = true;
+      }
+    }
+    
+    if (!madeProgress) break;
+  }
+  
+  // STRICT: Require ALL 52 cards for first game
+  const foundationCount = Object.values(simFoundations).reduce((sum, pile) => sum + pile.length, 0);
+  return foundationCount === 52;
+}
