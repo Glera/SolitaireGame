@@ -1,0 +1,15 @@
+[build]
+  command = "npm run build:client"
+  publish = "dist/public"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = ""
+    Content-Security-Policy = "frame-ancestors *"
+    Access-Control-Allow-Origin = "*"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
