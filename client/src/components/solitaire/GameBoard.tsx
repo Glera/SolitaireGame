@@ -3419,13 +3419,13 @@ export function GameBoard() {
         document.body
       )}
       
-      {/* Bottom Buttons - Daily Quests and Collections */}
+      {/* Bottom Buttons - Compact Icon-Only Design */}
       {/* Hide when any popup is open (except pack popup - need collections button for flying items) */}
       {!showDailyQuests && !showWinScreen && !showCollections && !showShop && 
        !showLeaderboard && !showTreasureHunt && !showTreasureHuntPromo && !showCollectionsUnlock && !showLockedCollectionsPopup &&
        !showLockedPointsEventPopup && !showLockedLeaderboardPopup && !showLeaderboardUnlock && !showPromoUnlock &&
        !showLevelUp && !showStreakPopup && !showDailyReward && (
-        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5">
           {/* New Game Button - shown when no moves available */}
           {showNewGameButton && (
             <button
@@ -3435,11 +3435,10 @@ export function GameBoard() {
                 setNoMovesShownOnce(false);
                 newGame('solvable');
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 rounded-full shadow-lg border border-white/20 transition-all hover:scale-105 animate-pulse"
+              className="w-11 h-11 flex items-center justify-center bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 rounded-xl shadow-lg border border-white/20 transition-all hover:scale-110 animate-pulse"
               title="Новая раскладка"
             >
-              <span className="text-lg">🔄</span>
-              <span className="text-white font-semibold text-sm">Новая</span>
+              <span className="text-xl">🔄</span>
             </button>
           )}
           
@@ -3447,33 +3446,30 @@ export function GameBoard() {
           <button
             onClick={() => {
               getHint();
-              // Clear hint after animation completes
               setTimeout(() => clearHint(), 350);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 rounded-full shadow-lg border border-white/20 transition-all hover:scale-105"
+            className="w-11 h-11 flex items-center justify-center bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 rounded-xl shadow-lg border border-white/20 transition-all hover:scale-110"
             title="Подсказка"
           >
-            <span className="text-lg">💡</span>
-            <span className="text-white font-semibold text-sm">Подсказка</span>
+            <span className="text-xl">💡</span>
           </button>
           
           {/* Daily Quests Button */}
           <button
             onClick={() => {
-              // Sync displayed stars before showing
               const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
               setDisplayedStars(actualTotal);
               setShowDailyQuests(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-full shadow-lg border border-white/20 transition-all hover:scale-105"
+            className="relative w-11 h-11 flex items-center justify-center bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl shadow-lg border border-white/20 transition-all hover:scale-110"
+            title="Задания"
           >
-            <span className="text-lg">📋</span>
-            <span className="text-white font-semibold text-sm">Задания</span>
+            <span className="text-xl">📋</span>
             {(() => {
               const completed = dailyQuests.filter(q => q.completed).length;
               const total = dailyQuests.length;
               return (
-                <span className={`text-xs px-2 py-0.5 rounded-full ${completed === total ? 'bg-green-500' : 'bg-white/20'}`}>
+                <span className={`absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold ${completed === total ? 'bg-green-500 text-white' : 'bg-white/90 text-gray-800'}`}>
                   {completed}/{total}
                 </span>
               );
@@ -3487,155 +3483,122 @@ export function GameBoard() {
               setDisplayedStars(actualTotal);
               setShowShop(true);
             }}
-            className="relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-full shadow-lg border border-white/20 transition-all hover:scale-105"
+            className="relative w-11 h-11 flex items-center justify-center bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl shadow-lg border border-white/20 transition-all hover:scale-110"
+            title="Магазин"
           >
-            <span className="text-lg">🛒</span>
-            <span className="text-white font-semibold text-sm">Магазин</span>
+            <span className="text-xl">🛒</span>
             {isSubscribed && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500">👑</span>
+              <span className="absolute -top-1 -right-1 text-sm">👑</span>
             )}
           </button>
           
-          {/* Collections Button - always visible, locked until level 2 */}
+          {/* Collections Button */}
           <button
             ref={collectionsUnlocked ? collectionsButtonRef : undefined}
             data-collections-button
             onClick={() => {
               if (!collectionsUnlocked) {
-                // Show locked popup
                 setShowLockedCollectionsPopup(true);
                 return;
               }
-              
-              // Sync displayed stars before showing
               const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
               setDisplayedStars(actualTotal);
-              
-              // Check for unrewarded collections when manually opening
               const unrewardedCollections = collections
                 .filter(c => c.items.every(i => i.collected) && !rewardedCollections.has(c.id))
                 .map(c => c.id);
-              
               if (unrewardedCollections.length > 0) {
-                // Queue unrewarded collections for rewards
                 setPendingCollectionRewards(unrewardedCollections);
               }
-              
-              // Mark as manually opened (not after win)
               setCollectionsAfterWin(false);
               setShowCollections(true);
             }}
-            className={`relative flex ${collectionsUnlocked ? 'items-center gap-2' : 'flex-col items-center gap-0.5'} px-4 py-2 rounded-full shadow-lg border transition-all ${
+            className={`relative w-11 h-11 flex items-center justify-center rounded-xl shadow-lg border transition-all ${
               collectionsUnlocked 
-                ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 border-white/20 hover:scale-105' 
+                ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 border-white/20 hover:scale-110' 
                 : 'bg-gradient-to-r from-gray-600 to-gray-700 border-gray-500/30 opacity-70'
             }`}
-            style={collectionButtonPulse ? { 
-              animation: 'collection-pop 0.15s ease-out',
-            } : undefined}
+            style={collectionButtonPulse ? { animation: 'collection-pop 0.15s ease-out' } : undefined}
+            title={collectionsUnlocked ? 'Коллекции' : `Коллекции (LVL ${COLLECTIONS_REQUIRED_LEVEL})`}
           >
             {collectionsUnlocked ? (
-              <>
-                <svg width="20" height="24" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
-                  <rect x="0" y="0" width="36" height="48" rx="4" fill="#3b82f6" />
-                  <rect x="0" y="0" width="36" height="48" rx="4" fill="url(#packShineBtn)" />
-                  <text x="18" y="28" textAnchor="middle" fontSize="14" fill="#fbbf24" style={{ textShadow: '0 0 4px rgba(251, 191, 36, 0.8)' }}>★★</text>
-                  <defs>
-                    <linearGradient id="packShineBtn" x1="0" y1="0" x2="36" y2="48">
-                      <stop offset="0%" stopColor="rgba(255,255,255,0.3)" />
-                      <stop offset="100%" stopColor="rgba(0,0,0,0.15)" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <span className="text-white font-semibold text-sm">Коллекции</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${completedCollectionsCount === collections.length ? 'bg-green-500' : 'bg-white/20'}`}>
-                  {completedCollectionsCount}/{collections.length}
-                </span>
-              </>
+              <svg width="18" height="22" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
+                <rect x="0" y="0" width="36" height="48" rx="4" fill="#3b82f6" />
+                <rect x="0" y="0" width="36" height="48" rx="4" fill="url(#packShineBtn)" />
+                <text x="18" y="28" textAnchor="middle" fontSize="14" fill="#fbbf24" style={{ textShadow: '0 0 4px rgba(251, 191, 36, 0.8)' }}>★★</text>
+                <defs>
+                  <linearGradient id="packShineBtn" x1="0" y1="0" x2="36" y2="48">
+                    <stop offset="0%" stopColor="rgba(255,255,255,0.3)" />
+                    <stop offset="100%" stopColor="rgba(0,0,0,0.15)" />
+                  </linearGradient>
+                </defs>
+              </svg>
             ) : (
-              <>
-                <div className="flex items-center gap-1.5">
-                  <svg width="20" height="24" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))', opacity: 0.5 }}>
-                    <rect x="0" y="0" width="36" height="48" rx="4" fill="#6b7280" />
-                    <text x="18" y="28" textAnchor="middle" fontSize="14" fill="#9ca3af">★★</text>
-                  </svg>
-                  <span className="text-white font-semibold text-sm">Коллекции</span>
-                </div>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/50 text-white/80 flex items-center gap-0.5">
-                  🔒 LVL {COLLECTIONS_REQUIRED_LEVEL}
-                </span>
-              </>
+              <span className="text-xl opacity-50">🎴</span>
             )}
-            {/* New item notification - hide when all collections are rewarded */}
-            {collectionsUnlocked && hasNewCollectionItem && !allCollectionsRewarded && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                !
+            {collectionsUnlocked ? (
+              <span className={`absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold ${completedCollectionsCount === collections.length ? 'bg-green-500 text-white' : 'bg-white/90 text-gray-800'}`}>
+                {completedCollectionsCount}/{collections.length}
               </span>
+            ) : (
+              <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] px-1 rounded bg-black/70 text-white">🔒{COLLECTIONS_REQUIRED_LEVEL}</span>
+            )}
+            {collectionsUnlocked && hasNewCollectionItem && !allCollectionsRewarded && (
+              <span className="absolute -top-1 -left-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold">!</span>
             )}
           </button>
           
-          {/* Leaderboard/Tournament Button - always visible, locked until level 4 */}
+          {/* Leaderboard Button */}
           <button
             onClick={() => {
               if (!leaderboardUnlocked) {
                 setShowLockedLeaderboardPopup(true);
                 return;
               }
-              // Update leaderboard with current season stars before showing
               const currentSeasonStars = getSeasonStars();
               const result = updateCurrentUserStars(currentSeasonStars);
               setLeaderboardPlayers(result.players);
-              // Use oldPosition from last time we viewed leaderboard for animation
               setLeaderboardOldPosition(result.oldPosition);
               setLeaderboardNewPosition(result.newPosition);
               setShowLeaderboard(true);
-              setShowOvertakenNotification(false); // Clear notification
+              setShowOvertakenNotification(false);
             }}
-            className={`relative flex ${leaderboardUnlocked ? 'items-center gap-2' : 'flex-col items-center gap-0.5'} px-4 py-2 rounded-full shadow-lg border transition-all ${
+            className={`relative w-11 h-11 flex items-center justify-center rounded-xl shadow-lg border transition-all ${
               leaderboardUnlocked 
-                ? `bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 border-white/20 hover:scale-105 ${showOvertakenNotification ? 'animate-pulse ring-2 ring-red-500' : ''}`
+                ? `bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 border-white/20 hover:scale-110 ${showOvertakenNotification ? 'animate-pulse ring-2 ring-red-500' : ''}`
                 : 'bg-gradient-to-r from-gray-600 to-gray-700 border-gray-500/30 opacity-70'
             }`}
+            title={leaderboardUnlocked ? `Турнир ${leaderboardNewPosition}/20` : `Турнир (LVL ${LEADERBOARD_REQUIRED_LEVEL})`}
           >
+            <span className={`text-xl ${leaderboardUnlocked ? '' : 'opacity-50'}`}>🏆</span>
             {leaderboardUnlocked ? (
               <>
-                <span className="text-lg">🏆</span>
-                <span className="text-white font-semibold text-sm whitespace-nowrap">
-                  Турнир {leaderboardNewPosition}/20
+                <span className="absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold bg-white/90 text-gray-800">
+                  {leaderboardNewPosition}
                 </span>
                 {leaderboardNewPosition <= 3 && (
-                  <span className="text-sm">
+                  <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-xs">
                     {leaderboardNewPosition === 1 ? '🥇' : leaderboardNewPosition === 2 ? '🥈' : '🥉'}
                   </span>
                 )}
-                {/* Overtaken indicator */}
                 {showOvertakenNotification && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                  <span className="absolute -top-1 -left-1 flex h-4 w-4">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-[10px] items-center justify-center">⬇️</span>
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-[8px] items-center justify-center">⬇️</span>
                   </span>
                 )}
               </>
             ) : (
-              <>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-lg opacity-50">🏆</span>
-                  <span className="text-white font-semibold text-sm">Турнир</span>
-                </div>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/50 text-white/80 flex items-center gap-0.5">
-                  🔒 LVL {LEADERBOARD_REQUIRED_LEVEL}
-                </span>
-              </>
+              <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] px-1 rounded bg-black/70 text-white">🔒{LEADERBOARD_REQUIRED_LEVEL}</span>
             )}
           </button>
           
           {/* Overtaken notification toast */}
           {leaderboardUnlocked && showOvertakenNotification && (
             <div 
-              className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-500/90 text-white text-sm px-3 py-1.5 rounded-lg shadow-lg"
+              className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-500/90 text-white text-xs px-2 py-1 rounded-lg shadow-lg"
               style={{ animation: 'slideUp 0.3s ease-out' }}
             >
-              😱 Вас обогнали в турнире!
+              😱 Вас обогнали!
             </div>
           )}
         </div>
@@ -3644,23 +3607,20 @@ export function GameBoard() {
       {/* Collections Button - visible during Treasure Hunt popup for flying icons */}
       {/* Not clickable, just a target for flying collection items */}
       {showTreasureHunt && (
-        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 pointer-events-none">
-          {/* Invisible spacers to match button row layout */}
-          <div className="px-4 py-2 opacity-0">🔄 Новая</div>
-          <div className="px-4 py-2 opacity-0">💡 Подсказка</div>
-          <div className="px-4 py-2 opacity-0">📋 Задания 0/3</div>
-          <div className="px-4 py-2 opacity-0">🛒 Магазин</div>
-          <div className="px-4 py-2 opacity-0 whitespace-nowrap min-w-[105px]">Рейтинг 20/20</div>
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1.5 pointer-events-none">
+          {/* Invisible spacers to match compact button row layout */}
+          <div className="w-11 h-11 opacity-0"></div>
+          <div className="w-11 h-11 opacity-0"></div>
+          <div className="w-11 h-11 opacity-0"></div>
+          <div className="w-11 h-11 opacity-0"></div>
           {/* Actual visible Collections button */}
           <div
             ref={collectionsButtonRef}
             data-collections-button
-            className="relative flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 rounded-full shadow-lg border border-white/20"
-            style={collectionButtonPulse ? { 
-              animation: 'collection-pop 0.15s ease-out',
-            } : undefined}
+            className="relative w-11 h-11 flex items-center justify-center bg-gradient-to-r from-amber-600 to-orange-600 rounded-xl shadow-lg border border-white/20"
+            style={collectionButtonPulse ? { animation: 'collection-pop 0.15s ease-out' } : undefined}
           >
-            <svg width="20" height="24" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
+            <svg width="18" height="22" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
               <rect x="0" y="0" width="36" height="48" rx="4" fill="#3b82f6" />
               <rect x="0" y="0" width="36" height="48" rx="4" fill="url(#packShineBtn2)" />
               <text x="18" y="28" textAnchor="middle" fontSize="14" fill="#fbbf24" style={{ textShadow: '0 0 4px rgba(251, 191, 36, 0.8)' }}>★★</text>
@@ -3671,16 +3631,14 @@ export function GameBoard() {
                 </linearGradient>
               </defs>
             </svg>
-            <span className="text-white font-semibold text-sm">Коллекции</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${completedCollectionsCount === collections.length ? 'bg-green-500' : 'bg-white/20'}`}>
+            <span className={`absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold ${completedCollectionsCount === collections.length ? 'bg-green-500 text-white' : 'bg-white/90 text-gray-800'}`}>
               {completedCollectionsCount}/{collections.length}
             </span>
             {hasNewCollectionItem && !allCollectionsRewarded && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                !
-              </span>
+              <span className="absolute -top-1 -left-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold">!</span>
             )}
           </div>
+          <div className="w-11 h-11 opacity-0"></div>
         </div>
       )}
       
