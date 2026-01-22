@@ -41,8 +41,9 @@ export function useGameScale(): GameDimensions {
 
       // Base game dimensions (at scale 1)
       // 7 columns × 80px (card width w-20) + 6 gaps × 4px (gap-1) = 560 + 24 = 584px
-      // Top row uses justify-between with fixed 584px width to match tableau
-      const BASE_WIDTH = 600;   // Slightly larger for padding
+      // Plus side panels: 80px (left events) + 80px (right promos) + 2×12px (gaps) = 768px total
+      // Adding padding for mobile safety margin
+      const BASE_WIDTH = 780;   // Full width including side panels
       
       // Height calculation:
       // - Top row (Stock/Waste/Foundations): 112px (card height h-28) + 12px gap = 124px

@@ -1,6 +1,24 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 
+// Hook to detect if we need compact mode for small screens
+function useCompactMode() {
+  const [isCompact, setIsCompact] = useState(false);
+  
+  useEffect(() => {
+    const checkHeight = () => {
+      // If screen height is less than 700px, use compact mode
+      setIsCompact(window.innerHeight < 700);
+    };
+    
+    checkHeight();
+    window.addEventListener('resize', checkHeight);
+    return () => window.removeEventListener('resize', checkHeight);
+  }, []);
+  
+  return isCompact;
+}
+
 // Pack colors by rarity
 const PACK_COLORS: Record<number, string> = {
   1: '#9ca3af', // gray
@@ -61,29 +79,35 @@ const SUBSCRIPTION_PRICE = 5.99;
 const MAX_STAR_ICONS = 25;
 
 // Card pack SVG component
-function CardPackIcon({ color, stars }: { color: string; stars: number }) {
+function CardPackIcon({ color, stars, compact = false }: { color: string; stars: number; compact?: boolean }) {
   // Split stars into rows if more than 3
   const topRow = stars > 3 ? Math.ceil(stars / 2) : stars;
   const bottomRow = stars > 3 ? stars - topRow : 0;
   
+  const width = compact ? 26 : 36;
+  const height = compact ? 34 : 48;
+  const containerWidth = compact ? 34 : 48;
+  const containerHeight = compact ? 40 : 58;
+  const starSize = compact ? '8px' : '10px';
+  
   return (
-    <div className="relative flex items-center justify-center" style={{ width: 48, height: 58 }}>
+    <div className="relative flex items-center justify-center" style={{ width: containerWidth, height: containerHeight }}>
       <svg 
-        width="36" 
-        height="48" 
-        viewBox="0 0 36 48" 
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
         fill="none"
         style={{
           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
         }}
       >
         {/* Single card */}
-        <rect x="0" y="0" width="36" height="48" rx="4" fill={color} />
+        <rect x="0" y="0" width={width} height={height} rx="4" fill={color} />
         {/* Shine effect */}
-        <rect x="0" y="0" width="36" height="48" rx="4" fill="url(#shopPackShine)" />
+        <rect x="0" y="0" width={width} height={height} rx="4" fill="url(#shopPackShine)" />
         {/* Gradient definition */}
         <defs>
-          <linearGradient id="shopPackShine" x1="0" y1="0" x2="36" y2="48" gradientUnits="userSpaceOnUse">
+          <linearGradient id="shopPackShine" x1="0" y1="0" x2={width} y2={height} gradientUnits="userSpaceOnUse">
             <stop offset="0%" stopColor="rgba(255,255,255,0.3)" />
             <stop offset="50%" stopColor="rgba(255,255,255,0)" />
             <stop offset="100%" stopColor="rgba(0,0,0,0.15)" />
@@ -106,7 +130,7 @@ function CardPackIcon({ color, stars }: { color: string; stars: number }) {
               <span 
                 key={i} 
                 style={{ 
-                  fontSize: '10px',
+                  fontSize: starSize,
                   filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
                 }}
               >
@@ -121,7 +145,7 @@ function CardPackIcon({ color, stars }: { color: string; stars: number }) {
                 <span 
                   key={i} 
                   style={{ 
-                    fontSize: '10px',
+                    fontSize: starSize,
                     filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
                   }}
                 >
@@ -237,6 +261,7 @@ export function Shop({
   const [confirmType, setConfirmType] = useState<'purchase' | 'subscribe'>('purchase');
   const [isAnimating, setIsAnimating] = useState(false);
   const [flyingStars, setFlyingStars] = useState<FlyingItem[]>([]);
+  const isCompact = useCompactMode();
   
   const pendingPurchaseRef = useRef<ShopItem | null>(null);
   const animationStartedRef = useRef(false);
@@ -414,44 +439,52 @@ export function Shop({
       {/* Modal Content */}
       {!isAnimating && (
         <div 
-          className="relative bg-gradient-to-br from-slate-900 via-purple-900/50 to-slate-900 rounded-2xl p-6 max-w-lg w-full mx-4 border border-purple-500/30 shadow-2xl"
+          className={`relative bg-gradient-to-br from-slate-900 via-purple-900/50 to-slate-900 rounded-2xl max-w-lg w-full mx-4 border border-purple-500/30 shadow-2xl ${
+            isCompact ? 'p-3' : 'p-6'
+          }`}
           onClick={e => e.stopPropagation()}
         >
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 text-white/60 hover:text-white text-2xl transition-colors"
+            className={`absolute text-white/60 hover:text-white text-2xl transition-colors ${
+              isCompact ? 'top-2 right-2' : 'top-4 right-4'
+            }`}
           >
             ✕
           </button>
 
           {/* Header */}
-          <div className="text-center mb-5">
-            <h2 className="text-3xl font-bold text-white mb-1">🛒 Магазин</h2>
-            <p className="text-purple-300/80">Получи звёзды и паки коллекций</p>
+          <div className={`text-center ${isCompact ? 'mb-2' : 'mb-5'}`}>
+            <h2 className={`font-bold text-white mb-1 ${isCompact ? 'text-xl' : 'text-3xl'}`}>🛒 Магазин</h2>
+            <p className={`text-purple-300/80 ${isCompact ? 'text-xs' : ''}`}>Получи звёзды и паки коллекций</p>
           </div>
 
           {/* Subscription Section */}
-          <div className="mb-5">
-            <div className={`relative p-4 rounded-xl border-2 transition-all ${
+          <div className={isCompact ? 'mb-2' : 'mb-5'}>
+            <div className={`relative rounded-xl border-2 transition-all ${
+              isCompact ? 'p-2' : 'p-4'
+            } ${
               isSubscribed 
                 ? 'bg-green-500/20 border-green-500/50' 
                 : 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-amber-500/50 hover:border-amber-400'
             }`}>
               {!isSubscribed && (
-                <div className="absolute -top-2 -right-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                <div className={`absolute -top-2 -right-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-full ${
+                  isCompact ? 'text-[8px] px-1.5 py-0.5' : 'text-xs px-2 py-0.5'
+                }`}>
                   PREMIUM
                 </div>
               )}
               
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="text-3xl">{isSubscribed ? '✅' : '👑'}</div>
+                <div className={`flex items-center ${isCompact ? 'gap-2' : 'gap-3'}`}>
+                  <div className={isCompact ? 'text-xl' : 'text-3xl'}>{isSubscribed ? '✅' : '👑'}</div>
                   <div>
-                    <h3 className="text-white font-bold">
+                    <h3 className={`text-white font-bold ${isCompact ? 'text-sm' : ''}`}>
                       {isSubscribed ? 'Подписка активна' : 'Premium подписка'}
                     </h3>
-                    <p className="text-white/60 text-sm">
+                    <p className={`text-white/60 ${isCompact ? 'text-[10px]' : 'text-sm'}`}>
                       Без рекламы • Дейли награды x3
                     </p>
                   </div>
@@ -460,7 +493,9 @@ export function Shop({
                 {!isSubscribed && (
                   <button
                     onClick={handleSubscribeClick}
-                    className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold rounded-lg transition-all hover:scale-105 shadow-lg"
+                    className={`bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold rounded-lg transition-all hover:scale-105 shadow-lg ${
+                      isCompact ? 'px-2 py-1 text-sm' : 'px-4 py-2'
+                    }`}
                   >
                     {formatPrice(SUBSCRIPTION_PRICE)}/мес
                   </button>
@@ -470,18 +505,20 @@ export function Shop({
           </div>
 
           {/* Divider */}
-          <div className="flex items-center gap-3 mb-4">
+          <div className={`flex items-center gap-3 ${isCompact ? 'mb-2' : 'mb-4'}`}>
             <div className="flex-1 h-px bg-white/20" />
-            <span className="text-white/40 text-sm">Наборы</span>
+            <span className={`text-white/40 ${isCompact ? 'text-xs' : 'text-sm'}`}>Наборы</span>
             <div className="flex-1 h-px bg-white/20" />
           </div>
 
           {/* Shop Items Grid - 3 columns, 2 rows */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className={`grid grid-cols-3 ${isCompact ? 'gap-1.5' : 'gap-3'}`}>
             {SHOP_ITEMS.map((item) => (
               <div
                 key={item.id}
-                className={`relative p-3 rounded-xl border-2 transition-all cursor-pointer hover:scale-[1.02] ${
+                className={`relative rounded-xl border-2 transition-all cursor-pointer hover:scale-[1.02] ${
+                  isCompact ? 'p-1.5' : 'p-3'
+                } ${
                   item.bestValue 
                     ? 'bg-gradient-to-br from-purple-500/30 to-pink-500/30 border-purple-400/50 hover:border-purple-300'
                     : item.popular
@@ -492,12 +529,16 @@ export function Shop({
               >
                 {/* Badges */}
                 {item.bestValue && (
-                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
+                  <div className={`absolute -top-2 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-full whitespace-nowrap ${
+                    isCompact ? 'text-[8px] px-1.5' : 'text-[10px] px-2 py-0.5'
+                  }`}>
                     ХИТ
                   </div>
                 )}
                 {item.popular && !item.bestValue && (
-                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  <div className={`absolute -top-2 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold rounded-full ${
+                    isCompact ? 'text-[8px] px-1.5' : 'text-[10px] px-2 py-0.5'
+                  }`}>
                     ТОП
                   </div>
                 )}
@@ -505,29 +546,33 @@ export function Shop({
                 {/* Content */}
                 <div className="text-center flex flex-col items-center">
                   {/* Stars amount */}
-                  <div className="flex items-center justify-center gap-1 mb-2">
-                    <span className="text-yellow-400 text-lg">⭐</span>
-                    <span className="text-white font-bold text-lg">{item.stars}</span>
+                  <div className={`flex items-center justify-center gap-1 ${isCompact ? 'mb-1' : 'mb-2'}`}>
+                    <span className={`text-yellow-400 ${isCompact ? 'text-sm' : 'text-lg'}`}>⭐</span>
+                    <span className={`text-white font-bold ${isCompact ? 'text-sm' : 'text-lg'}`}>{item.stars}</span>
                   </div>
                   
                   {/* Pack icon or placeholder */}
-                  <div className="h-[58px] flex items-center justify-center mb-2">
+                  <div className={`flex items-center justify-center ${isCompact ? 'h-[40px] mb-1' : 'h-[58px] mb-2'}`}>
                     {item.packRarity > 0 ? (
-                      <CardPackIcon color={PACK_COLORS[item.packRarity]} stars={item.packRarity} />
+                      <CardPackIcon color={PACK_COLORS[item.packRarity]} stars={item.packRarity} compact={isCompact} />
                     ) : (
-                      <div className="text-white/30 text-xs text-center">
+                      <div className={`text-white/30 text-center ${isCompact ? 'text-[9px]' : 'text-xs'}`}>
                         Только<br/>звёзды
                       </div>
                     )}
                   </div>
                   
-                  {/* Pack name */}
-                  <div className="text-white/60 text-xs h-4 mb-1">
-                    {item.packRarity > 0 ? getPackName(item.packRarity) : ''}
-                  </div>
+                  {/* Pack name - hidden in compact mode */}
+                  {!isCompact && (
+                    <div className="text-white/60 text-xs h-4 mb-1">
+                      {item.packRarity > 0 ? getPackName(item.packRarity) : ''}
+                    </div>
+                  )}
                   
                   {/* Price button */}
-                  <div className={`w-full py-1.5 px-2 rounded-lg font-bold text-sm ${
+                  <div className={`w-full rounded-lg font-bold ${
+                    isCompact ? 'py-1 px-1 text-xs' : 'py-1.5 px-2 text-sm'
+                  } ${
                     item.bestValue
                       ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
                       : item.popular
@@ -541,10 +586,12 @@ export function Shop({
             ))}
           </div>
 
-          {/* Footer Note */}
-          <p className="text-center text-white/30 text-xs mt-4">
-            Покупки симулируются в демо-версии
-          </p>
+          {/* Footer Note - hidden in compact mode */}
+          {!isCompact && (
+            <p className="text-center text-white/30 text-xs mt-4">
+              Покупки симулируются в демо-версии
+            </p>
+          )}
         </div>
       )}
 

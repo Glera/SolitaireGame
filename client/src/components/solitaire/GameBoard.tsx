@@ -2380,7 +2380,10 @@ export function GameBoard() {
       style={{ 
         paddingTop: '5px',
         paddingBottom: '5px',
-        overflow: 'hidden'
+        paddingLeft: '4px',
+        paddingRight: '4px',
+        overflow: 'hidden',
+        boxSizing: 'border-box'
       }}
     >
       {/* Hint highlight style */}

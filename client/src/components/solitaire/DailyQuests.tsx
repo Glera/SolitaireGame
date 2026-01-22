@@ -7,9 +7,9 @@ function useCompactMode() {
   
   useEffect(() => {
     const checkHeight = () => {
-      // If screen height is less than 700px, use compact mode
-      // This ensures everything fits without scrolling
-      setIsCompact(window.innerHeight < 700);
+      // If screen height is less than 580px, use compact mode
+      // This ensures everything fits without scrolling on very small screens
+      setIsCompact(window.innerHeight < 580);
     };
     
     checkHeight();
