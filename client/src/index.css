@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent Telegram WebView gestures during gameplay */
+html, body {
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: auto;
+  touch-action: pan-x pan-y;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Game board specific - disable all scroll gestures */
+[data-game-board] {
+  touch-action: none;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: auto;
+}
+
 /* Mobile drag and drop improvements */
 .dnd-poly-drag-image {
   opacity: 0.9 !important;
