@@ -3419,13 +3419,13 @@ export function GameBoard() {
         document.body
       )}
       
-      {/* Bottom Buttons - Compact Icon-Only Design */}
+      {/* Bottom Buttons - Icons on Cushions Design */}
       {/* Hide when any popup is open (except pack popup - need collections button for flying items) */}
       {!showDailyQuests && !showWinScreen && !showCollections && !showShop && 
        !showLeaderboard && !showTreasureHunt && !showTreasureHuntPromo && !showCollectionsUnlock && !showLockedCollectionsPopup &&
        !showLockedPointsEventPopup && !showLockedLeaderboardPopup && !showLeaderboardUnlock && !showPromoUnlock &&
        !showLevelUp && !showStreakPopup && !showDailyReward && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5">
+        <div className="fixed bottom-2 left-1/2 -translate-x-1/2 z-40 flex items-end gap-2 pt-6">
           {/* New Game Button - shown when no moves available */}
           {showNewGameButton && (
             <button
@@ -3435,10 +3435,10 @@ export function GameBoard() {
                 setNoMovesShownOnce(false);
                 newGame('solvable');
               }}
-              className="w-11 h-11 flex items-center justify-center bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 rounded-xl shadow-lg border border-white/20 transition-all hover:scale-110 animate-pulse"
+              className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-red-400 to-red-600 hover:from-red-300 hover:to-red-500 rounded-xl shadow-lg border-b-4 border-red-700 transition-all hover:scale-105 animate-pulse"
               title="Новая раскладка"
             >
-              <span className="text-xl">🔄</span>
+              <span className="absolute -top-5 text-3xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}>🔄</span>
             </button>
           )}
           
@@ -3448,10 +3448,10 @@ export function GameBoard() {
               getHint();
               setTimeout(() => clearHint(), 350);
             }}
-            className="w-11 h-11 flex items-center justify-center bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 rounded-xl shadow-lg border border-white/20 transition-all hover:scale-110"
+            className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 rounded-xl shadow-lg border-b-4 border-amber-600 transition-all hover:scale-105"
             title="Подсказка"
           >
-            <span className="text-xl">💡</span>
+            <span className="absolute -top-5 text-3xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}>💡</span>
           </button>
           
           {/* Daily Quests Button */}
@@ -3461,15 +3461,15 @@ export function GameBoard() {
               setDisplayedStars(actualTotal);
               setShowDailyQuests(true);
             }}
-            className="relative w-11 h-11 flex items-center justify-center bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl shadow-lg border border-white/20 transition-all hover:scale-110"
+            className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 rounded-xl shadow-lg border-b-4 border-purple-700 transition-all hover:scale-105"
             title="Задания"
           >
-            <span className="text-xl">📋</span>
+            <span className="absolute -top-5 text-3xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}>📋</span>
             {(() => {
               const completed = dailyQuests.filter(q => q.completed).length;
               const total = dailyQuests.length;
               return (
-                <span className={`absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold ${completed === total ? 'bg-green-500 text-white' : 'bg-white/90 text-gray-800'}`}>
+                <span className={`absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${completed === total ? 'bg-green-500 text-white' : 'bg-white text-gray-800'}`}>
                   {completed}/{total}
                 </span>
               );
@@ -3483,12 +3483,12 @@ export function GameBoard() {
               setDisplayedStars(actualTotal);
               setShowShop(true);
             }}
-            className="relative w-11 h-11 flex items-center justify-center bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl shadow-lg border border-white/20 transition-all hover:scale-110"
+            className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 rounded-xl shadow-lg border-b-4 border-teal-700 transition-all hover:scale-105"
             title="Магазин"
           >
-            <span className="text-xl">🛒</span>
+            <span className="absolute -top-5 text-3xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}>🛒</span>
             {isSubscribed && (
-              <span className="absolute -top-1 -right-1 text-sm">👑</span>
+              <span className="absolute -top-1 -right-1 text-base drop-shadow-md">👑</span>
             )}
           </button>
           
@@ -3512,16 +3512,16 @@ export function GameBoard() {
               setCollectionsAfterWin(false);
               setShowCollections(true);
             }}
-            className={`relative w-11 h-11 flex items-center justify-center rounded-xl shadow-lg border transition-all ${
+            className={`relative w-12 h-7 flex items-center justify-center rounded-xl shadow-lg border-b-4 transition-all ${
               collectionsUnlocked 
-                ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 border-white/20 hover:scale-110' 
-                : 'bg-gradient-to-r from-gray-600 to-gray-700 border-gray-500/30 opacity-70'
+                ? 'bg-gradient-to-b from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 border-orange-700 hover:scale-105' 
+                : 'bg-gradient-to-b from-gray-500 to-gray-600 border-gray-700 opacity-70'
             }`}
             style={collectionButtonPulse ? { animation: 'collection-pop 0.15s ease-out' } : undefined}
             title={collectionsUnlocked ? 'Коллекции' : `Коллекции (LVL ${COLLECTIONS_REQUIRED_LEVEL})`}
           >
             {collectionsUnlocked ? (
-              <svg width="18" height="22" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
+              <svg className="absolute -top-6" width="24" height="32" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}>
                 <rect x="0" y="0" width="36" height="48" rx="4" fill="#3b82f6" />
                 <rect x="0" y="0" width="36" height="48" rx="4" fill="url(#packShineBtn)" />
                 <text x="18" y="28" textAnchor="middle" fontSize="14" fill="#fbbf24" style={{ textShadow: '0 0 4px rgba(251, 191, 36, 0.8)' }}>★★</text>
@@ -3533,17 +3533,17 @@ export function GameBoard() {
                 </defs>
               </svg>
             ) : (
-              <span className="text-xl opacity-50">🎴</span>
+              <span className="absolute -top-5 text-3xl opacity-50" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }}>🎴</span>
             )}
             {collectionsUnlocked ? (
-              <span className={`absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold ${completedCollectionsCount === collections.length ? 'bg-green-500 text-white' : 'bg-white/90 text-gray-800'}`}>
+              <span className={`absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${completedCollectionsCount === collections.length ? 'bg-green-500 text-white' : 'bg-white text-gray-800'}`}>
                 {completedCollectionsCount}/{collections.length}
               </span>
             ) : (
-              <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] px-1 rounded bg-black/70 text-white">🔒{COLLECTIONS_REQUIRED_LEVEL}</span>
+              <span className="absolute top-1 left-1/2 -translate-x-1/2 text-[8px] px-1 rounded bg-black/80 text-white font-bold">🔒{COLLECTIONS_REQUIRED_LEVEL}</span>
             )}
             {collectionsUnlocked && hasNewCollectionItem && !allCollectionsRewarded && (
-              <span className="absolute -top-1 -left-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold">!</span>
+              <span className="absolute -top-2 -left-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md animate-bounce">!</span>
             )}
           </button>
           
@@ -3562,40 +3562,40 @@ export function GameBoard() {
               setShowLeaderboard(true);
               setShowOvertakenNotification(false);
             }}
-            className={`relative w-11 h-11 flex items-center justify-center rounded-xl shadow-lg border transition-all ${
+            className={`relative w-12 h-7 flex items-center justify-center rounded-xl shadow-lg border-b-4 transition-all ${
               leaderboardUnlocked 
-                ? `bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 border-white/20 hover:scale-110 ${showOvertakenNotification ? 'animate-pulse ring-2 ring-red-500' : ''}`
-                : 'bg-gradient-to-r from-gray-600 to-gray-700 border-gray-500/30 opacity-70'
+                ? `bg-gradient-to-b from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 border-blue-700 hover:scale-105 ${showOvertakenNotification ? 'animate-pulse ring-2 ring-red-500' : ''}`
+                : 'bg-gradient-to-b from-gray-500 to-gray-600 border-gray-700 opacity-70'
             }`}
             title={leaderboardUnlocked ? `Турнир ${leaderboardNewPosition}/20` : `Турнир (LVL ${LEADERBOARD_REQUIRED_LEVEL})`}
           >
-            <span className={`text-xl ${leaderboardUnlocked ? '' : 'opacity-50'}`}>🏆</span>
+            <span className={`absolute -top-5 text-3xl ${leaderboardUnlocked ? '' : 'opacity-50'}`} style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}>🏆</span>
             {leaderboardUnlocked ? (
               <>
-                <span className="absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold bg-white/90 text-gray-800">
+                <span className="absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold bg-white text-gray-800 shadow-md">
                   {leaderboardNewPosition}
                 </span>
                 {leaderboardNewPosition <= 3 && (
-                  <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-xs">
+                  <span className="absolute top-1 left-1/2 -translate-x-1/2 text-sm">
                     {leaderboardNewPosition === 1 ? '🥇' : leaderboardNewPosition === 2 ? '🥈' : '🥉'}
                   </span>
                 )}
                 {showOvertakenNotification && (
-                  <span className="absolute -top-1 -left-1 flex h-4 w-4">
+                  <span className="absolute -top-2 -left-1 flex h-5 w-5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-[8px] items-center justify-center">⬇️</span>
+                    <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 text-[10px] items-center justify-center shadow-md">⬇️</span>
                   </span>
                 )}
               </>
             ) : (
-              <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] px-1 rounded bg-black/70 text-white">🔒{LEADERBOARD_REQUIRED_LEVEL}</span>
+              <span className="absolute top-1 left-1/2 -translate-x-1/2 text-[8px] px-1 rounded bg-black/80 text-white font-bold">🔒{LEADERBOARD_REQUIRED_LEVEL}</span>
             )}
           </button>
           
           {/* Overtaken notification toast */}
           {leaderboardUnlocked && showOvertakenNotification && (
             <div 
-              className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-500/90 text-white text-xs px-2 py-1 rounded-lg shadow-lg"
+              className="absolute bottom-full mb-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-500/90 text-white text-xs px-3 py-1.5 rounded-lg shadow-lg"
               style={{ animation: 'slideUp 0.3s ease-out' }}
             >
               😱 Вас обогнали!
@@ -3607,20 +3607,20 @@ export function GameBoard() {
       {/* Collections Button - visible during Treasure Hunt popup for flying icons */}
       {/* Not clickable, just a target for flying collection items */}
       {showTreasureHunt && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1.5 pointer-events-none">
-          {/* Invisible spacers to match compact button row layout */}
-          <div className="w-11 h-11 opacity-0"></div>
-          <div className="w-11 h-11 opacity-0"></div>
-          <div className="w-11 h-11 opacity-0"></div>
-          <div className="w-11 h-11 opacity-0"></div>
+        <div className="fixed bottom-2 left-1/2 -translate-x-1/2 z-[60] flex items-end gap-2 pt-6 pointer-events-none">
+          {/* Invisible spacers to match cushion button row layout */}
+          <div className="w-12 h-7 opacity-0"></div>
+          <div className="w-12 h-7 opacity-0"></div>
+          <div className="w-12 h-7 opacity-0"></div>
+          <div className="w-12 h-7 opacity-0"></div>
           {/* Actual visible Collections button */}
           <div
             ref={collectionsButtonRef}
             data-collections-button
-            className="relative w-11 h-11 flex items-center justify-center bg-gradient-to-r from-amber-600 to-orange-600 rounded-xl shadow-lg border border-white/20"
+            className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-amber-500 to-orange-600 rounded-xl shadow-lg border-b-4 border-orange-700"
             style={collectionButtonPulse ? { animation: 'collection-pop 0.15s ease-out' } : undefined}
           >
-            <svg width="18" height="22" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
+            <svg className="absolute -top-6" width="24" height="32" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}>
               <rect x="0" y="0" width="36" height="48" rx="4" fill="#3b82f6" />
               <rect x="0" y="0" width="36" height="48" rx="4" fill="url(#packShineBtn2)" />
               <text x="18" y="28" textAnchor="middle" fontSize="14" fill="#fbbf24" style={{ textShadow: '0 0 4px rgba(251, 191, 36, 0.8)' }}>★★</text>
@@ -3631,14 +3631,14 @@ export function GameBoard() {
                 </linearGradient>
               </defs>
             </svg>
-            <span className={`absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold ${completedCollectionsCount === collections.length ? 'bg-green-500 text-white' : 'bg-white/90 text-gray-800'}`}>
+            <span className={`absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${completedCollectionsCount === collections.length ? 'bg-green-500 text-white' : 'bg-white text-gray-800'}`}>
               {completedCollectionsCount}/{collections.length}
             </span>
             {hasNewCollectionItem && !allCollectionsRewarded && (
-              <span className="absolute -top-1 -left-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold">!</span>
+              <span className="absolute -top-2 -left-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md">!</span>
             )}
           </div>
-          <div className="w-11 h-11 opacity-0"></div>
+          <div className="w-12 h-7 opacity-0"></div>
         </div>
       )}
       
