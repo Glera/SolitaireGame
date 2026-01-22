@@ -1,5 +1,24 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom';
+
+// Hook to detect if we need compact mode
+function useCompactMode() {
+  const [isCompact, setIsCompact] = useState(false);
+  
+  useEffect(() => {
+    const checkHeight = () => {
+      // If screen height is less than 700px, use compact mode
+      // This ensures everything fits without scrolling
+      setIsCompact(window.innerHeight < 700);
+    };
+    
+    checkHeight();
+    window.addEventListener('resize', checkHeight);
+    return () => window.removeEventListener('resize', checkHeight);
+  }, []);
+  
+  return isCompact;
+}
 
 interface Quest {
   id: string;
@@ -80,6 +99,7 @@ export function DailyQuests({
   monthlyRewardClaimed = false,
   onMonthlyProgressIncrement
 }: DailyQuestsProps) {
+  const isCompact = useCompactMode();
   const [isAnimating, setIsAnimating] = useState(false);
   const [animatedProgress, setAnimatedProgress] = useState<Record<string, number>>({});
   const [displayedCount, setDisplayedCount] = useState<Record<string, number>>({});
@@ -445,58 +465,59 @@ export function DailyQuests({
         className="fixed inset-0 z-[9997] flex items-center justify-center"
         style={{ 
           backgroundColor: 'rgba(0, 0, 0, 0.85)',
-          paddingTop: '65px',
-          paddingBottom: '70px'
+          paddingTop: isCompact ? '50px' : '65px',
+          paddingBottom: isCompact ? '50px' : '70px'
         }}
         onClick={handleClick}
       >
         <div 
-          className={`bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl p-5 mx-4 max-w-sm w-full shadow-2xl border border-slate-600/50 ${isAnimating ? 'animate-quest-appear' : ''}`}
-          style={{ maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}
+          className={`bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl mx-4 max-w-sm w-full shadow-2xl border border-slate-600/50 ${isAnimating ? 'animate-quest-appear' : ''} ${isCompact ? 'p-3' : 'p-5'}`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="text-center mb-3">
-            <h2 className="text-lg font-bold text-white">Ежедневные задания</h2>
+          <div className={`text-center ${isCompact ? 'mb-2' : 'mb-3'}`}>
+            <h2 className={`font-bold text-white ${isCompact ? 'text-base' : 'text-lg'}`}>Ежедневные задания</h2>
           </div>
           
           {/* Quests list */}
-          <div className="space-y-2">
+          <div className={isCompact ? 'space-y-1.5' : 'space-y-2'}>
             {quests.map((quest, index) => (
               <div 
                 key={quest.id}
                 ref={el => questCardRefs.current[quest.id] = el}
-                className={`relative rounded-xl p-3 transition-all border ${
+                className={`relative rounded-xl transition-all border ${isCompact ? 'p-2' : 'p-3'} ${
                   showCompletedLabel[quest.id] 
                     ? 'bg-lime-900/30 border-lime-600/40' 
                     : 'bg-slate-700/50 border-slate-600/50'
                 }`}
               >
                 {/* Quest content */}
-                <div className="flex items-start gap-2">
-                  <div className="text-xl">
+                <div className={`flex items-start ${isCompact ? 'gap-1.5' : 'gap-2'}`}>
+                  <div className={isCompact ? 'text-base' : 'text-xl'}>
                     {showCompletedLabel[quest.id] ? '✅' : '🎯'}
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-white text-sm">
+                      <h3 className={`font-semibold text-white ${isCompact ? 'text-xs' : 'text-sm'} truncate`}>
                         {quest.title}
                       </h3>
                       {!showCompletedLabel[quest.id] && (
                         <div 
                           ref={el => rewardIconRefs.current[quest.id] = el}
-                          className={`flex items-center gap-1 text-yellow-400 text-sm ${hiddenRewardIcons[quest.id] ? 'invisible' : ''}`}
+                          className={`flex items-center gap-0.5 text-yellow-400 flex-shrink-0 ${isCompact ? 'text-xs' : 'text-sm'} ${hiddenRewardIcons[quest.id] ? 'invisible' : ''}`}
                         >
                           <span>+{quest.reward}</span>
                           <span>⭐</span>
                         </div>
                       )}
                     </div>
-                    <p className="text-slate-400 text-xs mt-0.5">{quest.description}</p>
+                    {!isCompact && (
+                      <p className="text-slate-400 text-xs mt-0.5">{quest.description}</p>
+                    )}
                     
                     {/* Progress bar - invisible but keeps space when completed */}
-                    <div className={`mt-2 ${showCompletedLabel[quest.id] ? 'invisible' : ''}`}>
-                      <div className="flex justify-between text-xs mb-1">
+                    <div className={`${isCompact ? 'mt-1' : 'mt-2'} ${showCompletedLabel[quest.id] ? 'invisible' : ''}`}>
+                      <div className={`flex justify-between mb-0.5 ${isCompact ? 'text-[10px]' : 'text-xs'}`}>
                         <span className="text-slate-400">
                           Прогресс
                         </span>
@@ -509,7 +530,7 @@ export function DailyQuests({
                       </div>
                       <div 
                         ref={el => questProgressBarRefs.current[quest.id] = el}
-                        className="h-2 bg-slate-600 rounded-full overflow-hidden"
+                        className={`bg-slate-600 rounded-full overflow-hidden ${isCompact ? 'h-1.5' : 'h-2'}`}
                       >
                         <div 
                           className="h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r from-sky-500 to-sky-400"
@@ -522,15 +543,15 @@ export function DailyQuests({
                 
                 {/* Completed label - shown only after stars arrive */}
                 {showCompletedLabel[quest.id] && (
-                  <div className="absolute top-2 right-2">
-                    <span className="text-lime-400 text-xs font-bold animate-fade-in">ВЫПОЛНЕНО</span>
+                  <div className={`absolute ${isCompact ? 'top-1 right-1' : 'top-2 right-2'}`}>
+                    <span className={`text-lime-400 font-bold animate-fade-in ${isCompact ? 'text-[10px]' : 'text-xs'}`}>ВЫПОЛНЕНО</span>
                   </div>
                 )}
               </div>
             ))}
             
-            {/* Empty slots */}
-            {Array.from({ length: Math.max(0, 3 - quests.length) }).map((_, index) => (
+            {/* Empty slots - hide in compact mode */}
+            {!isCompact && Array.from({ length: Math.max(0, 3 - quests.length) }).map((_, index) => (
               <div 
                 key={`empty-${index}`}
                 className="rounded-xl p-3 bg-slate-800/30 border border-slate-700/30 border-dashed"
@@ -546,21 +567,21 @@ export function DailyQuests({
           {/* Monthly Progress - at the bottom */}
           <div 
             ref={monthlyBarRef}
-            className={`mt-4 p-3 bg-gradient-to-r from-amber-900/40 to-orange-900/40 rounded-xl border transition-all duration-300 ${monthlyBarPulse ? 'scale-[1.02] border-amber-400/60' : 'border-amber-600/30'}`}
+            className={`bg-gradient-to-r from-amber-900/40 to-orange-900/40 rounded-xl border transition-all duration-300 ${isCompact ? 'mt-2 p-2' : 'mt-4 p-3'} ${monthlyBarPulse ? 'scale-[1.02] border-amber-400/60' : 'border-amber-600/30'}`}
           >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🏆</span>
-                <span className="text-sm font-semibold text-amber-200">Месячный бонус</span>
+            <div className={`flex items-center justify-between ${isCompact ? 'mb-1' : 'mb-2'}`}>
+              <div className="flex items-center gap-1.5">
+                <span className={isCompact ? 'text-base' : 'text-lg'}>🏆</span>
+                <span className={`font-semibold text-amber-200 ${isCompact ? 'text-xs' : 'text-sm'}`}>Месячный бонус</span>
               </div>
-              <div className="flex items-center gap-1">
-                <span className="text-yellow-400">⭐</span>
-                <span className="text-sm font-bold text-yellow-300">{monthlyReward}</span>
+              <div className="flex items-center gap-0.5">
+                <span className={`text-yellow-400 ${isCompact ? 'text-xs' : 'text-sm'}`}>⭐</span>
+                <span className={`font-bold text-yellow-300 ${isCompact ? 'text-xs' : 'text-sm'}`}>{monthlyReward}</span>
               </div>
             </div>
             
             {/* Progress bar with overshoot animation */}
-            <div className="relative h-4 bg-slate-800/60 rounded-full overflow-hidden border border-amber-700/30">
+            <div className={`relative bg-slate-800/60 rounded-full overflow-hidden border border-amber-700/30 ${isCompact ? 'h-3' : 'h-4'}`}>
               <div 
                 className="absolute inset-y-0 left-0 bg-gradient-to-r from-amber-500 to-orange-400 rounded-full transition-all duration-300"
                 style={{ 
@@ -569,7 +590,7 @@ export function DailyQuests({
               />
               <div className="absolute inset-0 flex items-center justify-center">
                 <span 
-                  className={`text-xs font-bold text-white drop-shadow-lg transition-all duration-200 ${monthlyTextPulse ? 'scale-125 text-amber-300' : ''}`}
+                  className={`font-bold text-white drop-shadow-lg transition-all duration-200 ${isCompact ? 'text-[10px]' : 'text-xs'} ${monthlyTextPulse ? 'scale-125 text-amber-300' : ''}`}
                 >
                   {monthlyProgress} / {monthlyTarget}
                 </span>
@@ -583,17 +604,17 @@ export function DailyQuests({
                   e.stopPropagation();
                   onMonthlyRewardClaim?.();
                 }}
-                className="mt-2 w-full py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold text-sm rounded-lg shadow-lg animate-pulse transition-all"
+                className={`w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold rounded-lg shadow-lg animate-pulse transition-all ${isCompact ? 'mt-1.5 py-1.5 text-xs' : 'mt-2 py-2 text-sm'}`}
               >
                 🎁 Забрать награду!
               </button>
             )}
             {monthlyRewardClaimed && (
-              <div className="mt-2 text-center text-sm text-amber-400 font-semibold">
+              <div className={`text-center text-amber-400 font-semibold ${isCompact ? 'mt-1 text-xs' : 'mt-2 text-sm'}`}>
                 ✓ Награда получена!
               </div>
             )}
-            {monthlyProgress < monthlyTarget && (
+            {monthlyProgress < monthlyTarget && !isCompact && (
               <div className="mt-1 text-center text-xs text-amber-300/70">
                 Выполняй задания каждый день
               </div>
@@ -601,10 +622,10 @@ export function DailyQuests({
           </div>
           
           {/* Footer */}
-          <div className="mt-3 text-center">
+          <div className={`text-center ${isCompact ? 'mt-2' : 'mt-3'}`}>
             <button
               onClick={onClose}
-              className="px-5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm rounded-lg transition-colors"
+              className={`bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-lg transition-colors ${isCompact ? 'px-4 py-1 text-xs' : 'px-5 py-1.5 text-sm'}`}
             >
               Продолжить
             </button>

@@ -33,7 +33,7 @@ export function resetFirstWinFlag(): void {
  * - Many attempts to find perfect layout
  */
 export function generateSolvableGame(): GameState {
-  console.log('🎲 Generating guaranteed solvable layout...');
+  console.log('🎲 Generating natural solvable layout...');
   return generateGuaranteedSolvableLayout();
 }
 
@@ -785,17 +785,17 @@ function selectPremiumCards(allCards: Card[], count: number): Set<string> {
 }
 
 /**
- * Generate a GUARANTEED SOLVABLE layout
+ * Generate a NATURAL but SOLVABLE layout
  * Strategy:
- * - Place all 4 aces on top of tableau columns (guaranteed immediate moves)
- * - Place 2s right below aces where possible
- * - Very strict solvability check (must solve 100%)
- * - Many attempts to find perfect game
+ * - 1-2 aces visible on top (not all 4 - that's too obvious)
+ * - Low cards (2, 3) biased toward accessible positions
+ * - Natural card distribution with solvability check
+ * - Many attempts to find a good balance
  */
 function generateGuaranteedSolvableLayout(): GameState {
   const roomType = getRoomFromURL();
   
-  const maxAttempts = 500; // Many attempts to find perfect layout
+  const maxAttempts = 800; // More attempts for finding natural solvable layout
   let attempts = 0;
   let bestGame: { tableau: Card[][], stock: Card[], score: number } | null = null;
   
@@ -817,65 +817,107 @@ function generateGuaranteedSolvableLayout(): GameState {
       });
     });
     
-    // Separate aces and other cards
+    // Shuffle all cards first
+    for (let i = allCards.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allCards[i], allCards[j]] = [allCards[j], allCards[i]];
+    }
+    
+    // Separate by rank for strategic placement
     const aces = allCards.filter(c => c.rank === 'A');
     const twos = allCards.filter(c => c.rank === '2');
-    const otherCards = allCards.filter(c => c.rank !== 'A' && c.rank !== '2');
+    const threes = allCards.filter(c => c.rank === '3');
+    const lowCards = allCards.filter(c => ['4', '5', '6'].includes(c.rank));
+    const otherCards = allCards.filter(c => !['A', '2', '3', '4', '5', '6'].includes(c.rank));
     
-    // Shuffle aces and twos randomly
-    for (let i = aces.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [aces[i], aces[j]] = [aces[j], aces[i]];
-    }
-    for (let i = twos.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [twos[i], twos[j]] = [twos[j], twos[i]];
-    }
+    // Shuffle each group
+    [aces, twos, threes, lowCards, otherCards].forEach(group => {
+      for (let i = group.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [group[i], group[j]] = [group[j], group[i]];
+      }
+    });
     
-    // Shuffle other cards
-    for (let i = otherCards.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [otherCards[i], otherCards[j]] = [otherCards[j], otherCards[i]];
-    }
+    // Decide how many aces to place on top (1-2, more natural)
+    const acesOnTop = 1 + Math.floor(Math.random() * 2); // 1 or 2 aces visible
     
-    // Build tableau with aces guaranteed on top
+    // Build tableau
     const tableau: Card[][] = [[], [], [], [], [], [], []];
     const columnSizes = [1, 2, 3, 4, 5, 6, 7];
     
-    let otherCardIndex = 0;
-    let twosIndex = 0;
+    // Create pool of cards for tableau, biasing low cards to be face-up
+    const faceUpPool: Card[] = [];
+    const faceDownPool: Card[] = [];
     
-    // Fill columns - aces will be placed on top of columns 0, 1, 2, 3
+    // Add selected aces for face-up positions
+    for (let i = 0; i < acesOnTop; i++) {
+      if (aces[i]) faceUpPool.push(aces[i]);
+    }
+    // Remaining aces go to face-down pool or stock
+    for (let i = acesOnTop; i < aces.length; i++) {
+      faceDownPool.push(aces[i]);
+    }
+    
+    // Add some twos/threes to face-up pool (not all)
+    const twosForFaceUp = Math.floor(Math.random() * 2) + 1; // 1-2 twos visible
+    for (let i = 0; i < twosForFaceUp && i < twos.length; i++) {
+      faceUpPool.push(twos[i]);
+    }
+    for (let i = twosForFaceUp; i < twos.length; i++) {
+      faceDownPool.push(twos[i]);
+    }
+    
+    // Add some threes
+    const threesForFaceUp = Math.floor(Math.random() * 2); // 0-1 threes visible
+    for (let i = 0; i < threesForFaceUp && i < threes.length; i++) {
+      faceUpPool.push(threes[i]);
+    }
+    for (let i = threesForFaceUp; i < threes.length; i++) {
+      faceDownPool.push(threes[i]);
+    }
+    
+    // Add low cards and others to face-down pool
+    faceDownPool.push(...lowCards, ...otherCards);
+    
+    // Shuffle pools
+    for (let i = faceUpPool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [faceUpPool[i], faceUpPool[j]] = [faceUpPool[j], faceUpPool[i]];
+    }
+    for (let i = faceDownPool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [faceDownPool[i], faceDownPool[j]] = [faceDownPool[j], faceDownPool[i]];
+    }
+    
+    let faceUpIdx = 0;
+    let faceDownIdx = 0;
+    
+    // Fill columns
     for (let col = 0; col < 7; col++) {
       const size = columnSizes[col];
       
       for (let row = 0; row < size; row++) {
         const isTop = row === size - 1;
         
-        if (isTop && col < 4) {
-          // Place ace on top of first 4 columns
-          const ace = aces[col];
-          ace.faceUp = true;
-          tableau[col].push(ace);
-        } else if (isTop) {
-          // For columns 4, 5, 6 - try to place a 2 or low card on top
-          if (twosIndex < twos.length && Math.random() > 0.3) {
-            const two = twos[twosIndex++];
-            two.faceUp = true;
-            tableau[col].push(two);
-          } else if (otherCardIndex < otherCards.length) {
-            const card = otherCards[otherCardIndex++];
+        if (isTop) {
+          // Top card - try to use from face-up pool
+          if (faceUpIdx < faceUpPool.length) {
+            const card = faceUpPool[faceUpIdx++];
+            card.faceUp = true;
+            tableau[col].push(card);
+          } else if (faceDownIdx < faceDownPool.length) {
+            const card = faceDownPool[faceDownIdx++];
             card.faceUp = true;
             tableau[col].push(card);
           }
         } else {
-          // Fill non-top positions with other cards (face down)
-          if (otherCardIndex < otherCards.length) {
-            const card = otherCards[otherCardIndex++];
+          // Not top - use face-down cards
+          if (faceDownIdx < faceDownPool.length) {
+            const card = faceDownPool[faceDownIdx++];
             card.faceUp = false;
             tableau[col].push(card);
-          } else if (twosIndex < twos.length) {
-            const card = twos[twosIndex++];
+          } else if (faceUpIdx < faceUpPool.length) {
+            const card = faceUpPool[faceUpIdx++];
             card.faceUp = false;
             tableau[col].push(card);
           }
@@ -883,47 +925,72 @@ function generateGuaranteedSolvableLayout(): GameState {
       }
     }
     
-    // Put remaining cards in stock (face down)
+    // Put remaining cards in stock
     const usedIds = new Set(tableau.flat().map(c => c.id));
     const stockCards = allCards.filter(c => !usedIds.has(c.id));
     
-    // Shuffle stock but bias twos to appear early
+    // Shuffle stock but place remaining aces/twos in first half
+    const stockAces = stockCards.filter(c => c.rank === 'A');
     const stockTwos = stockCards.filter(c => c.rank === '2');
-    const stockOthers = stockCards.filter(c => c.rank !== '2');
+    const stockThrees = stockCards.filter(c => c.rank === '3');
+    const stockOthers = stockCards.filter(c => !['A', '2', '3'].includes(c.rank));
     
-    // Interleave: some twos early, then others
+    // Shuffle others
+    for (let i = stockOthers.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [stockOthers[i], stockOthers[j]] = [stockOthers[j], stockOthers[i]];
+    }
+    
+    // Interleave low cards into first half of stock
     const orderedStock: Card[] = [];
-    let twoIdx = 0;
+    const importantCards = [...stockAces, ...stockTwos, ...stockThrees];
+    
+    // Shuffle important cards
+    for (let i = importantCards.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [importantCards[i], importantCards[j]] = [importantCards[j], importantCards[i]];
+    }
+    
+    let importantIdx = 0;
     let otherIdx = 0;
     
-    while (twoIdx < stockTwos.length || otherIdx < stockOthers.length) {
-      // Add a two every 3-5 cards if available
-      if (twoIdx < stockTwos.length && (otherIdx % 4 === 0 || otherIdx >= stockOthers.length)) {
-        orderedStock.push(stockTwos[twoIdx++]);
+    // Place important cards in roughly first 2/3 of stock
+    const totalStock = stockCards.length;
+    const importantZone = Math.floor(totalStock * 0.7);
+    
+    for (let i = 0; i < totalStock; i++) {
+      if (importantIdx < importantCards.length && i < importantZone && (i % 3 === 0 || otherIdx >= stockOthers.length)) {
+        orderedStock.push(importantCards[importantIdx++]);
       } else if (otherIdx < stockOthers.length) {
         orderedStock.push(stockOthers[otherIdx++]);
+      } else if (importantIdx < importantCards.length) {
+        orderedStock.push(importantCards[importantIdx++]);
       }
     }
     
     const stock = orderedStock.map(c => ({ ...c, faceUp: false }));
     
-    // Check solvability with STRICT requirement (must solve ALL 52 cards)
-    if (checkSolvabilityStrict(tableau, stock)) {
-      // Score this layout
-      let score = 100; // Base score for having all aces on top
+    // Check solvability - require at least 90% completion (more flexible)
+    const solveResult = checkSolvabilityFlexible(tableau, stock);
+    if (solveResult.solved >= 48) { // At least 48 out of 52 cards (92%)
+      // Score this layout - prefer more natural distributions
+      let score = solveResult.solved * 2;
       
-      // Bonus for twos being accessible
-      tableau.forEach(col => {
-        const topCard = col[col.length - 1];
-        if (topCard?.rank === '2') score += 40;
-        if (topCard?.rank === '3') score += 20;
-      });
+      // Count visible aces
+      const visibleAces = tableau.reduce((count, col) => {
+        const top = col[col.length - 1];
+        return count + (top?.rank === 'A' ? 1 : 0);
+      }, 0);
       
-      // Bonus if twos are early in stock
-      stock.slice(0, 10).forEach(card => {
-        if (card.rank === '2') score += 25;
-        if (card.rank === '3') score += 15;
-      });
+      // Penalty for too many visible aces (unnatural)
+      if (visibleAces >= 4) score -= 50;
+      if (visibleAces >= 3) score -= 20;
+      // Bonus for 1-2 aces (natural)
+      if (visibleAces === 1 || visibleAces === 2) score += 30;
+      
+      // Bonus for some variety in top cards
+      const topRanks = new Set(tableau.map(col => col[col.length - 1]?.rank).filter(Boolean));
+      score += topRanks.size * 5;
       
       if (!bestGame || score > bestGame.score) {
         bestGame = { tableau, stock, score };
@@ -956,6 +1023,145 @@ function generateGuaranteedSolvableLayout(): GameState {
   // Fallback to regular solvable game (should rarely happen)
   console.warn('⚠️ Could not find perfect first game, falling back to regular generation');
   return generateBasicSolvableGame();
+}
+
+/**
+ * Flexible solvability check - returns how many cards could be moved to foundations
+ * Used for natural layouts that don't need to be 100% solvable
+ */
+function checkSolvabilityFlexible(tableau: Card[][], stock: Card[]): { solved: number } {
+  // Create deep copies
+  const simTableau = tableau.map(col => col.map(c => ({ ...c })));
+  const simStock = stock.map(c => ({ ...c }));
+  const simWaste: Card[] = [];
+  const simFoundations: { [key in Suit]: Card[] } = {
+    hearts: [], diamonds: [], clubs: [], spades: []
+  };
+  
+  const maxIterations = 2000;
+  let iterations = 0;
+  const maxStockCycles = 5;
+  let stockCycles = 0;
+  
+  while (iterations < maxIterations) {
+    iterations++;
+    let madeProgress = false;
+    
+    // Try to move cards to foundations from tableau
+    for (let colIdx = 0; colIdx < simTableau.length; colIdx++) {
+      const col = simTableau[colIdx];
+      if (col.length === 0) continue;
+      
+      const topCard = col[col.length - 1];
+      if (!topCard.faceUp) continue;
+      
+      if (canMoveToFoundation(topCard, simFoundations)) {
+        simFoundations[topCard.suit].push(col.pop()!);
+        if (col.length > 0 && !col[col.length - 1].faceUp) {
+          col[col.length - 1].faceUp = true;
+        }
+        madeProgress = true;
+      }
+    }
+    
+    // Try waste to foundations
+    if (simWaste.length > 0) {
+      const topWaste = simWaste[simWaste.length - 1];
+      if (canMoveToFoundation(topWaste, simFoundations)) {
+        simFoundations[topWaste.suit].push(simWaste.pop()!);
+        madeProgress = true;
+      }
+    }
+    
+    // Try tableau moves
+    for (let fromIdx = 0; fromIdx < simTableau.length; fromIdx++) {
+      if (madeProgress) break;
+      
+      const fromCol = simTableau[fromIdx];
+      if (fromCol.length === 0) continue;
+      
+      let stackStart = fromCol.length - 1;
+      while (stackStart > 0 && 
+             fromCol[stackStart - 1].faceUp &&
+             canPlaceOnTableau(fromCol[stackStart], fromCol[stackStart - 1])) {
+        stackStart--;
+      }
+      
+      const movingCard = fromCol[stackStart];
+      if (!movingCard.faceUp) continue;
+      
+      for (let toIdx = 0; toIdx < simTableau.length; toIdx++) {
+        if (fromIdx === toIdx) continue;
+        
+        const toCol = simTableau[toIdx];
+        
+        if (toCol.length === 0) {
+          if (movingCard.rank === 'K' && stackStart > 0) {
+            const stack = fromCol.splice(stackStart);
+            toCol.push(...stack);
+            if (fromCol.length > 0 && !fromCol[fromCol.length - 1].faceUp) {
+              fromCol[fromCol.length - 1].faceUp = true;
+            }
+            madeProgress = true;
+            break;
+          }
+        } else {
+          const topCard = toCol[toCol.length - 1];
+          if (canPlaceOnTableau(movingCard, topCard)) {
+            const stack = fromCol.splice(stackStart);
+            toCol.push(...stack);
+            if (fromCol.length > 0 && !fromCol[fromCol.length - 1].faceUp) {
+              fromCol[fromCol.length - 1].faceUp = true;
+            }
+            madeProgress = true;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Try waste to tableau
+    if (!madeProgress && simWaste.length > 0) {
+      const topWaste = simWaste[simWaste.length - 1];
+      for (let toIdx = 0; toIdx < simTableau.length; toIdx++) {
+        const toCol = simTableau[toIdx];
+        if (toCol.length === 0) {
+          if (topWaste.rank === 'K') {
+            toCol.push(simWaste.pop()!);
+            madeProgress = true;
+            break;
+          }
+        } else {
+          const topCard = toCol[toCol.length - 1];
+          if (canPlaceOnTableau(topWaste, topCard)) {
+            toCol.push(simWaste.pop()!);
+            madeProgress = true;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Draw from stock
+    if (!madeProgress) {
+      if (simStock.length > 0) {
+        simWaste.push(simStock.pop()!);
+        madeProgress = true;
+      } else if (simWaste.length > 0 && stockCycles < maxStockCycles) {
+        while (simWaste.length > 0) {
+          simStock.push(simWaste.pop()!);
+        }
+        stockCycles++;
+        madeProgress = true;
+      }
+    }
+    
+    if (!madeProgress) break;
+  }
+  
+  // Count solved cards (cards in foundations)
+  const solvedCount = Object.values(simFoundations).reduce((sum, pile) => sum + pile.length, 0);
+  return { solved: solvedCount };
 }
 
 /**

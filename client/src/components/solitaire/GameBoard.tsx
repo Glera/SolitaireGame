@@ -3425,7 +3425,7 @@ export function GameBoard() {
        !showLeaderboard && !showTreasureHunt && !showTreasureHuntPromo && !showCollectionsUnlock && !showLockedCollectionsPopup &&
        !showLockedPointsEventPopup && !showLockedLeaderboardPopup && !showLeaderboardUnlock && !showPromoUnlock &&
        !showLevelUp && !showStreakPopup && !showDailyReward && (
-        <div className="fixed bottom-2 left-1/2 -translate-x-1/2 z-40 flex items-end gap-2 pt-6">
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 flex items-end gap-2 pb-2" style={{ paddingTop: '40px' }}>
           {/* New Game Button - shown when no moves available */}
           {showNewGameButton && (
             <button
@@ -3438,7 +3438,7 @@ export function GameBoard() {
               className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-red-400 to-red-600 hover:from-red-300 hover:to-red-500 rounded-xl shadow-lg border-b-4 border-red-700 transition-all hover:scale-105 animate-pulse"
               title="Новая раскладка"
             >
-              <span className="absolute -top-5 text-3xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}>🔄</span>
+              <span className="absolute -top-7 text-4xl" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>🔄</span>
             </button>
           )}
           
@@ -3451,7 +3451,7 @@ export function GameBoard() {
             className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 rounded-xl shadow-lg border-b-4 border-amber-600 transition-all hover:scale-105"
             title="Подсказка"
           >
-            <span className="absolute -top-5 text-3xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}>💡</span>
+            <span className="absolute -top-7 text-4xl" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>💡</span>
           </button>
           
           {/* Daily Quests Button */}
@@ -3464,7 +3464,7 @@ export function GameBoard() {
             className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 rounded-xl shadow-lg border-b-4 border-purple-700 transition-all hover:scale-105"
             title="Задания"
           >
-            <span className="absolute -top-5 text-3xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}>📋</span>
+            <span className="absolute -top-7 text-4xl" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>📋</span>
             {(() => {
               const completed = dailyQuests.filter(q => q.completed).length;
               const total = dailyQuests.length;
@@ -3486,9 +3486,9 @@ export function GameBoard() {
             className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 rounded-xl shadow-lg border-b-4 border-teal-700 transition-all hover:scale-105"
             title="Магазин"
           >
-            <span className="absolute -top-5 text-3xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}>🛒</span>
+            <span className="absolute -top-7 text-4xl" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>🛒</span>
             {isSubscribed && (
-              <span className="absolute -top-1 -right-1 text-base drop-shadow-md">👑</span>
+              <span className="absolute -top-2 -right-1 text-lg drop-shadow-md">👑</span>
             )}
           </button>
           
@@ -3521,26 +3521,41 @@ export function GameBoard() {
             title={collectionsUnlocked ? 'Коллекции' : `Коллекции (LVL ${COLLECTIONS_REQUIRED_LEVEL})`}
           >
             {collectionsUnlocked ? (
-              <svg className="absolute -top-6" width="24" height="32" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}>
-                <rect x="0" y="0" width="36" height="48" rx="4" fill="#3b82f6" />
-                <rect x="0" y="0" width="36" height="48" rx="4" fill="url(#packShineBtn)" />
-                <text x="18" y="28" textAnchor="middle" fontSize="14" fill="#fbbf24" style={{ textShadow: '0 0 4px rgba(251, 191, 36, 0.8)' }}>★★</text>
+              <svg className="absolute -top-7" width="28" height="38" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>
+                {/* Pack background - purple/gold gradient for legendary feel */}
+                <rect x="0" y="0" width="36" height="48" rx="5" fill="url(#packGradient5)" />
+                <rect x="0" y="0" width="36" height="48" rx="5" fill="url(#packShine5)" />
+                {/* 5 stars in arc pattern */}
+                <text x="18" y="20" textAnchor="middle" fontSize="8" fill="#fbbf24" style={{ textShadow: '0 0 6px rgba(251, 191, 36, 1)' }}>★ ★ ★</text>
+                <text x="18" y="32" textAnchor="middle" fontSize="10" fill="#fbbf24" style={{ textShadow: '0 0 6px rgba(251, 191, 36, 1)' }}>★ ★</text>
+                {/* Border glow */}
+                <rect x="1" y="1" width="34" height="46" rx="4" fill="none" stroke="rgba(251, 191, 36, 0.5)" strokeWidth="1" />
                 <defs>
-                  <linearGradient id="packShineBtn" x1="0" y1="0" x2="36" y2="48">
+                  <linearGradient id="packGradient5" x1="0" y1="0" x2="36" y2="48">
+                    <stop offset="0%" stopColor="#7c3aed" />
+                    <stop offset="50%" stopColor="#6d28d9" />
+                    <stop offset="100%" stopColor="#4c1d95" />
+                  </linearGradient>
+                  <linearGradient id="packShine5" x1="0" y1="0" x2="36" y2="48">
                     <stop offset="0%" stopColor="rgba(255,255,255,0.3)" />
-                    <stop offset="100%" stopColor="rgba(0,0,0,0.15)" />
+                    <stop offset="50%" stopColor="rgba(255,255,255,0)" />
+                    <stop offset="100%" stopColor="rgba(0,0,0,0.2)" />
                   </linearGradient>
                 </defs>
               </svg>
             ) : (
-              <span className="absolute -top-5 text-3xl opacity-50" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }}>🎴</span>
+              <svg className="absolute -top-7" width="28" height="38" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))', opacity: 0.5 }}>
+                <rect x="0" y="0" width="36" height="48" rx="5" fill="#6b7280" />
+                <text x="18" y="20" textAnchor="middle" fontSize="8" fill="#9ca3af">★ ★ ★</text>
+                <text x="18" y="32" textAnchor="middle" fontSize="10" fill="#9ca3af">★ ★</text>
+              </svg>
             )}
             {collectionsUnlocked ? (
               <span className={`absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${completedCollectionsCount === collections.length ? 'bg-green-500 text-white' : 'bg-white text-gray-800'}`}>
                 {completedCollectionsCount}/{collections.length}
               </span>
             ) : (
-              <span className="absolute top-1 left-1/2 -translate-x-1/2 text-[8px] px-1 rounded bg-black/80 text-white font-bold">🔒{COLLECTIONS_REQUIRED_LEVEL}</span>
+              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 text-xs px-1.5 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒{COLLECTIONS_REQUIRED_LEVEL}</span>
             )}
             {collectionsUnlocked && hasNewCollectionItem && !allCollectionsRewarded && (
               <span className="absolute -top-2 -left-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md animate-bounce">!</span>
@@ -3569,7 +3584,7 @@ export function GameBoard() {
             }`}
             title={leaderboardUnlocked ? `Турнир ${leaderboardNewPosition}/20` : `Турнир (LVL ${LEADERBOARD_REQUIRED_LEVEL})`}
           >
-            <span className={`absolute -top-5 text-3xl ${leaderboardUnlocked ? '' : 'opacity-50'}`} style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}>🏆</span>
+            <span className={`absolute -top-7 text-4xl ${leaderboardUnlocked ? '' : 'opacity-50'}`} style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>🏆</span>
             {leaderboardUnlocked ? (
               <>
                 <span className="absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold bg-white text-gray-800 shadow-md">
@@ -3588,7 +3603,7 @@ export function GameBoard() {
                 )}
               </>
             ) : (
-              <span className="absolute top-1 left-1/2 -translate-x-1/2 text-[8px] px-1 rounded bg-black/80 text-white font-bold">🔒{LEADERBOARD_REQUIRED_LEVEL}</span>
+              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 text-xs px-1.5 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒{LEADERBOARD_REQUIRED_LEVEL}</span>
             )}
           </button>
           
@@ -3607,7 +3622,7 @@ export function GameBoard() {
       {/* Collections Button - visible during Treasure Hunt popup for flying icons */}
       {/* Not clickable, just a target for flying collection items */}
       {showTreasureHunt && (
-        <div className="fixed bottom-2 left-1/2 -translate-x-1/2 z-[60] flex items-end gap-2 pt-6 pointer-events-none">
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-[60] flex items-end gap-2 pb-2 pointer-events-none" style={{ paddingTop: '40px' }}>
           {/* Invisible spacers to match cushion button row layout */}
           <div className="w-12 h-7 opacity-0"></div>
           <div className="w-12 h-7 opacity-0"></div>
@@ -3620,14 +3635,22 @@ export function GameBoard() {
             className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-amber-500 to-orange-600 rounded-xl shadow-lg border-b-4 border-orange-700"
             style={collectionButtonPulse ? { animation: 'collection-pop 0.15s ease-out' } : undefined}
           >
-            <svg className="absolute -top-6" width="24" height="32" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))' }}>
-              <rect x="0" y="0" width="36" height="48" rx="4" fill="#3b82f6" />
-              <rect x="0" y="0" width="36" height="48" rx="4" fill="url(#packShineBtn2)" />
-              <text x="18" y="28" textAnchor="middle" fontSize="14" fill="#fbbf24" style={{ textShadow: '0 0 4px rgba(251, 191, 36, 0.8)' }}>★★</text>
+            <svg className="absolute -top-7" width="28" height="38" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>
+              <rect x="0" y="0" width="36" height="48" rx="5" fill="url(#packGradient5b)" />
+              <rect x="0" y="0" width="36" height="48" rx="5" fill="url(#packShine5b)" />
+              <text x="18" y="20" textAnchor="middle" fontSize="8" fill="#fbbf24" style={{ textShadow: '0 0 6px rgba(251, 191, 36, 1)' }}>★ ★ ★</text>
+              <text x="18" y="32" textAnchor="middle" fontSize="10" fill="#fbbf24" style={{ textShadow: '0 0 6px rgba(251, 191, 36, 1)' }}>★ ★</text>
+              <rect x="1" y="1" width="34" height="46" rx="4" fill="none" stroke="rgba(251, 191, 36, 0.5)" strokeWidth="1" />
               <defs>
-                <linearGradient id="packShineBtn2" x1="0" y1="0" x2="36" y2="48">
+                <linearGradient id="packGradient5b" x1="0" y1="0" x2="36" y2="48">
+                  <stop offset="0%" stopColor="#7c3aed" />
+                  <stop offset="50%" stopColor="#6d28d9" />
+                  <stop offset="100%" stopColor="#4c1d95" />
+                </linearGradient>
+                <linearGradient id="packShine5b" x1="0" y1="0" x2="36" y2="48">
                   <stop offset="0%" stopColor="rgba(255,255,255,0.3)" />
-                  <stop offset="100%" stopColor="rgba(0,0,0,0.15)" />
+                  <stop offset="50%" stopColor="rgba(255,255,255,0)" />
+                  <stop offset="100%" stopColor="rgba(0,0,0,0.2)" />
                 </linearGradient>
               </defs>
             </svg>
