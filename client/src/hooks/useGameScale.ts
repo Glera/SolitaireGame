@@ -31,19 +31,20 @@ export function useGameScale(): GameDimensions {
       const containerHeight = window.innerHeight;
 
       // Reserved spaces (in pixels) - must match actual UI measurements
-      const AD_SPACE = 60;          // Bottom ad space for banner
-      const PROGRESS_BAR = 95;      // Progress bar container (95px in GameBoard)
-      const CONTROLS = 50;          // Room info + game controls + margins
-      const PADDING = 20;           // Padding and spacing between elements
+      const AD_SPACE = 70;          // Bottom ad space for banner
+      const PROGRESS_BAR = 85;      // Progress bar container + margins
+      const EVENTS_ROW = 55;        // Top events row (icons + margins)
+      const BOTTOM_BUTTONS = 80;    // Bottom control buttons with margins
+      const PADDING = 30;           // Padding and spacing between elements
       
-      const reservedHeight = AD_SPACE + PROGRESS_BAR + CONTROLS + PADDING;
+      const reservedHeight = AD_SPACE + PROGRESS_BAR + EVENTS_ROW + BOTTOM_BUTTONS + PADDING;
       const availableHeight = containerHeight - reservedHeight;
 
       // Base game dimensions (at scale 1)
       // 7 columns × 80px (card width w-20) + 6 gaps × 4px (gap-1) = 560 + 24 = 584px
-      // Plus side panels: 80px (left events) + 80px (right promos) + 2×12px (gaps) = 768px total
-      // Adding padding for mobile safety margin
-      const BASE_WIDTH = 780;   // Full width including side panels
+      // Side panels removed - events now inline above cards
+      // Adding small padding for mobile safety margin
+      const BASE_WIDTH = 600;   // Just the game field + small margin
       
       // Height calculation:
       // - Top row (Stock/Waste/Foundations): 112px (card height h-28) + 12px gap = 124px

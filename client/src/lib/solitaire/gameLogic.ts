@@ -162,7 +162,7 @@ export function moveCards(
     newState.foundations[targetFoundation] = [...newState.foundations[targetFoundation], ...cards];
     
     // Calculate points and XP for cards moved to foundation
-    for (const card of cards) {
+      for (const card of cards) {
       // Award XP for moving card to foundation
       awardCardXP(card.id);
       
@@ -172,21 +172,21 @@ export function moveCards(
         
         if (points > 0) {
           onPointsEarned(points);
-          
-          // Show floating score for each card
+        
+        // Show floating score for each card
           if (onFloatingScore && result.breakdown) {
-            // Use card start position if available, otherwise fallback to center
-            let scoreX = window.innerWidth / 2;
-            let scoreY = 200;
-            
-            if (cardStartPosition) {
-              scoreX = cardStartPosition.x;
-              scoreY = cardStartPosition.y;
-            }
-            
-            onFloatingScore(points, scoreX, scoreY, result.breakdown.cardRank, card.isPremium);
+          // Use card start position if available, otherwise fallback to center
+          let scoreX = window.innerWidth / 2;
+          let scoreY = 200;
+          
+          if (cardStartPosition) {
+            scoreX = cardStartPosition.x;
+            scoreY = cardStartPosition.y;
           }
+          
+          onFloatingScore(points, scoreX, scoreY, result.breakdown.cardRank, card.isPremium);
         }
+      }
       }
     }
   }

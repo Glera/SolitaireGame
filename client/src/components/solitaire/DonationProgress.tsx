@@ -252,7 +252,9 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
   
   return (
     <>
-      <div className="w-full px-2 pt-2 pb-16 relative" ref={ref}>
+      <div className="w-full px-2 pt-2 pb-2 relative" ref={ref} style={{ pointerEvents: 'none' }}>
+        {/* Inner wrapper for clickable elements */}
+        <div style={{ pointerEvents: 'auto' }}>
         {/* Top row with icons aligned to progress bar center */}
         <div className="flex items-center gap-2" ref={progressBarContainerRef}>
           {/* Player level indicator - click opens info */}
@@ -472,6 +474,7 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
               )}
             </div>
           </div>
+        </div>
         </div>
         
       </div>
