@@ -258,7 +258,7 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
         {/* Inner wrapper for clickable elements */}
         <div style={{ pointerEvents: 'auto' }}>
         {/* Top row with icons aligned to progress bar center */}
-        <div className="flex items-center gap-2" ref={progressBarContainerRef}>
+        <div className="flex items-center gap-2" ref={progressBarContainerRef} style={{ paddingRight: '28px' }}>
           {/* Player level indicator - click opens info */}
           <LevelIndicator 
             level={levelInfo.level} 
@@ -268,7 +268,7 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
           />
           
           {/* Combined star circle + progress bar - click opens info */}
-          <div className="flex-1 relative cursor-pointer" style={{ marginRight: '24px' }} onClick={() => setShowInfo(true)}>
+          <div className="flex-1 relative cursor-pointer" onClick={() => setShowInfo(true)}>
             {/* Progress bar background */}
             <div className="h-8 bg-black/30 border border-white/20 rounded-full relative" ref={progressBarInnerRef}>
               {/* Progress fill - sky blue, min width to show behind star icon */}

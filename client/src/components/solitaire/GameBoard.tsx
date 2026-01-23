@@ -2665,7 +2665,7 @@ export function GameBoard() {
                 />
               ))}
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1" style={{ marginRight: '8px' }}>
               <WastePile cards={waste} />
               <StockPile cards={stock} />
                 </div>
