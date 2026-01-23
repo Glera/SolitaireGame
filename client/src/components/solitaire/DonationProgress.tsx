@@ -357,7 +357,7 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
           </div>
           
           {/* Dog icon */}
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0" style={{ marginLeft: '-4px' }}>
             <div 
               className="w-9 h-8 flex items-center justify-center cursor-pointer"
               onClick={() => setShowInfo(true)}

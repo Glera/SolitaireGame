@@ -2497,7 +2497,7 @@ export function GameBoard() {
                   }}
                 >📦</span>
                 {!collectionsUnlocked && (
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {COLLECTIONS_REQUIRED_LEVEL}</span>
+                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {COLLECTIONS_REQUIRED_LEVEL}</span>
                 )}
               </div>
             </div>
@@ -3492,7 +3492,7 @@ export function GameBoard() {
        !showLeaderboard && !showTreasureHunt && !showTreasureHuntPromo && !showCollectionsUnlock && !showLockedCollectionsPopup &&
        !showLockedPointsEventPopup && !showLockedLeaderboardPopup && !showLeaderboardUnlock && !showPromoUnlock &&
        !showLevelUp && !showStreakPopup && !showDailyReward && (
-        <div className="fixed bottom-11 left-1/2 -translate-x-1/2 z-40 flex items-end gap-2 pb-0" style={{ paddingTop: '40px' }}>
+        <div className="fixed bottom-[49px] left-1/2 -translate-x-1/2 z-40 flex items-end gap-2 pb-0" style={{ paddingTop: '40px' }}>
           {/* New Game Button - shown when no moves available */}
           {showNewGameButton && (
             <button
@@ -3622,7 +3622,7 @@ export function GameBoard() {
                 {completedCollectionsCount}/{collections.length}
               </span>
             ) : (
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {COLLECTIONS_REQUIRED_LEVEL}</span>
+              <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {COLLECTIONS_REQUIRED_LEVEL}</span>
             )}
             {collectionsUnlocked && hasNewCollectionItem && !allCollectionsRewarded && (
               <span className="absolute -top-2 -left-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md animate-bounce">!</span>
@@ -3665,7 +3665,7 @@ export function GameBoard() {
                 )}
               </>
             ) : (
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {LEADERBOARD_REQUIRED_LEVEL}</span>
+              <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {LEADERBOARD_REQUIRED_LEVEL}</span>
             )}
           </button>
           
@@ -3684,7 +3684,7 @@ export function GameBoard() {
       {/* Collections Button - visible during Treasure Hunt popup for flying icons */}
       {/* Not clickable, just a target for flying collection items */}
       {showTreasureHunt && (
-        <div className="fixed bottom-11 left-1/2 -translate-x-1/2 z-[60] flex items-end gap-2 pb-0 pointer-events-none" style={{ paddingTop: '40px' }}>
+        <div className="fixed bottom-[49px] left-1/2 -translate-x-1/2 z-[60] flex items-end gap-2 pb-0 pointer-events-none" style={{ paddingTop: '40px' }}>
           {/* Invisible spacers to match cushion button row layout */}
           <div className="w-12 h-7 opacity-0"></div>
           <div className="w-12 h-7 opacity-0"></div>

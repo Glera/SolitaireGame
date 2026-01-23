@@ -56,9 +56,9 @@ export function useGameScale(): GameDimensions {
       const isMobile = containerWidth <= 768;
       const CARD_HEIGHT = 104;
       // Minimum readable offset at 65% compression (must match stackCompression.ts)
-      // Mobile: 42px * 0.65 = 27px, Desktop: 38px * 0.65 = 25px
-      const MIN_FACE_UP_OFFSET = isMobile ? 27 : 25;
-      const MIN_FACE_DOWN_OFFSET = 7;  // 10px * 0.65 ≈ 7px
+      // Mobile: 45px * 0.65 = 29px, Desktop: 41px * 0.65 = 27px
+      const MIN_FACE_UP_OFFSET = isMobile ? 29 : 27;
+      const MIN_FACE_DOWN_OFFSET = 8;  // 13px * 0.65 ≈ 8px
       const MAX_FACE_DOWN = 6;  // Maximum face-down cards in a column
       const MAX_FACE_UP = 13;   // Maximum face-up cards (full suit)
       const TOP_ROW_HEIGHT = CARD_HEIGHT + 12; // Top row + gap = 124px

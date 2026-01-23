@@ -65,14 +65,19 @@ function FlyingCardItem({ data }: { data: FlyingCardData }) {
   
   // Easing function for smooth animation
   const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-  const easedProgress = easeOutCubic(progress);
+  // Stop position interpolation at 90% to not overshoot
+  const clampedProgress = Math.min(progress, 0.9);
+  const easedProgress = easeOutCubic(clampedProgress / 0.9);
   
   // Interpolate position
   const x = data.startRect.left + (data.endRect.left - data.startRect.left) * easedProgress;
   const y = data.startRect.top + (data.endRect.top - data.startRect.top) * easedProgress;
   
-  // Scale down slightly as card flies
-  const scale = 1 - (0.1 * easedProgress);
+  // Scale down as card flies, more aggressively at the end
+  const scale = 1 - (0.3 * easedProgress);
+  
+  // Fade out starting at 70% progress
+  const opacity = progress < 0.7 ? 1 : Math.max(0, 1 - (progress - 0.7) / 0.3);
   
   return (
     <div
@@ -83,8 +88,7 @@ function FlyingCardItem({ data }: { data: FlyingCardData }) {
         transform: `scale(${scale})`,
         zIndex: 10000,
         pointerEvents: 'none',
-        opacity: progress < 1 ? 1 : 0,
-        transition: 'opacity 0.05s'
+        opacity
       }}
     >
       <Card card={data.card} isClickable={false} />
