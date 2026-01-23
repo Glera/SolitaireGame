@@ -32,6 +32,15 @@ html, body {
   -webkit-overflow-scrolling: auto;
 }
 
+/* Allow scrolling in modal windows */
+[data-scrollable],
+.overflow-y-auto,
+.overflow-auto {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
 /* Mobile drag and drop improvements */
 .dnd-poly-drag-image {
   opacity: 0.9 !important;

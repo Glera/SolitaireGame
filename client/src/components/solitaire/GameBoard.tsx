@@ -2497,7 +2497,7 @@ export function GameBoard() {
                   }}
                 >📦</span>
                 {!collectionsUnlocked && (
-                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {COLLECTIONS_REQUIRED_LEVEL}</span>
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {COLLECTIONS_REQUIRED_LEVEL}</span>
                 )}
               </div>
             </div>
@@ -2531,7 +2531,7 @@ export function GameBoard() {
                     </div>
                   )}
                   {!isEventAvailable(playerLevel) && (
-                    <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {getRequiredLevel()}</span>
+                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {getRequiredLevel()}</span>
                   )}
                 </button>
               </div>
@@ -3622,7 +3622,7 @@ export function GameBoard() {
                 {completedCollectionsCount}/{collections.length}
               </span>
             ) : (
-              <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {COLLECTIONS_REQUIRED_LEVEL}</span>
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {COLLECTIONS_REQUIRED_LEVEL}</span>
             )}
             {collectionsUnlocked && hasNewCollectionItem && !allCollectionsRewarded && (
               <span className="absolute -top-2 -left-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md animate-bounce">!</span>
@@ -3665,7 +3665,7 @@ export function GameBoard() {
                 )}
               </>
             ) : (
-              <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {LEADERBOARD_REQUIRED_LEVEL}</span>
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {LEADERBOARD_REQUIRED_LEVEL}</span>
             )}
           </button>
           

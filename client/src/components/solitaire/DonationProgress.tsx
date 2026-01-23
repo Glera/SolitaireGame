@@ -496,8 +496,9 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
           onClick={() => setShowInfo(false)}
         >
           <div 
-            className="bg-gradient-to-b from-amber-900 to-amber-950 text-white p-5 rounded-2xl shadow-2xl max-w-sm w-full border border-amber-600/30"
-            style={{ margin: 'auto' }}
+            className="bg-gradient-to-b from-amber-900 to-amber-950 text-white p-5 rounded-2xl shadow-2xl max-w-sm w-full border border-amber-600/30 overflow-y-auto"
+            data-scrollable
+            style={{ margin: 'auto', maxHeight: 'calc(100vh - 32px)' }}
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
