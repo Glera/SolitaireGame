@@ -163,8 +163,16 @@ export const TreasureHuntPopup: React.FC<TreasureHuntPopupProps> = ({
   // Locked state
   if (isLocked) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-        <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 max-w-sm mx-4 border-2 border-gray-600 shadow-2xl">
+      <div 
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div 
+          className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 max-w-sm mx-4 border-2 border-gray-600 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="text-center">
             <div className="text-6xl mb-4">🎁</div>
             <h2 className="text-xl font-bold text-white mb-2">Охота за сокровищами</h2>
@@ -222,7 +230,10 @@ export const TreasureHuntPopup: React.FC<TreasureHuntPopupProps> = ({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-gradient-to-b from-slate-900 to-slate-950 rounded-2xl max-w-lg w-full mx-4 border border-amber-500/30 shadow-2xl overflow-hidden">
+      <div 
+        className="bg-gradient-to-b from-slate-900 to-slate-950 rounded-2xl max-w-lg w-full mx-4 border border-amber-500/30 shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="bg-gradient-to-r from-amber-900/80 to-orange-900/80 px-4 py-3 border-b border-amber-500/30 relative">
           <button

@@ -86,9 +86,10 @@ interface PromoWidgetProps {
   onPurchase?: (packId: string, stars: number, cards: number) => void;
   onStarArrived?: (count: number) => void; // Now receives count
   onCollectionCardArrived?: () => void;
+  compact?: boolean; // Compact mode for events row
 }
 
-export function PromoWidget({ onPurchase, onStarArrived, onCollectionCardArrived }: PromoWidgetProps) {
+export function PromoWidget({ onPurchase, onStarArrived, onCollectionCardArrived, compact = false }: PromoWidgetProps) {
   const [showModal, setShowModal] = useState(false);
   const [timeLeft, setTimeLeft] = useState({ hours: 23, minutes: 59, seconds: 59 });
   const [flyingStars, setFlyingStars] = useState<FlyingItem[]>([]);
@@ -341,61 +342,89 @@ export function PromoWidget({ onPurchase, onStarArrived, onCollectionCardArrived
   
   return (
     <>
-      {/* Promo Widget Button */}
-      <button
-        onClick={() => !isAnimating && setShowModal(true)}
-        className="relative flex flex-col items-center justify-center bg-gradient-to-b from-amber-500 to-orange-600 rounded-xl shadow-lg border-2 border-amber-400/50 hover:scale-105 transition-transform"
-        style={{ 
-          width: '70px', 
-          height: '96px',
-          opacity: isAnimating ? 0.5 : 1,
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2), 0 4px 12px rgba(0,0,0,0.3)',
-        }}
-        disabled={isAnimating}
-      >
-        {/* Sale badge - static */}
-        <div className="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-red-400 shadow-md z-10">
-          SALE
-        </div>
-        
-        {/* Premium Pack Icon */}
-        <div className="relative flex items-center justify-center" style={{ marginTop: '-4px' }}>
-          <svg width="44" height="44" viewBox="0 0 36 36">
-            {/* Glow effect */}
-            <defs>
-              <filter id="promoGlow" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="2" result="blur"/>
-                <feMerge>
-                  <feMergeNode in="blur"/>
-                  <feMergeNode in="SourceGraphic"/>
-                </feMerge>
-              </filter>
-              <linearGradient id="promoCardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#fcd34d"/>
-                <stop offset="50%" stopColor="#f59e0b"/>
-                <stop offset="100%" stopColor="#d97706"/>
-              </linearGradient>
-            </defs>
-            {/* Back cards (stack effect) */}
-            <rect x="10" y="4" width="18" height="24" rx="3" fill="#92400e" opacity="0.6"/>
-            <rect x="8" y="6" width="18" height="24" rx="3" fill="#b45309" opacity="0.8"/>
-            {/* Main card */}
-            <rect x="6" y="8" width="18" height="24" rx="3" fill="url(#promoCardGrad)" filter="url(#promoGlow)"/>
-            {/* Stars on card */}
-            <text x="15" y="18" textAnchor="middle" fill="#fff" fontSize="6" fontWeight="bold" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>★★</text>
-            <text x="15" y="26" textAnchor="middle" fill="#fff" fontSize="6" fontWeight="bold" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>★★★</text>
-            {/* Sparkle */}
-            <text x="28" y="10" fill="#fff" fontSize="8">✨</text>
-          </svg>
-        </div>
-        
-        {/* Timer */}
-        <div className="mt-1">
-          <div className="text-[9px] text-white font-mono bg-black/50 px-1.5 py-0.5 rounded whitespace-nowrap">
+      {/* Promo Widget Button - Compact or Full */}
+      {compact ? (
+        <div className="relative" style={{ pointerEvents: 'auto' }}>
+          <button
+            onClick={() => !isAnimating && setShowModal(true)}
+            className="relative flex flex-col items-center justify-center rounded-full transition-all duration-150 cursor-pointer hover:scale-110"
+            style={{ 
+              width: '52px', 
+              height: '52px',
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              boxShadow: '0 3px 10px rgba(0,0,0,0.3)',
+              border: '2px solid rgba(255,255,255,0.25)',
+              opacity: isAnimating ? 0.5 : 1,
+            }}
+            disabled={isAnimating}
+          >
+            {/* Icon - discount percentage */}
+            <span className="text-2xl font-black text-white" style={{ 
+              textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+            }}>%</span>
+          </button>
+          
+          {/* Compact Timer below button - outside button so it doesn't scale */}
+          <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-xs px-1.5 py-px rounded-full bg-black/90 text-white font-mono font-bold shadow-lg whitespace-nowrap pointer-events-none">
             {formatTime(timeLeft.hours)}:{formatTime(timeLeft.minutes)}:{formatTime(timeLeft.seconds)}
-          </div>
+          </span>
         </div>
-      </button>
+      ) : (
+        <button
+          onClick={() => !isAnimating && setShowModal(true)}
+          className="relative flex flex-col items-center justify-center bg-gradient-to-b from-amber-500 to-orange-600 rounded-xl shadow-lg border-2 border-amber-400/50 hover:scale-105 transition-transform"
+          style={{ 
+            width: '70px', 
+            height: '96px',
+            opacity: isAnimating ? 0.5 : 1,
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2), 0 4px 12px rgba(0,0,0,0.3)',
+          }}
+          disabled={isAnimating}
+        >
+          {/* Sale badge - static */}
+          <div className="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-red-400 shadow-md z-10">
+            SALE
+          </div>
+          
+          {/* Premium Pack Icon */}
+          <div className="relative flex items-center justify-center" style={{ marginTop: '-4px' }}>
+            <svg width="44" height="44" viewBox="0 0 36 36">
+              {/* Glow effect */}
+              <defs>
+                <filter id="promoGlow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="2" result="blur"/>
+                  <feMerge>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+                <linearGradient id="promoCardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#fcd34d"/>
+                  <stop offset="50%" stopColor="#f59e0b"/>
+                  <stop offset="100%" stopColor="#d97706"/>
+                </linearGradient>
+              </defs>
+              {/* Back cards (stack effect) */}
+              <rect x="10" y="4" width="18" height="24" rx="3" fill="#92400e" opacity="0.6"/>
+              <rect x="8" y="6" width="18" height="24" rx="3" fill="#b45309" opacity="0.8"/>
+              {/* Main card */}
+              <rect x="6" y="8" width="18" height="24" rx="3" fill="url(#promoCardGrad)" filter="url(#promoGlow)"/>
+              {/* Stars on card */}
+              <text x="15" y="18" textAnchor="middle" fill="#fff" fontSize="6" fontWeight="bold" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>★★</text>
+              <text x="15" y="26" textAnchor="middle" fill="#fff" fontSize="6" fontWeight="bold" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>★★★</text>
+              {/* Sparkle */}
+              <text x="28" y="10" fill="#fff" fontSize="8">✨</text>
+            </svg>
+          </div>
+          
+          {/* Timer */}
+          <div className="mt-1">
+            <div className="text-[9px] text-white font-mono bg-black/50 px-1.5 py-0.5 rounded whitespace-nowrap">
+              {formatTime(timeLeft.hours)}:{formatTime(timeLeft.minutes)}:{formatTime(timeLeft.seconds)}
+            </div>
+          </div>
+        </button>
+      )}
       
       {/* Purchase Modal */}
       {showModal && ReactDOM.createPortal(

@@ -232,16 +232,17 @@ export function LeaderboardPopup({
   
   return (
     <div 
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      onClick={onClose}
     >
+      {/* Backdrop - separate layer, no animation */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div 
-        className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl p-5 mx-4 max-w-md w-full shadow-2xl border border-slate-600/50 max-h-[80vh] flex flex-col"
+        className="relative bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl p-5 mx-4 max-w-md w-full shadow-2xl border border-slate-600/50 max-h-[80vh] flex flex-col"
         style={{
-          animation: 'bounceIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
+          animation: 'modalSlideIn 0.2s ease-out'
         }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="text-center mb-4">

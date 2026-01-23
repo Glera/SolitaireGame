@@ -6,7 +6,7 @@ import { clearAllDropTargetHighlights } from '../solitaire/styleManager';
 import { calculateCardPoints, calculateCardPointsRaw, resetScoredCards } from '../solitaire/scoring';
 import { addFloatingScore } from '../solitaire/floatingScoreManager';
 import GameIntegration from '../gameIntegration';
-import { generateSolvableGame, generateUnsolvableGame, markFirstWin } from '../solitaire/solvableGenerator';
+import { generateSolvableGame, generateUnsolvableGame, markFirstWin, ensureSolvability } from '../solitaire/solvableGenerator';
 import { awardWinXP, awardCardXP, resetXPEarnedCards } from '../solitaire/experienceManager';
 import { resetCardsMovedForCollection } from '../../components/solitaire/FlyingCollectionIcon';
 import { collectKeyFromCard } from '../liveops/keyManager';
@@ -365,8 +365,11 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         }
       }
       
+      // Ensure game remains solvable after card reveal
+      const solvableState = ensureSolvability(newGameState);
+      
       set({
-        ...newGameState,
+        ...solvableState,
         isDragging: false,
         draggedCards: [],
         sourceType: 'tableau',
@@ -534,14 +537,24 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         const newTableau = [...state.tableau];
         newTableau[colIndex] = column.slice(0, -1);
         
+        let cardWasFlipped = false;
         if (newTableau[colIndex].length > 0 && !newTableau[colIndex][newTableau[colIndex].length - 1].faceUp) {
           newTableau[colIndex] = [...newTableau[colIndex]];
           newTableau[colIndex][newTableau[colIndex].length - 1] = { 
             ...newTableau[colIndex][newTableau[colIndex].length - 1], 
             faceUp: true 
           };
+          cardWasFlipped = true;
         }
-        set({ tableau: newTableau });
+        
+        // If a card was flipped, ensure game remains solvable
+        if (cardWasFlipped) {
+          const tempState = { ...state, tableau: newTableau };
+          const solvableState = ensureSolvability(tempState);
+          set({ tableau: solvableState.tableau, stock: solvableState.stock });
+        } else {
+          set({ tableau: newTableau });
+        }
         cardRemovedFromTableau = true;
         break;
       }

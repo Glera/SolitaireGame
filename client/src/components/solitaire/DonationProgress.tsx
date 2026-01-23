@@ -29,15 +29,15 @@ interface DonationProgressProps {
 
 // Circular progress component for player level
 const LevelIndicator: React.FC<{ level: number; progress: number; isPulsing?: boolean; onClick?: () => void }> = ({ level, progress, isPulsing, onClick }) => {
-  const size = 52; // 1.5x larger than before (was 36)
-  const strokeWidth = 4;
+  const size = 68; // 30% larger (was 52)
+  const strokeWidth = 5;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
   
   return (
     <div 
-      className={`relative flex-shrink-0 cursor-pointer ${isPulsing ? 'animate-level-pulse' : ''}`} 
+      className="relative flex-shrink-0 cursor-pointer"
       style={{ width: size, height: size }}
       onClick={onClick}
     >
@@ -83,11 +83,13 @@ const LevelIndicator: React.FC<{ level: number; progress: number; isPulsing?: bo
           margin: strokeWidth,
           borderRadius: '50%',
           background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)',
-          boxShadow: isPulsing ? '0 0 20px rgba(59, 130, 246, 0.8)' : '0 0 12px rgba(59, 130, 246, 0.5)',
-          transition: 'box-shadow 0.2s ease-out'
+          boxShadow: '0 0 12px rgba(59, 130, 246, 0.5)',
         }}
       >
-        <span className="text-white font-bold text-2xl" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+        <span 
+          className={`text-white font-bold text-3xl transition-transform duration-150 ${isPulsing ? 'scale-125' : 'scale-100'}`}
+          style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}
+        >
           {level}
         </span>
       </div>

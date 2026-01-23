@@ -1320,7 +1320,14 @@ export function Collections({
             initialProgress[c.id] = actualProgress[c.id];
           }
         });
-        setAnimatedProgress(initialProgress);
+        // IMPORTANT: Never decrease progress - only increase
+        setAnimatedProgress(prev => {
+          const updated: Record<string, number> = {};
+          Object.keys(initialProgress).forEach(id => {
+            updated[id] = Math.max(initialProgress[id], prev[id] ?? 0);
+          });
+          return updated;
+        });
         
         // Scroll to first collection with new items after DOM updates
         // Only scroll if it's not one of the first 4 collections (already visible)
@@ -1341,14 +1348,28 @@ export function Collections({
         const timer = setTimeout(() => {
           if (hasAnimatedRef.current) return;
           hasAnimatedRef.current = true;
-          setAnimatedProgress(actualProgress);
+          // IMPORTANT: Never decrease progress - only increase
+          setAnimatedProgress(prev => {
+            const updated: Record<string, number> = {};
+            Object.keys(actualProgress).forEach(id => {
+              updated[id] = Math.max(actualProgress[id], prev[id] ?? 0);
+            });
+            return updated;
+          });
         }, 400); // Longer delay for window to settle
         
         prevVisibleRef.current = true;
         return () => clearTimeout(timer);
       } else {
         // No new items - show actual progress immediately without animation
-        setAnimatedProgress(actualProgress);
+        // IMPORTANT: Never decrease progress - only increase
+        setAnimatedProgress(prev => {
+          const updated: Record<string, number> = {};
+          Object.keys(actualProgress).forEach(id => {
+            updated[id] = Math.max(actualProgress[id], prev[id] ?? 0);
+          });
+          return updated;
+        });
         prevVisibleRef.current = true;
       }
     }
@@ -1674,7 +1695,6 @@ export function Collections({
       <div 
         className="fixed inset-0 z-[9997] flex items-center justify-center"
         style={{ 
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
           paddingTop: '50px',
           paddingBottom: '55px',
           paddingLeft: '16px',
@@ -1682,6 +1702,8 @@ export function Collections({
         }}
         onClick={handleCloseDetailView}
       >
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-black/80" />
         {/* Wrapper for modal + navigation arrows */}
         <div className="relative max-w-md w-full">
           {/* Left navigation arrow - positioned at left edge of modal */}
@@ -1899,7 +1921,6 @@ export function Collections({
       <div 
         className="fixed inset-0 z-[9997] flex items-center justify-center"
         style={{ 
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
           paddingTop: '50px',
           paddingBottom: '55px',
           paddingLeft: '16px',
@@ -1907,8 +1928,10 @@ export function Collections({
         }}
         onClick={() => setSelectedTrophy(null)}
       >
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-black/80" />
         <div 
-          className="bg-gradient-to-b from-amber-900 to-slate-900 text-white p-5 rounded-2xl shadow-2xl max-w-sm w-full border border-amber-500/30"
+          className="relative bg-gradient-to-b from-amber-900 to-slate-900 text-white p-5 rounded-2xl shadow-2xl max-w-sm w-full border border-amber-500/30"
           style={{ maxHeight: 'calc(100vh - 150px)', overflowY: 'auto' }}
           onClick={e => e.stopPropagation()}
         >
@@ -1973,18 +1996,18 @@ export function Collections({
     <div 
       className="fixed inset-0 z-[9997] flex items-center justify-center"
       style={{ 
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
         paddingTop: '50px',
         paddingBottom: '55px',
         paddingLeft: '16px',
-        paddingRight: '16px',
-        animation: 'fadeIn 0.2s ease-out'
+        paddingRight: '16px'
       }}
       onClick={onClose}
     >
+      {/* Backdrop - separate layer, no animation */}
+      <div className="absolute inset-0 bg-black/80" />
       <div 
-        className="bg-gradient-to-b from-indigo-900 to-slate-900 text-white p-5 rounded-2xl shadow-2xl max-w-md w-full border border-indigo-500/30"
-        style={{ animation: 'fadeIn 0.2s ease-out' }}
+        className="relative bg-gradient-to-b from-indigo-900 to-slate-900 text-white p-5 rounded-2xl shadow-2xl max-w-md w-full border border-indigo-500/30"
+        style={{ animation: 'modalSlideIn 0.2s ease-out' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header with Tabs */}

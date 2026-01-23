@@ -87,9 +87,9 @@ export function CollectionPackPopup({
       if (hasSource) {
         setPhase('arriving');
         
-        // Animate arrival
+        // Animate arrival - pack flies from miniature to center
         const startTime = performance.now();
-        const duration = 600; // ms
+        const duration = 450; // ms - faster for more impact
         
         const animate = (timestamp: number) => {
           const elapsed = timestamp - startTime;
@@ -209,8 +209,10 @@ export function CollectionPackPopup({
       const currentX = startX + (centerX - startX) * arrivalProgress;
       const currentY = startY + (centerY - startY) * arrivalProgress;
       
-      // Scale from small to full size
-      const scale = 0.3 + 0.7 * arrivalProgress;
+      // Scale from miniature-like size (0.1 = ~18px for 180px pack) to full size
+      // Using ease-out for scale to make it "burst" to full size at the end
+      const scaleEased = Math.pow(arrivalProgress, 0.5); // Faster scale growth
+      const scale = 0.1 + 0.9 * scaleEased;
       
       return {
         position: 'fixed' as const,
@@ -301,9 +303,9 @@ export function CollectionPackPopup({
       {/* Items reveal */}
       {(phase === 'revealing' || phase === 'items') && (
         <div className="relative">
-          {/* Items spread from center */}
+          {/* Items spread from center - responsive gap */}
           <div 
-            className="flex gap-4 items-center justify-center"
+            className="flex gap-2 sm:gap-4 items-center justify-center px-2"
             style={{ perspective: '1000px' }}
           >
             {items.map((item, index) => {
@@ -366,14 +368,19 @@ export function CollectionPackPopup({
   );
 }
 
-// Separate component for item card
+// Separate component for item card - responsive sizing
 function ItemCard({ item }: { item: PackItem }) {
+  // Use smaller cards on mobile (window width < 400px)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 400;
+  const cardWidth = isMobile ? 72 : 90;
+  const cardHeight = isMobile ? 92 : 110;
+  
   return (
     <div
-      className="relative rounded-xl p-3 flex flex-col items-center"
+      className="relative rounded-xl p-2 sm:p-3 flex flex-col items-center"
       style={{
-        width: '90px',
-        height: '110px',
+        width: `${cardWidth}px`,
+        height: `${cardHeight}px`,
         background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%)',
         border: `2px solid ${RARITY_GLOW_COLORS[item.rarity]}`,
         boxShadow: item.isNew 
@@ -395,9 +402,9 @@ function ItemCard({ item }: { item: PackItem }) {
         </div>
       )}
       
-      {/* Item icon */}
+      {/* Item icon - responsive size */}
       <div 
-        className="text-4xl"
+        className="text-3xl sm:text-4xl"
         style={{
           filter: item.isNew 
             ? `drop-shadow(0 0 8px ${RARITY_GLOW_COLORS[item.rarity]})`

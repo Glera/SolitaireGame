@@ -43,8 +43,8 @@ export function useGameScale(): GameDimensions {
       // Base game dimensions (at scale 1)
       // 7 columns × 80px (card width w-20) + 6 gaps × 4px (gap-1) = 560 + 24 = 584px
       // Side panels removed - events now inline above cards
-      // Adding small padding for mobile safety margin
-      const BASE_WIDTH = 600;   // Just the game field + small margin
+      // Minimal margin to maximize horizontal space usage
+      const BASE_WIDTH = 588;   // Game field (584px) + tiny margin (4px)
       
       // Height calculation:
       // - Top row (Stock/Waste/Foundations): 112px (card height h-28) + 12px gap = 124px

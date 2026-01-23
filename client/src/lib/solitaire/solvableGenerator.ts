@@ -4,6 +4,10 @@ import { getRoomFromURL, getPremiumCardsCount } from '../roomUtils';
 const SUITS: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
 const RANKS: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
+// Track if we've recently rearranged to avoid excessive operations
+let lastRearrangeTime = 0;
+const REARRANGE_COOLDOWN = 500; // ms
+
 const RANK_VALUES: { [key in Rank]: number } = {
   'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
   '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13
@@ -1307,4 +1311,273 @@ function checkSolvabilityStrict(tableau: Card[][], stock: Card[]): boolean {
   // STRICT: Require ALL 52 cards for first game
   const foundationCount = Object.values(simFoundations).reduce((sum, pile) => sum + pile.length, 0);
   return foundationCount === 52;
+}
+
+/**
+ * DYNAMIC SOLVABILITY CHECK AND CORRECTION
+ * Called after each move that reveals a face-down card.
+ * If the game becomes unsolvable, rearranges hidden cards to restore solvability.
+ */
+export function ensureSolvability(gameState: GameState): GameState {
+  // Skip if game is already won
+  if (gameState.isWon) return gameState;
+  
+  // Cooldown to avoid excessive operations
+  const now = Date.now();
+  if (now - lastRearrangeTime < REARRANGE_COOLDOWN) {
+    return gameState;
+  }
+  
+  // Count hidden cards - if very few left, no need to check
+  const hiddenInTableau = gameState.tableau.reduce((count, col) => 
+    count + col.filter(c => !c.faceUp).length, 0);
+  const stockCount = gameState.stock.length;
+  
+  if (hiddenInTableau + stockCount < 3) {
+    // Too few hidden cards to meaningfully rearrange
+    return gameState;
+  }
+  
+  // Check current solvability
+  const { solved } = checkCurrentSolvability(gameState);
+  
+  // If solvable enough (90%+), don't intervene
+  if (solved >= 47) { // 47/52 = ~90%
+    return gameState;
+  }
+  
+  console.log(`🔄 Game solvability dropped to ${solved}/52, rearranging hidden cards...`);
+  lastRearrangeTime = now;
+  
+  // Collect all hidden cards (face-down in tableau + stock)
+  const hiddenCards: Card[] = [];
+  const faceDownPositions: { col: number; row: number }[] = [];
+  
+  // Collect face-down cards from tableau
+  for (let col = 0; col < gameState.tableau.length; col++) {
+    for (let row = 0; row < gameState.tableau[col].length; row++) {
+      const card = gameState.tableau[col][row];
+      if (!card.faceUp) {
+        hiddenCards.push({ ...card });
+        faceDownPositions.push({ col, row });
+      }
+    }
+  }
+  
+  // Collect stock cards
+  const stockCards = gameState.stock.map(c => ({ ...c }));
+  hiddenCards.push(...stockCards);
+  
+  // Try to find a better arrangement
+  const maxAttempts = 100;
+  let bestArrangement: { tableau: Card[][]; stock: Card[]; solved: number } | null = null;
+  
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // Shuffle hidden cards
+    const shuffled = [...hiddenCards];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    
+    // Build new tableau with rearranged hidden cards
+    const newTableau = gameState.tableau.map(col => col.map(c => ({ ...c })));
+    let shuffledIdx = 0;
+    
+    // Replace face-down cards in tableau
+    for (const pos of faceDownPositions) {
+      if (shuffledIdx < shuffled.length) {
+        const newCard = shuffled[shuffledIdx++];
+        newCard.faceUp = false;
+        newTableau[pos.col][pos.row] = newCard;
+      }
+    }
+    
+    // Remaining shuffled cards go to stock
+    const newStock = shuffled.slice(shuffledIdx).map(c => ({ ...c, faceUp: false }));
+    
+    // Check solvability of this arrangement
+    const result = checkCurrentSolvabilityWithState(newTableau, newStock, gameState.waste, gameState.foundations);
+    
+    if (result.solved > (bestArrangement?.solved ?? 0)) {
+      bestArrangement = { tableau: newTableau, stock: newStock, solved: result.solved };
+      
+      // If we found a highly solvable arrangement (95%+), use it
+      if (result.solved >= 49) {
+        console.log(`✅ Found excellent arrangement (${result.solved}/52) in ${attempt + 1} attempts`);
+        break;
+      }
+    }
+  }
+  
+  // Use best arrangement found, or return original if nothing better
+  if (bestArrangement && bestArrangement.solved > solved) {
+    console.log(`✅ Improved solvability from ${solved}/52 to ${bestArrangement.solved}/52`);
+    return {
+      ...gameState,
+      tableau: bestArrangement.tableau,
+      stock: bestArrangement.stock
+    };
+  }
+  
+  console.log(`⚠️ Could not improve solvability (${solved}/52)`);
+  return gameState;
+}
+
+/**
+ * Check solvability of current game state
+ */
+function checkCurrentSolvability(gameState: GameState): { solved: number } {
+  return checkCurrentSolvabilityWithState(
+    gameState.tableau,
+    gameState.stock,
+    gameState.waste,
+    gameState.foundations
+  );
+}
+
+/**
+ * Check solvability with explicit state components
+ */
+function checkCurrentSolvabilityWithState(
+  tableau: Card[][],
+  stock: Card[],
+  waste: Card[],
+  foundations: { [key in Suit]: Card[] }
+): { solved: number } {
+  // Create deep copies for simulation
+  const simTableau = tableau.map(col => col.map(c => ({ ...c })));
+  const simStock = stock.map(c => ({ ...c }));
+  const simWaste = waste.map(c => ({ ...c }));
+  const simFoundations: { [key in Suit]: Card[] } = {
+    hearts: foundations.hearts.map(c => ({ ...c })),
+    diamonds: foundations.diamonds.map(c => ({ ...c })),
+    clubs: foundations.clubs.map(c => ({ ...c })),
+    spades: foundations.spades.map(c => ({ ...c }))
+  };
+  
+  const maxIterations = 2000;
+  let iterations = 0;
+  const maxStockCycles = 5;
+  let stockCycles = 0;
+  
+  while (iterations < maxIterations) {
+    iterations++;
+    let madeProgress = false;
+    
+    // Try to move cards to foundations from tableau
+    for (let colIdx = 0; colIdx < simTableau.length; colIdx++) {
+      const col = simTableau[colIdx];
+      if (col.length === 0) continue;
+      
+      const topCard = col[col.length - 1];
+      if (!topCard.faceUp) continue;
+      
+      if (canMoveToFoundation(topCard, simFoundations)) {
+        simFoundations[topCard.suit].push(col.pop()!);
+        if (col.length > 0 && !col[col.length - 1].faceUp) {
+          col[col.length - 1].faceUp = true;
+        }
+        madeProgress = true;
+      }
+    }
+    
+    // Try waste to foundations
+    if (simWaste.length > 0) {
+      const topWaste = simWaste[simWaste.length - 1];
+      if (canMoveToFoundation(topWaste, simFoundations)) {
+        simFoundations[topWaste.suit].push(simWaste.pop()!);
+        madeProgress = true;
+      }
+    }
+    
+    // Try tableau moves
+    for (let fromIdx = 0; fromIdx < simTableau.length; fromIdx++) {
+      if (madeProgress) break;
+      
+      const fromCol = simTableau[fromIdx];
+      if (fromCol.length === 0) continue;
+      
+      let stackStart = fromCol.length - 1;
+      while (stackStart > 0 && 
+             fromCol[stackStart - 1].faceUp &&
+             canPlaceOnTableau(fromCol[stackStart], fromCol[stackStart - 1])) {
+        stackStart--;
+      }
+      
+      const movingCard = fromCol[stackStart];
+      if (!movingCard.faceUp) continue;
+      
+      for (let toIdx = 0; toIdx < simTableau.length; toIdx++) {
+        if (fromIdx === toIdx) continue;
+        
+        const toCol = simTableau[toIdx];
+        
+        if (toCol.length === 0) {
+          if (movingCard.rank === 'K' && stackStart > 0) {
+            const stack = fromCol.splice(stackStart);
+            toCol.push(...stack);
+            if (fromCol.length > 0 && !fromCol[fromCol.length - 1].faceUp) {
+              fromCol[fromCol.length - 1].faceUp = true;
+            }
+            madeProgress = true;
+            break;
+          }
+        } else {
+          const topCard = toCol[toCol.length - 1];
+          if (canPlaceOnTableau(movingCard, topCard)) {
+            const stack = fromCol.splice(stackStart);
+            toCol.push(...stack);
+            if (fromCol.length > 0 && !fromCol[fromCol.length - 1].faceUp) {
+              fromCol[fromCol.length - 1].faceUp = true;
+            }
+            madeProgress = true;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Try waste to tableau
+    if (!madeProgress && simWaste.length > 0) {
+      const topWaste = simWaste[simWaste.length - 1];
+      for (let toIdx = 0; toIdx < simTableau.length; toIdx++) {
+        const toCol = simTableau[toIdx];
+        if (toCol.length === 0) {
+          if (topWaste.rank === 'K') {
+            toCol.push(simWaste.pop()!);
+            madeProgress = true;
+            break;
+          }
+        } else {
+          const topCard = toCol[toCol.length - 1];
+          if (canPlaceOnTableau(topWaste, topCard)) {
+            toCol.push(simWaste.pop()!);
+            madeProgress = true;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Draw from stock
+    if (!madeProgress) {
+      if (simStock.length > 0) {
+        simWaste.push(simStock.pop()!);
+        madeProgress = true;
+      } else if (simWaste.length > 0 && stockCycles < maxStockCycles) {
+        while (simWaste.length > 0) {
+          simStock.push(simWaste.pop()!);
+        }
+        stockCycles++;
+        madeProgress = true;
+      }
+    }
+    
+    if (!madeProgress) break;
+  }
+  
+  // Count solved cards
+  const solvedCount = Object.values(simFoundations).reduce((sum, pile) => sum + pile.length, 0);
+  return { solved: solvedCount };
 }
