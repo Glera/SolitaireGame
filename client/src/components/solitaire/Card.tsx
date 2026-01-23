@@ -164,7 +164,7 @@ export function Card({
           </div>
         </div>
         <div className={cn(
-          "text-[2.625rem] font-black absolute bottom-[-2px] left-1/2 -translate-x-1/2",
+          "text-[2.625rem] font-black absolute bottom-[-10px] left-1/2 -translate-x-1/2",
           isRed ? "text-red-600" : "text-black"
         )}>
           {suitSymbol}
@@ -188,7 +188,7 @@ export function Card({
           </div>
         </div>
         <div className={cn(
-          "text-[3.375rem] font-black absolute bottom-[-2px] left-1/2 -translate-x-1/2",
+          "text-[3.375rem] font-black absolute bottom-[-10px] left-1/2 -translate-x-1/2",
           isRed ? "text-red-600" : "text-black"
         )}>
           {suitSymbol}
