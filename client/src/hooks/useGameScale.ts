@@ -71,9 +71,19 @@ export function useGameScale(): GameDimensions {
       const scaleX = containerWidth / BASE_WIDTH;
       const scaleY = availableHeight / BASE_HEIGHT;
       
-      // Use the smaller scale to ensure everything fits
-      // Removed max scale limit to allow better screen utilization
-      const scale = Math.max(0.5, Math.min(scaleX, scaleY));
+      // Detect Telegram Desktop (narrow but tall window)
+      const aspectRatio = containerWidth / containerHeight;
+      const isTelegramDesktop = aspectRatio < 0.6 && containerHeight > 700;
+      
+      // For Telegram Desktop, prioritize width-based scaling (allow vertical scroll if needed)
+      // For normal cases, use the smaller scale to ensure everything fits
+      let scale: number;
+      if (isTelegramDesktop) {
+        // Use 95% of width, allow some vertical overflow
+        scale = Math.max(0.5, scaleX * 0.95);
+      } else {
+        scale = Math.max(0.5, Math.min(scaleX, scaleY));
+      }
 
       setDimensions({
         scale,
