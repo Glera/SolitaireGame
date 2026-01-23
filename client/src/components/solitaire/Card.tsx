@@ -149,7 +149,7 @@ export function Card({
     >
       {/* Desktop version */}
       <div className="w-full h-full flex flex-col desktop-card relative px-0.5 pt-0 pb-1">
-        <div className="flex justify-between items-start -mx-1 -mt-0.5">
+        <div className="flex justify-between items-start -mx-1 -mt-1">
           <div className={cn(
             card.rank === '10' ? "text-3xl font-extrabold leading-none" : "text-4xl font-extrabold leading-none pl-1",
             isRed ? "text-red-600" : "text-black"
@@ -164,7 +164,7 @@ export function Card({
           </div>
         </div>
         <div className={cn(
-          "text-[2.625rem] font-black absolute bottom-[-10px] left-1/2 -translate-x-1/2",
+          "text-[3.25rem] font-black absolute bottom-[-10px] left-1/2 -translate-x-1/2",
           isRed ? "text-red-600" : "text-black"
         )}>
           {suitSymbol}
@@ -173,7 +173,7 @@ export function Card({
 
       {/* Mobile version */}
       <div className="w-full h-full flex flex-col mobile-card relative px-0.5 pt-0 pb-1">
-        <div className="flex justify-between items-start -mx-1 -mt-0.5">
+        <div className="flex justify-between items-start -mx-1 -mt-1">
           <div className={cn(
             card.rank === '10' ? "text-4xl font-extrabold leading-none" : "text-5xl font-extrabold leading-none pl-1",
             isRed ? "text-red-600" : "text-black"
