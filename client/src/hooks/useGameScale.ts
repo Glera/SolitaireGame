@@ -43,8 +43,8 @@ export function useGameScale(): GameDimensions {
       // Base game dimensions (at scale 1)
       // 7 columns × 80px (card width w-20) + 6 gaps × 4px (gap-1) = 560 + 24 = 584px
       // Side panels removed - events now inline above cards
-      // Minimal margin to maximize horizontal space usage
-      const BASE_WIDTH = 588;   // Game field (584px) + tiny margin (4px)
+      // No extra margin - maximize usable width
+      const BASE_WIDTH = 584;   // Game field exact width
       
       // Height calculation:
       // - Top row (Stock/Waste/Foundations): 112px (card height h-28) + 12px gap = 124px
@@ -71,16 +71,16 @@ export function useGameScale(): GameDimensions {
       const scaleX = containerWidth / BASE_WIDTH;
       const scaleY = availableHeight / BASE_HEIGHT;
       
-      // Detect Telegram Desktop (narrow but tall window)
+      // Detect narrow windows (like Telegram Desktop or mobile portrait)
       const aspectRatio = containerWidth / containerHeight;
-      const isTelegramDesktop = aspectRatio < 0.6 && containerHeight > 700;
+      const isNarrowWindow = aspectRatio < 0.7;
       
-      // For Telegram Desktop, prioritize width-based scaling (allow vertical scroll if needed)
+      // For narrow windows, maximize width usage
       // For normal cases, use the smaller scale to ensure everything fits
       let scale: number;
-      if (isTelegramDesktop) {
-        // Use 95% of width, allow some vertical overflow
-        scale = Math.max(0.5, scaleX * 0.95);
+      if (isNarrowWindow) {
+        // Use almost full width (98%), allow vertical scroll if needed
+        scale = Math.max(0.5, (containerWidth - 4) / BASE_WIDTH);
       } else {
         scale = Math.max(0.5, Math.min(scaleX, scaleY));
       }

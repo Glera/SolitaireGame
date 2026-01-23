@@ -2383,8 +2383,8 @@ export function GameBoard() {
       style={{ 
         paddingTop: '5px',
         paddingBottom: '5px',
-        paddingLeft: '2px',
-        paddingRight: '2px',
+        paddingLeft: '0px',
+        paddingRight: '0px',
         overflow: 'hidden',
         boxSizing: 'border-box'
       }}
