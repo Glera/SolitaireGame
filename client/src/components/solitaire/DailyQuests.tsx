@@ -786,12 +786,14 @@ function QuestFlyingStar({ star, onArrived }: { star: FlyingStar; onArrived: () 
   return ReactDOM.createPortal(
     <div
       ref={elementRef}
+      data-flying-element
       className="fixed text-2xl pointer-events-none z-[10000]"
       style={{
         left: star.startX,
         top: star.startY,
-        transform: 'translate(-50%, -50%)',
-        filter: getStarStyle(star.value)
+        transform: 'translate(-50%, -50%) translateZ(0)',
+        filter: getStarStyle(star.value),
+        willChange: 'transform, left, top'
       }}
     >
       ⭐
@@ -870,16 +872,18 @@ function QuestFlyingChip({ chip, onArrived }: { chip: FlyingChip; onArrived: () 
   return ReactDOM.createPortal(
     <div
       ref={elementRef}
+      data-flying-element
       className="fixed pointer-events-none z-[10000]"
       style={{
         left: chip.startX,
         top: chip.startY,
-        transform: 'translate(-50%, -50%)',
+        transform: 'translate(-50%, -50%) translateZ(0)',
         width: '10px',
         height: '10px',
         borderRadius: '3px',
         backgroundColor: '#f97316',
         boxShadow: '0 0 6px #f97316, 0 0 12px #ea580c',
+        willChange: 'transform, left, top'
       }}
     />,
     document.body

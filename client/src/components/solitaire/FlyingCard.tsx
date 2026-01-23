@@ -81,14 +81,16 @@ function FlyingCardItem({ data }: { data: FlyingCardData }) {
   
   return (
     <div
+      data-flying-element
       style={{
         position: 'fixed',
         left: x,
         top: y,
-        transform: `scale(${scale})`,
+        transform: `scale(${scale}) translateZ(0)`,
         zIndex: 10000,
         pointerEvents: 'none',
-        opacity
+        opacity,
+        willChange: 'transform, left, top, opacity'
       }}
     >
       <Card card={data.card} isClickable={false} />

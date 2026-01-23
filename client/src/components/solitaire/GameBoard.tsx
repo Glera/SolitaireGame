@@ -2531,7 +2531,7 @@ export function GameBoard() {
                     </div>
                   )}
                   {!isEventAvailable(playerLevel) && (
-                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {getRequiredLevel()}</span>
+                    <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {getRequiredLevel()}</span>
                   )}
                 </button>
               </div>

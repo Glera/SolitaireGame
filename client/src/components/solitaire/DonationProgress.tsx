@@ -258,7 +258,7 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
         {/* Inner wrapper for clickable elements */}
         <div style={{ pointerEvents: 'auto' }}>
         {/* Top row with icons aligned to progress bar center */}
-        <div className="flex items-center gap-2" ref={progressBarContainerRef} style={{ paddingRight: '28px' }}>
+        <div className="flex items-center gap-2" ref={progressBarContainerRef} style={{ paddingRight: '36px' }}>
           {/* Player level indicator - click opens info */}
           <LevelIndicator 
             level={levelInfo.level} 
@@ -357,7 +357,7 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
           </div>
           
           {/* Dog icon */}
-          <div className="flex-shrink-0" style={{ marginLeft: '-4px' }}>
+          <div className="flex-shrink-0" style={{ marginLeft: '-8px' }}>
             <div 
               className="w-9 h-8 flex items-center justify-center cursor-pointer"
               onClick={() => setShowInfo(true)}

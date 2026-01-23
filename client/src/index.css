@@ -14,6 +14,17 @@ html, body {
   overflow: hidden;
 }
 
+/* Force GPU acceleration for smooth 60fps animations in Telegram WebView */
+.gpu-accelerated,
+[data-flying-element] {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform, opacity;
+  -webkit-transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+}
+
 /* Game board specific - disable all scroll gestures */
 [data-game-board] {
   touch-action: none;
