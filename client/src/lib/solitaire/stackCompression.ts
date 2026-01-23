@@ -14,7 +14,7 @@ export function calculateStackOffsets(
   // Standard offsets (will be compressed if needed)
   const standardFaceUpOffset = isMobile ? 52 : 48;
   const standardFaceDownOffset = isMobile ? 12 : 8;
-  const cardHeight = 112; // h-28 = 112px
+  const cardHeight = 104; // h-26 = 104px
   
   // Calculate total height with standard offsets
   let totalHeightNeeded = cardHeight; // First card height

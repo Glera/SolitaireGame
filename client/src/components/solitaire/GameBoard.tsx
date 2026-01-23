@@ -2411,19 +2411,21 @@ export function GameBoard() {
           {/* Actual DonationProgress is rendered via portal at the end of the component */}
           <div style={{
             width: '584px', 
-            height: '75px',
-            marginBottom: '4px'
+            height: '65px',
+            marginBottom: '0px'
           }} />
           
           {/* Compact Event Icons Row - between progress bar and cards */}
           <div 
-            className="flex items-center gap-3 mb-4"
+            className="flex items-center gap-3 mb-2"
             style={{ 
               visibility: (showDailyQuests || showCollections) ? 'hidden' : 'visible',
               width: '584px',
+              paddingLeft: '120px',
               position: 'relative',
               zIndex: 10,
-              pointerEvents: 'auto'
+              pointerEvents: 'auto',
+              boxSizing: 'border-box'
             }}
           >
             {/* Points Event - compact circle with progress ring */}
@@ -2570,7 +2572,7 @@ export function GameBoard() {
                   return (
                     <div
                       key={reward.id}
-                      className="flex items-center justify-center bg-black/40 rounded-full p-1"
+                      className="flex items-center justify-center"
                       style={{ 
                         width: '24px', 
                         height: '24px',
@@ -3490,7 +3492,7 @@ export function GameBoard() {
        !showLeaderboard && !showTreasureHunt && !showTreasureHuntPromo && !showCollectionsUnlock && !showLockedCollectionsPopup &&
        !showLockedPointsEventPopup && !showLockedLeaderboardPopup && !showLeaderboardUnlock && !showPromoUnlock &&
        !showLevelUp && !showStreakPopup && !showDailyReward && (
-        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 flex items-end gap-2 pb-2" style={{ paddingTop: '40px' }}>
+        <div className="fixed bottom-11 left-1/2 -translate-x-1/2 z-40 flex items-end gap-2 pb-0" style={{ paddingTop: '40px' }}>
           {/* New Game Button - shown when no moves available */}
           {showNewGameButton && (
             <button
@@ -3682,7 +3684,7 @@ export function GameBoard() {
       {/* Collections Button - visible during Treasure Hunt popup for flying icons */}
       {/* Not clickable, just a target for flying collection items */}
       {showTreasureHunt && (
-        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-[60] flex items-end gap-2 pb-2 pointer-events-none" style={{ paddingTop: '40px' }}>
+        <div className="fixed bottom-11 left-1/2 -translate-x-1/2 z-[60] flex items-end gap-2 pb-0 pointer-events-none" style={{ paddingTop: '40px' }}>
           {/* Invisible spacers to match cushion button row layout */}
           <div className="w-12 h-7 opacity-0"></div>
           <div className="w-12 h-7 opacity-0"></div>

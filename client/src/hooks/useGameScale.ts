@@ -47,14 +47,14 @@ export function useGameScale(): GameDimensions {
       const BASE_WIDTH = 584;   // Game field exact width
       
       // Height calculation:
-      // - Top row (Stock/Waste/Foundations): 112px (card height h-28) + 12px gap = 124px
+      // - Top row (Stock/Waste/Foundations): 104px (card height h-26) + 12px gap = 116px
       // - Tableau: Account for maximum possible stack
-      //   - First card: 112px (full card)
+      //   - First card: 104px (full card)
       //   - Maximum stack: 19 cards (6 face-down + 13 face-up), but compressed
       //   - With 50% compression: face-up offset 26px, face-down 6px
-      //   - Worst case: 6*6 + 12*26 = 36 + 312 = 348px + 112 = 460px for tableau
+      //   - Worst case: 6*6 + 12*26 = 36 + 312 = 348px + 104 = 452px for tableau
       const isMobile = containerWidth <= 768;
-      const CARD_HEIGHT = 112;
+      const CARD_HEIGHT = 104;
       // Minimum readable offset at 65% compression (must match stackCompression.ts)
       // Mobile: 52px * 0.65 = 34px, Desktop: 48px * 0.65 = 31px
       const MIN_FACE_UP_OFFSET = isMobile ? 34 : 31;

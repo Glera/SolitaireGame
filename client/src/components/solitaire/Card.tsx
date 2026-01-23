@@ -127,7 +127,7 @@ export function Card({
       }}
     >
       <div 
-        className="w-16 h-24 border border-green-700 rounded opacity-30"
+        className="w-16 h-[88px] border border-green-700 rounded opacity-30"
         data-inner-border="true"
       />
     </div>
@@ -164,7 +164,7 @@ export function Card({
           </div>
         </div>
         <div className={cn(
-          "text-[3rem] font-black absolute bottom-[-2px] left-1/2 -translate-x-1/2",
+          "text-[2.625rem] font-black absolute bottom-[-2px] left-1/2 -translate-x-1/2",
           isRed ? "text-red-600" : "text-black"
         )}>
           {suitSymbol}
@@ -188,7 +188,7 @@ export function Card({
           </div>
         </div>
         <div className={cn(
-          "text-6xl font-black absolute bottom-[-2px] left-1/2 -translate-x-1/2",
+          "text-[3.375rem] font-black absolute bottom-[-2px] left-1/2 -translate-x-1/2",
           isRed ? "text-red-600" : "text-black"
         )}>
           {suitSymbol}
@@ -201,7 +201,7 @@ export function Card({
     <div
       data-card-id={card.id}
       className={cn(
-        "w-20 h-28 cursor-pointer select-none relative",
+        "w-20 h-[104px] cursor-pointer select-none relative",
         isDragging && "opacity-0",
         isAnimating && "opacity-0",
         className

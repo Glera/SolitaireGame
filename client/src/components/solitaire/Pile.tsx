@@ -46,7 +46,7 @@ export function Pile({
     <div
       {...props}
       className={cn(
-        "w-20 h-28 rounded-lg flex items-center justify-center relative",
+        "w-20 h-[104px] rounded-lg flex items-center justify-center relative",
         // Show border for foundation piles always, and for empty stock pile
         !props['data-waste-pile'] && (!props['data-stock-pile'] || isEmpty) && "border border-dashed border-teal-500/50 hover:border-teal-400/70 transition-colors duration-200",
         // Show background for empty stock pile

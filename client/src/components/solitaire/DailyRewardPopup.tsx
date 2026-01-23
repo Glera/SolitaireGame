@@ -217,7 +217,7 @@ export function DailyRewardPopup({
                       <div
                         key={day}
                         ref={rewardIconRef}
-                        className={`relative w-20 h-28 rounded-xl flex flex-col items-center justify-center shadow-xl ${
+                        className={`relative w-20 h-[104px] rounded-xl flex flex-col items-center justify-center shadow-xl ${
                           isBonusDay 
                             ? 'bg-gradient-to-b from-purple-400 to-purple-600 shadow-purple-500/50' 
                             : 'bg-gradient-to-b from-yellow-400 to-amber-500 shadow-yellow-500/50'

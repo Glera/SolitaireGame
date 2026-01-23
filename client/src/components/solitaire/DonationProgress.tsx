@@ -345,10 +345,10 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
               />
             )}
             
-            {/* Timer - absolute positioned below progress bar, same width for perfect centering */}
+            {/* Timer - absolute positioned above progress bar, same width for perfect centering */}
             <div 
               className="absolute left-0 right-0 flex justify-center" 
-              style={{ top: '100%', marginTop: '4px', paddingLeft: '24px', zIndex: 1 }}
+              style={{ bottom: '100%', marginBottom: '2px', paddingLeft: '24px', zIndex: 1 }}
             >
               <span className="text-white/80 text-xs font-medium">
                 Осталось: {timeLeft.days} дн. {formatTime(timeLeft.hours)}:{formatTime(timeLeft.minutes)}:{formatTime(timeLeft.seconds)}
@@ -356,8 +356,8 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
             </div>
           </div>
           
-          {/* Dog icon + buttons grouped */}
-          <div className="flex-shrink-0 flex items-start" style={{ gap: '0px' }}>
+          {/* Dog icon */}
+          <div className="flex-shrink-0">
             <div 
               className="w-9 h-8 flex items-center justify-center cursor-pointer"
               onClick={() => setShowInfo(true)}
@@ -369,117 +369,124 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
                 🐕
               </span>
             </div>
-            
-            {/* Settings menu button */}
-            <div ref={debugMenuRef} className="relative" style={{ marginTop: '16px', marginLeft: '-2px' }}>
-              <button
-                onClick={() => setShowDebugMenu(!showDebugMenu)}
-                className={`w-6 h-6 flex items-center justify-center rounded-full transition-all border ${
-                  showDebugMenu 
-                    ? 'bg-white/30 border-white/50 rotate-90' 
-                    : 'bg-white/15 hover:bg-white/25 border-white/30'
-                }`}
-                aria-label="Настройки"
-                style={{ transition: 'transform 0.2s ease-out, background 0.2s' }}
-              >
-                <span className="text-white text-sm">⚙️</span>
-              </button>
-              
-              {/* Dropdown menu */}
-              {showDebugMenu && (
-                <div 
-                  className="absolute top-full left-0 mt-1 flex flex-col gap-1.5"
-                  style={{ zIndex: 100 }}
-                >
-                  {/* Info button - closes menu because it opens a modal */}
-                  <button
-                    onClick={() => { setShowInfo(true); setShowDebugMenu(false); }}
-                    className="w-7 h-7 flex items-center justify-center rounded-full bg-white/40 hover:bg-white/60 transition-colors border border-white/50 shadow-md backdrop-blur-sm"
-                    aria-label="Информация о пожертвовании"
-                    title="Информация"
-                  >
-                    <span className="text-white text-sm font-bold">?</span>
-                  </button>
-                  
-                  {/* Test win button - keep menu open for multi-clicks */}
-                  {onTestWin && (
-                    <button
-                      onClick={() => onTestWin()}
-                      className="w-7 h-7 flex items-center justify-center rounded-full bg-green-500/50 hover:bg-green-500/70 transition-colors border border-green-400/60 shadow-md backdrop-blur-sm"
-                      aria-label="Тест победы"
-                      title="Тест победы"
-                    >
-                      <span className="text-white text-sm">✓</span>
-                    </button>
-                  )}
-                  
-                  {/* Drop collection item button - keep menu open for multi-clicks */}
-                  {onDropCollectionItem && (
-                    <button
-                      onClick={() => onDropCollectionItem()}
-                      className="w-7 h-7 flex items-center justify-center rounded-full bg-amber-500/50 hover:bg-amber-500/70 transition-colors border border-amber-400/60 shadow-md backdrop-blur-sm"
-                      aria-label="Дроп коллекции"
-                      title="Дроп коллекции"
-                    >
-                      <span className="text-white text-sm">🎁</span>
-                    </button>
-                  )}
-                  
-                  {/* Test level up button - keep menu open for multi-clicks */}
-                  {onTestLevelUp && (
-                    <button
-                      onClick={() => onTestLevelUp()}
-                      className="w-7 h-7 flex items-center justify-center rounded-full bg-purple-500/50 hover:bg-purple-500/70 transition-colors border border-purple-400/60 shadow-md backdrop-blur-sm"
-                      aria-label="Тест левелапа"
-                      title="Тест левелапа"
-                    >
-                      <span className="text-white text-sm">⬆</span>
-                    </button>
-                  )}
-                  
-                  {/* Next day button - keep menu open for multi-clicks */}
-                  {onNextDay && (
-                    <button
-                      onClick={() => onNextDay()}
-                      className="w-7 h-7 flex items-center justify-center rounded-full bg-sky-500/50 hover:bg-sky-500/70 transition-colors border border-sky-400/60 shadow-md backdrop-blur-sm"
-                      aria-label="Следующий день"
-                      title="Следующий день"
-                    >
-                      <span className="text-white text-sm">📅</span>
-                    </button>
-                  )}
-                  
-                  {/* Test other player notification button - keep menu open for multi-clicks */}
-                  {onOtherPlayerStars && (
-                    <button
-                      onClick={() => otherPlayerTriggerRef.current?.()}
-                      className="w-7 h-7 flex items-center justify-center rounded-full bg-indigo-500/50 hover:bg-indigo-500/70 transition-colors border border-indigo-400/60 shadow-md backdrop-blur-sm"
-                      aria-label="Тест уведомления от другого игрока"
-                      title="Тест уведомления"
-                    >
-                      <span className="text-white text-sm">👤</span>
-                    </button>
-                  )}
-                  
-                  {/* Debug button - keep menu open for multi-clicks */}
-                  {onDebugClick && (
-                    <button
-                      onClick={() => onDebugClick()}
-                      className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-500/50 hover:bg-gray-500/70 transition-colors border border-gray-400/60 shadow-md backdrop-blur-sm"
-                      aria-label="Debug info"
-                      title="Debug info"
-                    >
-                      <span className="text-white text-sm">🔧</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
           </div>
         </div>
         </div>
         
       </div>
+      
+      {/* Settings menu button - fixed in top right corner */}
+      {ReactDOM.createPortal(
+        <div 
+          ref={debugMenuRef} 
+          className="fixed z-50"
+          style={{ top: '5px', right: '5px', pointerEvents: 'auto' }}
+        >
+          <button
+            onClick={() => setShowDebugMenu(!showDebugMenu)}
+            className={`w-7 h-7 flex items-center justify-center rounded-full transition-all border ${
+              showDebugMenu 
+                ? 'bg-white/30 border-white/50 rotate-90' 
+                : 'bg-black/30 hover:bg-black/50 border-white/20'
+            }`}
+            aria-label="Настройки"
+            style={{ transition: 'transform 0.2s ease-out, background 0.2s' }}
+          >
+            <span className="text-white text-sm">⚙️</span>
+          </button>
+          
+          {/* Dropdown menu */}
+          {showDebugMenu && (
+            <div 
+              className="absolute top-full right-0 mt-1 flex flex-col gap-1.5"
+              style={{ zIndex: 100 }}
+            >
+              {/* Info button - closes menu because it opens a modal */}
+              <button
+                onClick={() => { setShowInfo(true); setShowDebugMenu(false); }}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-white/40 hover:bg-white/60 transition-colors border border-white/50 shadow-md backdrop-blur-sm"
+                aria-label="Информация о пожертвовании"
+                title="Информация"
+              >
+                <span className="text-white text-sm font-bold">?</span>
+              </button>
+              
+              {/* Test win button - keep menu open for multi-clicks */}
+              {onTestWin && (
+                <button
+                  onClick={() => onTestWin()}
+                  className="w-7 h-7 flex items-center justify-center rounded-full bg-green-500/50 hover:bg-green-500/70 transition-colors border border-green-400/60 shadow-md backdrop-blur-sm"
+                  aria-label="Тест победы"
+                  title="Тест победы"
+                >
+                  <span className="text-white text-sm">✓</span>
+                </button>
+              )}
+              
+              {/* Drop collection item button - keep menu open for multi-clicks */}
+              {onDropCollectionItem && (
+                <button
+                  onClick={() => onDropCollectionItem()}
+                  className="w-7 h-7 flex items-center justify-center rounded-full bg-amber-500/50 hover:bg-amber-500/70 transition-colors border border-amber-400/60 shadow-md backdrop-blur-sm"
+                  aria-label="Дроп коллекции"
+                  title="Дроп коллекции"
+                >
+                  <span className="text-white text-sm">🎁</span>
+                </button>
+              )}
+              
+              {/* Test level up button - keep menu open for multi-clicks */}
+              {onTestLevelUp && (
+                <button
+                  onClick={() => onTestLevelUp()}
+                  className="w-7 h-7 flex items-center justify-center rounded-full bg-purple-500/50 hover:bg-purple-500/70 transition-colors border border-purple-400/60 shadow-md backdrop-blur-sm"
+                  aria-label="Тест левелапа"
+                  title="Тест левелапа"
+                >
+                  <span className="text-white text-sm">⬆</span>
+                </button>
+              )}
+              
+              {/* Next day button - keep menu open for multi-clicks */}
+              {onNextDay && (
+                <button
+                  onClick={() => onNextDay()}
+                  className="w-7 h-7 flex items-center justify-center rounded-full bg-sky-500/50 hover:bg-sky-500/70 transition-colors border border-sky-400/60 shadow-md backdrop-blur-sm"
+                  aria-label="Следующий день"
+                  title="Следующий день"
+                >
+                  <span className="text-white text-sm">📅</span>
+                </button>
+              )}
+              
+              {/* Test other player notification button - keep menu open for multi-clicks */}
+              {onOtherPlayerStars && (
+                <button
+                  onClick={() => otherPlayerTriggerRef.current?.()}
+                  className="w-7 h-7 flex items-center justify-center rounded-full bg-indigo-500/50 hover:bg-indigo-500/70 transition-colors border border-indigo-400/60 shadow-md backdrop-blur-sm"
+                  aria-label="Тест уведомления от другого игрока"
+                  title="Тест уведомления"
+                >
+                  <span className="text-white text-sm">👤</span>
+                </button>
+              )}
+              
+              {/* Debug button - keep menu open for multi-clicks */}
+              {onDebugClick && (
+                <button
+                  onClick={() => onDebugClick()}
+                  className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-500/50 hover:bg-gray-500/70 transition-colors border border-gray-400/60 shadow-md backdrop-blur-sm"
+                  aria-label="Debug info"
+                  title="Debug info"
+                >
+                  <span className="text-white text-sm">🔧</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
       
       {/* Info Modal - rendered via portal to escape transform stacking context */}
       {showInfo && ReactDOM.createPortal(

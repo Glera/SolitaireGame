@@ -192,7 +192,7 @@ export function StockPile({ cards }: StockPileProps) {
           }}>
             {/* Simple card face up - no 3D flip */}
             <div
-              className="w-20 h-28 bg-amber-50 p-1 shadow-md rounded-lg border border-stone-900"
+              className="w-20 h-[104px] bg-amber-50 p-1 shadow-md rounded-lg border border-stone-900"
               style={{ borderRadius: '0.5rem' }}
             >
               <div className="w-full h-full flex flex-col relative px-0.5 pt-0 pb-1">
