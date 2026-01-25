@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Card } from './Card';
 import { Pile } from './Pile';
 import { Card as CardType } from '../../lib/solitaire/types';
-import { useSolitaire } from '../../lib/stores/useSolitaire';
+import { useSolitaire, wasUndoJustCompleted } from '../../lib/stores/useSolitaire';
 import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 import { useTouchDrag } from '../../hooks/useTouchDrag';
 import { cardHasKey } from '../../lib/liveops/keyManager';
@@ -167,11 +167,11 @@ export function WastePile({ cards }: WastePileProps) {
 
     console.log('🎯 WastePile: Card clicked', topCard);
 
-    // Special case: Aces always go to foundation immediately
-    if (topCard.rank === 'A') {
+    // Special case: Aces and 2s always go to foundation immediately (no point putting them on tableau)
+    if (topCard.rank === 'A' || topCard.rank === '2') {
       const foundationSuit = canAutoMoveToFoundation(topCard);
       if (foundationSuit) {
-        console.log('✅ WastePile: Ace moving to foundation', foundationSuit);
+        console.log(`✅ WastePile: ${topCard.rank} moving to foundation`, foundationSuit);
         const startElement = cardRef.current;
         const endElement = document.querySelector(`[data-foundation-pile="${foundationSuit}"]`) as HTMLElement;
         autoMoveToFoundation(topCard, foundationSuit, startElement || undefined, endElement || undefined);
@@ -205,7 +205,7 @@ export function WastePile({ cards }: WastePileProps) {
     // No valid moves found - shake the card
     console.log(`⚠️ No valid moves for ${topCard.suit}-${topCard.rank}`);
     setIsShaking(true);
-    setTimeout(() => setIsShaking(false), 400);
+    setTimeout(() => setIsShaking(false), 300);
   };
 
   const handleDragStart = (e: React.DragEvent) => {
@@ -270,6 +270,10 @@ export function WastePile({ cards }: WastePileProps) {
   const prevCardIdsRef = useRef<Set<string>>(new Set());
   const currentCardIds = new Set(visibleCards.map(c => c.id));
   
+  // Check if undo animation is in progress OR just completed (disable transitions to prevent flickering)
+  const isUndoAnimating = animatingCard?.isUndoAnimation === true;
+  const disableTransitions = isUndoAnimating || wasUndoJustCompleted();
+  
   // Update after render
   useEffect(() => {
     prevCardIdsRef.current = currentCardIds;
@@ -290,7 +294,8 @@ export function WastePile({ cards }: WastePileProps) {
       }}
     >
       {/* Render 4th card at position 0 for 150ms while other cards shift */}
-      {shouldShowFourthCard && fourthCard && (
+      {/* Don't show 4th card during undo or when cards just changed to prevent flickering */}
+      {shouldShowFourthCard && fourthCard && !disableTransitions && (
         <div
           key={`fourth-${fourthCard.id}`}
           style={{
@@ -336,7 +341,8 @@ export function WastePile({ cards }: WastePileProps) {
               top: 0,
               zIndex: index,
               // Only apply transition to cards that are shifting, not new ones
-              transition: wasAlreadyVisible ? 'left 0.15s linear' : 'none',
+              // Disable transition during undo or when cards just changed to prevent flickering
+              transition: (wasAlreadyVisible && !disableTransitions) ? 'left 0.15s linear' : 'none',
               // Hide if being dragged or animating (but not stock animation - that's handled above)
               opacity: (shouldHideTop && !isStockAnimating) ? 0 : 1
             }}

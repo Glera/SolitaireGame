@@ -51,14 +51,13 @@ export function useGameScale(): GameDimensions {
       // - Tableau: Account for maximum possible stack
       //   - First card: 104px (full card)
       //   - Maximum stack: 19 cards (6 face-down + 13 face-up), but compressed
-      //   - With 50% compression: face-up offset 26px, face-down 6px
-      //   - Worst case: 6*6 + 12*26 = 36 + 312 = 348px + 104 = 452px for tableau
+      //   - With reduced spacing and 65% compression for worst case
       const isMobile = containerWidth <= 768;
       const CARD_HEIGHT = 104;
       // Minimum readable offset at 65% compression (must match stackCompression.ts)
-      // Mobile: 45px * 0.65 = 29px, Desktop: 41px * 0.65 = 27px
-      const MIN_FACE_UP_OFFSET = isMobile ? 29 : 27;
-      const MIN_FACE_DOWN_OFFSET = 8;  // 13px * 0.65 ≈ 8px
+      // Mobile: 36px * 0.65 = 23px, Desktop: 33px * 0.65 = 21px
+      const MIN_FACE_UP_OFFSET = isMobile ? 23 : 21;
+      const MIN_FACE_DOWN_OFFSET = isMobile ? 6 : 5;  // 10px/8px * 0.65
       const MAX_FACE_DOWN = 6;  // Maximum face-down cards in a column
       const MAX_FACE_UP = 13;   // Maximum face-up cards (full suit)
       const TOP_ROW_HEIGHT = CARD_HEIGHT + 12; // Top row + gap = 124px

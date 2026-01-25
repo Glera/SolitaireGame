@@ -25,7 +25,9 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
     sourceFoundation,
     endDrag,
     animatingCard,
-    setShowDragPreview
+    setShowDragPreview,
+    findTableauPlacementForCard,
+    moveFoundationToTableau
   } = useSolitaire();
   
   const cardRef = useRef<HTMLDivElement>(null);
@@ -110,10 +112,12 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   const secondCard = cards && cards.length > 1 ? cards[cards.length - 2] : null;
   
   // Check if a card is flying TO this foundation (to show it early and avoid flicker)
+  // Exclude undo animations - those cards are flying AWAY from foundation, not to it
   const incomingCard = animatingCard && 
     animatingCard.targetSuit === suit && 
     !animatingCard.isReturnAnimation &&
-    !animatingCard.isTableauMove
+    !animatingCard.isTableauMove &&
+    !animatingCard.isUndoAnimation
       ? animatingCard.card 
       : null;
   
@@ -163,6 +167,11 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
       return false;
     }
     
+    // For undo animations (card flying back from foundation), always hide
+    if (animatingCard.isUndoAnimation) {
+      return true;
+    }
+    
     // For normal moves, keep card hidden until animation FULLY completes
     // (card will appear in the NEW location, not the old one)
     return true;
@@ -171,8 +180,13 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   const handleCardClick = () => {
     if (!topCard) return;
     
-    // Foundation cards usually don't auto-move, but we can try
-    // For clicks without drag, don't start drag state
+    // Check if there's a valid tableau placement for this card
+    const targetColumn = findTableauPlacementForCard(topCard);
+    if (targetColumn !== null) {
+      // Move card from foundation back to tableau
+      const startElement = cardRef.current;
+      moveFoundationToTableau(topCard, suit, startElement || undefined);
+    }
   };
   
   const handleDragStart = (e: React.DragEvent) => {

@@ -22,8 +22,12 @@ export const CARD_POINTS: Record<Rank, number> = {
 // Total: 76+84+92+100+108+116+124+132+140+148+156+164+172 = 1512
 // Perfect! Just 12 points over 1500, which is acceptable
 
-// Set to track cards that have already been scored
+// Set to track cards that have already been scored (for level up / floating scores)
 const scoredCards = new Set<string>();
+
+// Separate set for event scoring (collection event points)
+// This is needed because calculateCardPoints and triggerCardToFoundation are called at different times
+const eventScoredCards = new Set<string>();
 
 /**
  * Calculate points for a card moved to foundation
@@ -84,6 +88,7 @@ export function calculateCardPointsRaw(card: Card): number {
  */
 export function resetScoredCards(): void {
   scoredCards.clear();
+  eventScoredCards.clear();
   console.log('🔄 Scored cards reset for new game');
 }
 
@@ -99,4 +104,24 @@ export function getScoredCardsCount(): number {
  */
 export function isCardScored(cardId: string): boolean {
   return scoredCards.has(cardId);
+}
+
+/**
+ * Check if a card has already earned event points (for collection event)
+ * Uses separate tracking from level-up scoring
+ */
+export function isCardEventScored(cardId: string): boolean {
+  return eventScoredCards.has(cardId);
+}
+
+/**
+ * Mark a card as having earned event points
+ * Returns true if card was newly marked, false if already marked
+ */
+export function markCardEventScored(cardId: string): boolean {
+  if (eventScoredCards.has(cardId)) {
+    return false;
+  }
+  eventScoredCards.add(cardId);
+  return true;
 }

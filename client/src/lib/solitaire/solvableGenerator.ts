@@ -842,8 +842,8 @@ function generateGuaranteedSolvableLayout(): GameState {
       }
     });
     
-    // Decide how many aces to place on top (1-2, more natural)
-    const acesOnTop = 1 + Math.floor(Math.random() * 2); // 1 or 2 aces visible
+    // Decide how many aces to place on top (2-3, higher win rate)
+    const acesOnTop = 2 + Math.floor(Math.random() * 2); // 2 or 3 aces visible
     
     // Build tableau
     const tableau: Card[][] = [[], [], [], [], [], [], []];
@@ -862,8 +862,8 @@ function generateGuaranteedSolvableLayout(): GameState {
       faceDownPool.push(aces[i]);
     }
     
-    // Add some twos/threes to face-up pool (not all)
-    const twosForFaceUp = Math.floor(Math.random() * 2) + 1; // 1-2 twos visible
+    // Add some twos/threes to face-up pool (more for higher win rate)
+    const twosForFaceUp = Math.floor(Math.random() * 2) + 2; // 2-3 twos visible
     for (let i = 0; i < twosForFaceUp && i < twos.length; i++) {
       faceUpPool.push(twos[i]);
     }
@@ -871,8 +871,8 @@ function generateGuaranteedSolvableLayout(): GameState {
       faceDownPool.push(twos[i]);
     }
     
-    // Add some threes
-    const threesForFaceUp = Math.floor(Math.random() * 2); // 0-1 threes visible
+    // Add some threes (more for higher win rate)
+    const threesForFaceUp = Math.floor(Math.random() * 2) + 1; // 1-2 threes visible
     for (let i = 0; i < threesForFaceUp && i < threes.length; i++) {
       faceUpPool.push(threes[i]);
     }
@@ -974,9 +974,9 @@ function generateGuaranteedSolvableLayout(): GameState {
     
     const stock = orderedStock.map(c => ({ ...c, faceUp: false }));
     
-    // Check solvability - require at least 90% completion (more flexible)
+    // Check solvability - require at least 85% completion (more forgiving for higher win rate)
     const solveResult = checkSolvabilityFlexible(tableau, stock);
-    if (solveResult.solved >= 48) { // At least 48 out of 52 cards (92%)
+    if (solveResult.solved >= 44) { // At least 44 out of 52 cards (85%)
       // Score this layout - prefer more natural distributions
       let score = solveResult.solved * 2;
       
@@ -986,11 +986,11 @@ function generateGuaranteedSolvableLayout(): GameState {
         return count + (top?.rank === 'A' ? 1 : 0);
       }, 0);
       
-      // Penalty for too many visible aces (unnatural)
-      if (visibleAces >= 4) score -= 50;
-      if (visibleAces >= 3) score -= 20;
-      // Bonus for 1-2 aces (natural)
-      if (visibleAces === 1 || visibleAces === 2) score += 30;
+      // Penalty for all 4 aces visible (too obvious)
+      if (visibleAces >= 4) score -= 30;
+      // Bonus for 2-3 aces (good balance of win rate and naturalness)
+      if (visibleAces === 2 || visibleAces === 3) score += 30;
+      if (visibleAces === 1) score += 10; // Still acceptable but less preferred
       
       // Bonus for some variety in top cards
       const topRanks = new Set(tableau.map(col => col[col.length - 1]?.rank).filter(Boolean));
@@ -1042,9 +1042,9 @@ function checkSolvabilityFlexible(tableau: Card[][], stock: Card[]): { solved: n
     hearts: [], diamonds: [], clubs: [], spades: []
   };
   
-  const maxIterations = 2000;
+  const maxIterations = 3000;
   let iterations = 0;
-  const maxStockCycles = 5;
+  const maxStockCycles = 8; // More cycles to find solutions
   let stockCycles = 0;
   
   while (iterations < maxIterations) {

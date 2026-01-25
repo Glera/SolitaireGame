@@ -83,6 +83,7 @@ import {
   resetPointsEvent,
   generatePackItems,
   getProgressToNextReward,
+  getRewardAtIndex,
   PackItem,
   PackRarity,
   COLLECTION_PACKS,
@@ -222,17 +223,13 @@ function FlyingRewardToMiniature({
     
     const targetRect = targetRef.current?.getBoundingClientRect();
     // Calculate target position based on container and miniature index
-    // Each miniature is ~20px wide + 4px gap, height ~20px + 4px gap
-    // Container maxWidth is 80px, so ~3 items per row
-    const miniatureWidth = 20;
-    const miniatureHeight = 20;
+    // Each miniature is 36x48 + 4px gap (same size as on event button)
+    const miniatureWidth = 36;
+    const miniatureHeight = 48;
     const gap = 4;
-    const containerMaxWidth = 80;
-    const itemsPerRow = Math.floor(containerMaxWidth / (miniatureWidth + gap));
     
-    // Calculate row and column for this miniature
-    const col = pendingIndex % itemsPerRow;
-    const row = Math.floor(pendingIndex / itemsPerRow);
+    // Miniatures are displayed in a single row (max 4 visible)
+    const col = Math.min(pendingIndex, 3); // Max index 3 (4 items)
     
     let targetX: number;
     let targetY: number;
@@ -240,7 +237,7 @@ function FlyingRewardToMiniature({
     if (targetRect) {
       // Calculate position within the container for this miniature
       targetX = targetRect.left + (col * (miniatureWidth + gap)) + miniatureWidth / 2;
-      targetY = targetRect.top + (row * (miniatureHeight + gap)) + miniatureHeight / 2;
+      targetY = targetRect.top + miniatureHeight / 2;
     } else {
       // Fallback - below the start position
       targetX = reward.startX;
@@ -348,7 +345,9 @@ export function GameBoard() {
     clearHint,
     isDealing,
     isAutoCollecting,
-    collectAllAvailable
+    collectAllAvailable,
+    canUndo,
+    undo
   } = useSolitaire();
   
   const { playSuccess } = useAudio();
@@ -383,7 +382,7 @@ export function GameBoard() {
   useEffect(() => {
     // Guard against saving NaN
     if (typeof totalStars === 'number' && !isNaN(totalStars)) {
-      localStorage.setItem('solitaire_total_stars', totalStars.toString());
+    localStorage.setItem('solitaire_total_stars', totalStars.toString());
     }
   }, [totalStars]);
   
@@ -637,8 +636,14 @@ export function GameBoard() {
   // Points Event LiveOps state
   const [pointsEventState, setPointsEventState] = useState<PointsEventState>(() => getPointsEventState());
   const [pointsEventPulse, setPointsEventPulse] = useState(false);
-  const [pendingPackReward, setPendingPackReward] = useState<{ rarity: PackRarity; items: PackItem[]; sourcePosition?: { x: number; y: number } } | null>(null);
+  const [rewardIconAnimating, setRewardIconAnimating] = useState(false); // Track when reward icon is flying away
+  const [nextRewardDropping, setNextRewardDropping] = useState(false); // Track when next reward is dropping in
+  const [animatingRewardIndex, setAnimatingRewardIndex] = useState<number | null>(null); // Index of reward being animated away
+  // Queue for pack rewards - allows multiple packs to be queued from rapid chest clicks
+  const [packRewardsQueue, setPackRewardsQueue] = useState<Array<{ rarity: PackRarity; items: PackItem[]; sourcePosition?: { x: number; y: number } }>>([]);
   const [showPackPopup, setShowPackPopup] = useState(false);
+  // Current pack being shown (first item from queue)
+  const currentPackReward = packRewardsQueue[0] || null;
   const [autoClaimingRewards, setAutoClaimingRewards] = useState(false); // Track if we're auto-claiming after win
   const autoClaimingRewardsRef = useRef(false); // Ref to avoid stale closure
   const isClaimingRewardRef = useRef(false); // Prevent double claiming
@@ -752,26 +757,22 @@ export function GameBoard() {
   }, []);
   
   // Distribute keys when game starts (after dealing animation completes)
+  // Keys are only placed on tableau cards, not on stock/waste pile
   useEffect(() => {
     if (!treasureHuntEvent.active) return;
     if (isDealing) return; // Wait for dealing to complete
     
-    // Get face-down cards from tableau (preferred for keys)
+    // Get face-down cards from tableau only (preferred for keys)
     const faceDownCards = tableau
       .flat()
       .filter(c => !c.faceUp)
       .map(c => c.id);
     
-    // Get face-up cards from tableau
+    // Get face-up cards from tableau only
     const faceUpCards = tableau
       .flat()
       .filter(c => c.faceUp)
       .map(c => c.id);
-    
-    // Also include waste pile top card as face-up
-    if (waste.length > 0) {
-      faceUpCards.push(waste[waste.length - 1].id);
-    }
     
     distributeKeys(faceDownCards, faceUpCards, treasureHuntEvent.active);
   }, [treasureHuntEvent.active, isDealing]);
@@ -1222,9 +1223,9 @@ export function GameBoard() {
     if (!rewardedCollections.has(collectionId)) {
       setNewItemsInCollections(prev => new Set(Array.from(prev).concat(collectionId)));
       setNewItemIds(prev => new Set(Array.from(prev).concat(itemId)));
-      
-      // Show notification on button
-      setHasNewCollectionItem(true);
+    
+    // Show notification on button
+    setHasNewCollectionItem(true);
     }
     setCollectionButtonPulse(true);
     setTimeout(() => setCollectionButtonPulse(false), 150);
@@ -1283,6 +1284,12 @@ export function GameBoard() {
             if (iconRect) {
               const earnResult = earnReward();
               if (earnResult) {
+                // Store the reward index we're animating away BEFORE updating state
+                setAnimatingRewardIndex(earnResult.reward.rewardIndex);
+                
+                // Start reward icon flying animation
+                setRewardIconAnimating(true);
+                
                 // Update state with new pending reward
                 setPointsEventState({ ...earnResult.state });
                 
@@ -1299,6 +1306,14 @@ export function GameBoard() {
                   startY: iconRect.top + iconRect.height / 2,
                   pendingIndex: newIndex,
                 });
+                
+                // After icon flies away, drop the next reward
+                setTimeout(() => {
+                  setRewardIconAnimating(false);
+                  setAnimatingRewardIndex(null);
+                  setNextRewardDropping(true);
+                  setTimeout(() => setNextRewardDropping(false), 300);
+                }, 400);
               } else {
                 // earnReward failed, reset the flag
                 isEarningRewardRef.current = false;
@@ -1510,24 +1525,21 @@ export function GameBoard() {
     const reward = claimResult.reward;
     
     // Get position from the last miniature (which was just claimed)
-    // Each miniature is ~20px wide + 4px gap, container is 80px wide, ~3 items per row
+    // Each miniature is 36x48 + 4px gap (same size as on event button)
     const containerRect = miniatureContainerRef.current?.getBoundingClientRect();
-    const miniatureWidth = 20;
-    const miniatureHeight = 20;
+    const miniatureWidth = 36;
+    const miniatureHeight = 48;
     const gap = 4;
-    const containerMaxWidth = 80;
-    const itemsPerRow = Math.floor(containerMaxWidth / (miniatureWidth + gap));
-    const lastIndex = pendingCount - 1;
+    const lastIndex = Math.min(pendingCount - 1, 3); // Max 4 visible
     
-    // Calculate row and column for the last miniature
-    const col = lastIndex % itemsPerRow;
-    const row = Math.floor(lastIndex / itemsPerRow);
+    // Miniatures are in a single row
+    const col = lastIndex;
     
     const startX = containerRect 
       ? containerRect.left + (col * (miniatureWidth + gap)) + miniatureWidth / 2
       : window.innerWidth - 100;
     const startY = containerRect 
-      ? containerRect.top + (row * (miniatureHeight + gap)) + miniatureHeight / 2 
+      ? containerRect.top + miniatureHeight / 2 
       : 150;
     
     if (reward.type === 'stars' && reward.stars) {
@@ -1552,10 +1564,10 @@ export function GameBoard() {
         }
       }, 1650); // Wait for star animation to fully complete
     } else if (reward.type === 'pack' && reward.packRarity) {
-      // Generate pack items and show pack popup
+      // Generate pack items and add to queue
       const items = generatePackItems(reward.packRarity, collections);
       // Pass source position so pack icon flies from miniature to center
-      setPendingPackReward({ rarity: reward.packRarity, items, sourcePosition: { x: startX, y: startY } });
+      setPackRewardsQueue(prev => [...prev, { rarity: reward.packRarity!, items, sourcePosition: { x: startX, y: startY } }]);
       setTimeout(() => {
         isClaimingRewardRef.current = false; // Reset flag before showing popup
         setShowPackPopup(true);
@@ -1610,6 +1622,10 @@ export function GameBoard() {
     
     // If all quests were already done, skip the daily quests screen
     if (allAlreadyCompleted) {
+      // Check if leaderboard should be shown first, then proceed to collections
+      if (tryShowLeaderboard(proceedToCollectionsOrNewGame)) {
+        return; // Leaderboard will call proceedToCollectionsOrNewGame when closed
+      }
       // Check for unrewarded collections before starting new game
       proceedToCollectionsOrNewGame();
       return;
@@ -1669,8 +1685,17 @@ export function GameBoard() {
   };
   
   // Try to show leaderboard if position improved, returns true if shown
+  // IMPORTANT: Only show leaderboard if unlock popup was already shown (user knows about the feature)
   const tryShowLeaderboard = (onAfterLeaderboard?: () => void): boolean => {
     if (pendingLeaderboardShow) {
+      // Don't show leaderboard popup before the unlock/promo popup was shown
+      // User should first learn about the feature, then see tournament results
+      if (!leaderboardUnlockShown) {
+        console.log('📊 Leaderboard popup pending, but unlock popup not yet shown - waiting');
+        // Keep pendingLeaderboardShow true, it will be shown after unlock popup
+        return false;
+      }
+      
       setPendingLeaderboardShow(false);
       setShowLeaderboard(true);
       // Store callback for after leaderboard closes
@@ -1809,6 +1834,25 @@ export function GameBoard() {
     setLeaderboardUnlockShown(true);
     localStorage.setItem('solitaire_leaderboard_unlock_shown', 'true');
     setPendingLeaderboardUnlock(false);
+    
+    // Now that unlock popup is shown, check if leaderboard popup is pending
+    // (user improved position and should see the tournament results)
+    if (pendingLeaderboardShow) {
+      setPendingLeaderboardShow(false);
+      setShowLeaderboard(true);
+      // After leaderboard closes, continue the flow
+      pendingAfterLeaderboardRef.current = () => {
+        // Continue with the rest of the flow
+        if (tryShowDailyReward()) return;
+        if (pendingPromoUnlock) { setShowPromoUnlock(true); return; }
+        if (pendingTreasureHuntPromo) { setShowTreasureHuntPromo(true); return; }
+        clearNoMoves();
+        setShowNewGameButton(false);
+        setNoMovesShownOnce(false);
+        newGame('solvable');
+      };
+      return;
+    }
     
     // Continue the flow - check daily reward
     if (tryShowDailyReward()) {
@@ -2035,7 +2079,7 @@ export function GameBoard() {
     // Reset Points Event
     const newPointsState = resetPointsEvent();
     setPointsEventState(newPointsState);
-    setPendingPackReward(null);
+    setPackRewardsQueue([]);
     setShowPackPopup(false);
     
     // Reset leaderboard state - create fresh leaderboard with low-star players
@@ -2125,7 +2169,7 @@ export function GameBoard() {
     // If there's a pack, show pack popup
     if (item.packRarity && item.packRarity > 0) {
       const packItems = generatePackItems(item.packRarity as PackRarity, collections);
-      setPendingPackReward({ rarity: item.packRarity as PackRarity, items: packItems });
+      setPackRewardsQueue(prev => [...prev, { rarity: item.packRarity as PackRarity, items: packItems }]);
       setShowPackPopup(true);
     }
   };
@@ -2409,7 +2453,7 @@ export function GameBoard() {
         }}>
           {/* Placeholder for Donation Progress Bar - maintains layout spacing */}
           {/* Actual DonationProgress is rendered via portal at the end of the component */}
-          <div style={{
+          <div style={{ 
             width: '584px', 
             height: '65px',
             marginBottom: '0px'
@@ -2445,28 +2489,28 @@ export function GameBoard() {
               {collectionsUnlocked && (
                 <svg 
                   className="absolute pointer-events-none"
-                  style={{ width: '62px', height: '62px', transform: 'rotate(-90deg)', left: '-5px', top: '-5px' }}
+                  style={{ width: '74px', height: '74px', transform: 'rotate(-90deg)', left: '-6px', top: '-6px' }}
                 >
                   {/* Background circle */}
                   <circle
-                    cx="31"
-                    cy="31"
-                    r="27"
+                    cx="37"
+                    cy="37"
+                    r="33"
                     fill="none"
                     stroke="rgba(0,0,0,0.4)"
                     strokeWidth="5"
                   />
                   {/* Progress circle */}
                   <circle
-                    cx="31"
-                    cy="31"
-                    r="27"
+                    cx="37"
+                    cy="37"
+                    r="33"
                     fill="none"
                     stroke="url(#progressGradient)"
                     strokeWidth="5"
                     strokeLinecap="round"
-                    strokeDasharray={`${2 * Math.PI * 27}`}
-                    strokeDashoffset={`${2 * Math.PI * 27 * (1 - getProgressToNextReward(pointsEventState) / 100)}`}
+                    strokeDasharray={`${2 * Math.PI * 33}`}
+                    strokeDashoffset={`${2 * Math.PI * 33 * (1 - getProgressToNextReward(pointsEventState) / 100)}`}
                     style={{ transition: 'stroke-dashoffset 0.3s ease-out' }}
                   />
                   <defs>
@@ -2478,10 +2522,10 @@ export function GameBoard() {
                 </svg>
               )}
               <div
-                className="relative flex items-center justify-center rounded-full"
+                className="relative flex items-center justify-center rounded-full overflow-visible"
                 style={{
-                  width: '52px',
-                  height: '52px',
+                  width: '62px',
+                  height: '62px',
                   background: collectionsUnlocked 
                     ? 'linear-gradient(135deg, #1e3a5f 0%, #0f2744 100%)'
                     : 'linear-gradient(135deg, #4b5563 0%, #374151 100%)',
@@ -2490,18 +2534,98 @@ export function GameBoard() {
                   pointerEvents: 'auto',
                 }}
               >
-                <span 
-                  className={`text-2xl transition-transform duration-150 ${pointsEventPulse ? 'scale-125' : 'scale-100'}`}
-                  style={{ 
-                    filter: collectionsUnlocked ? 'none' : 'grayscale(0.5) brightness(0.7)',
-                  }}
-                >📦</span>
+                {/* Dynamic reward icon based on next reward */}
+                {(() => {
+                  // Use animating index during animation, otherwise current index
+                  const displayIndex = animatingRewardIndex ?? pointsEventState.currentRewardIndex;
+                  const currentReward = getRewardAtIndex(displayIndex);
+                  const isStars = currentReward.type === 'stars';
+                  const packRarity = currentReward.packRarity || 1;
+                  const packColors: Record<number, string> = {
+                    1: '#9ca3af', // gray
+                    2: '#22c55e', // green
+                    3: '#3b82f6', // blue
+                    4: '#a855f7', // purple
+                    5: '#ef4444', // red/gold
+                  };
+                  
+                  // Get next reward for drop animation
+                  const nextReward = getRewardAtIndex(pointsEventState.currentRewardIndex);
+                  const nextIsStars = nextReward.type === 'stars';
+                  const nextPackRarity = nextReward.packRarity || 1;
+                  
+                  return (
+                    <div className="relative" style={{ width: '40px', height: '40px' }}>
+                      {/* Current reward icon - hidden when flying copy is animating to miniature */}
+                      {!nextRewardDropping && !rewardIconAnimating && (
+                        <div 
+                          className="absolute inset-0 flex items-center justify-center"
+                          style={{ 
+                            filter: collectionsUnlocked ? 'none' : 'grayscale(0.5) brightness(0.7)',
+                          }}
+                        >
+                          {isStars ? (
+                            <div className="relative">
+                              <span 
+                                className={`text-2xl transition-transform duration-150 inline-block ${pointsEventPulse ? 'scale-125' : 'scale-100'}`}
+                              >
+                                ⭐
+                              </span>
+                              <span 
+                                className="absolute text-sm font-bold text-yellow-400"
+                                style={{ right: '-7px', bottom: '-7px', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
+                              >
+                                {currentReward.stars}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className={`transition-transform duration-150 inline-block ${pointsEventPulse ? 'scale-110' : 'scale-100'}`}>
+                              <MiniCardPack 
+                                color={COLLECTION_PACKS[packRarity as 1|2|3|4|5]?.color || '#9ca3af'} 
+                                stars={packRarity} 
+                                size={32} 
+                              />
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Next reward dropping from above into button */}
+                      {nextRewardDropping && (
+                        <div 
+                          className="absolute inset-0 flex items-center justify-center"
+                          style={{
+                            animation: 'rewardDrop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+                          }}
+                        >
+                          {nextIsStars ? (
+                            <div className="relative">
+                              <span className="text-2xl">⭐</span>
+                              <span 
+                                className="absolute text-sm font-bold text-yellow-400"
+                                style={{ right: '-7px', bottom: '-7px', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
+                              >
+                                {nextReward.stars}
+                              </span>
+                            </div>
+                          ) : (
+                            <MiniCardPack 
+                              color={COLLECTION_PACKS[nextPackRarity as 1|2|3|4|5]?.color || '#9ca3af'} 
+                              stars={nextPackRarity} 
+                              size={32} 
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 {!collectionsUnlocked && (
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {COLLECTIONS_REQUIRED_LEVEL}</span>
+                  <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {COLLECTIONS_REQUIRED_LEVEL}</span>
                 )}
               </div>
-            </div>
-            
+          </div>
+          
             {/* Treasure Hunt - compact circle */}
             {(treasureHuntEvent.active || !isEventAvailable(playerLevel)) && (
               <div ref={treasureHuntIconRef} style={{ zIndex: 20 }}>
@@ -2509,8 +2633,8 @@ export function GameBoard() {
                   onClick={() => setShowTreasureHunt(true)}
                   className="relative flex items-center justify-center rounded-full transition-all duration-150 cursor-pointer hover:scale-110"
                   style={{
-                    width: '52px',
-                    height: '52px',
+                    width: '62px',
+                    height: '62px',
                     background: isEventAvailable(playerLevel)
                       ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
                       : 'linear-gradient(135deg, #4b5563 0%, #374151 100%)',
@@ -2522,7 +2646,7 @@ export function GameBoard() {
                     pointerEvents: 'auto',
                   }}
                 >
-                  <span className="text-2xl" style={{ 
+                  <span className="text-3xl" style={{ 
                     filter: isEventAvailable(playerLevel) ? 'none' : 'grayscale(0.5) brightness(0.7)',
                   }}>🎁</span>
                   {isEventAvailable(playerLevel) && treasureHuntEvent.keys > 0 && (
@@ -2531,7 +2655,7 @@ export function GameBoard() {
                     </div>
                   )}
                   {!isEventAvailable(playerLevel) && (
-                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {getRequiredLevel()}</span>
+                    <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {getRequiredLevel()}</span>
                   )}
                 </button>
               </div>
@@ -2567,15 +2691,15 @@ export function GameBoard() {
                 className="flex items-center gap-1 ml-1"
                 style={{ zIndex: 20 }}
               >
-                {pointsEventState.pendingRewards.slice(0, 6).map((reward) => {
+                {pointsEventState.pendingRewards.slice(0, 4).map((reward) => {
                   const isFlying = flyingRewardToMiniature?.id === reward.id;
                   return (
                     <div
                       key={reward.id}
                       className="flex items-center justify-center"
                       style={{ 
-                        width: '24px', 
-                        height: '24px',
+                        width: '36px', 
+                        height: '48px',
                         opacity: isFlying ? 0 : 1,
                       }}
                     >
@@ -2583,16 +2707,16 @@ export function GameBoard() {
                         <MiniCardPack 
                           color={COLLECTION_PACKS[reward.packRarity].color} 
                           stars={reward.packRarity} 
-                          size={18} 
+                          size={29} 
                         />
                       ) : (
-                        <span className="text-sm">⭐</span>
+                        <span className="text-2xl">⭐</span>
                       )}
                     </div>
                   );
                 })}
-                {pointsEventState.pendingRewards.length > 6 && (
-                  <span className="text-xs text-white/70 font-bold">+{pointsEventState.pendingRewards.length - 6}</span>
+                {pointsEventState.pendingRewards.length > 4 && (
+                  <span className="text-xs text-white/70 font-bold">+{pointsEventState.pendingRewards.length - 4}</span>
                 )}
               </div>
             )}
@@ -2600,11 +2724,11 @@ export function GameBoard() {
           
           {/* Game field container - no side panels */}
           <div 
-              className="inline-block space-y-3" 
-              data-game-field 
-              style={{ 
-            position: 'relative',
-                zIndex: 2,
+            className="inline-block space-y-3" 
+            data-game-field 
+            style={{ 
+              position: 'relative', 
+              zIndex: 2,
                 visibility: (showDailyQuests || showCollections) ? 'hidden' : 'visible',
                 pointerEvents: 'auto',
                 userSelect: 'none',
@@ -2654,21 +2778,21 @@ export function GameBoard() {
               }}
             />
             {/* Top row: Foundation piles on LEFT, Stock and Waste on RIGHT - optimized for right-handed mobile users */}
-              <div className="flex gap-1 items-start justify-between" style={{ width: '584px' }}>
-                <div className="flex gap-1">
-              {foundationRenderOrder.map((suit) => (
-                <FoundationPile 
-                  key={suit}
-                  cards={foundations[suit]} 
-                  suit={suit} 
-                  id={`foundation-${suit}`} 
-                />
-              ))}
-                </div>
+            <div className="flex gap-1 items-start justify-between" style={{ width: '584px' }}>
+              <div className="flex gap-1">
+                {foundationRenderOrder.map((suit) => (
+                  <FoundationPile 
+                    key={suit}
+                    cards={foundations[suit]} 
+                    suit={suit} 
+                    id={`foundation-${suit}`} 
+                  />
+                ))}
+              </div>
                 <div className="flex gap-1" style={{ marginRight: '8px' }}>
-              <WastePile cards={waste} />
-              <StockPile cards={stock} />
-                </div>
+                <WastePile cards={waste} />
+                <StockPile cards={stock} />
+              </div>
             </div>
             
             {/* Bottom row: Tableau columns */}
@@ -2710,29 +2834,29 @@ export function GameBoard() {
       
       {/* Floating scores */}
       {floatingScores.map(score => (
-          <FloatingScore
-            key={score.id}
-            score={score.score}
-            x={score.x}
-            y={score.y}
-            breakdown={score.breakdown}
+        <FloatingScore
+          key={score.id}
+          score={score.score}
+          x={score.x}
+          y={score.y}
+          breakdown={score.breakdown}
           onComplete={() => removeFloatingScore(score.id)}
-          />
+        />
       ))}
       
       {/* Debug Panel */}
       {showDebugPanel && (
         <div style={{ position: 'fixed', zIndex: 1001 }}>
-          <DebugPopup 
-            info={debugInfo}
-            onClose={() => setShowDebugPanel(false)}
-            onResetDailyQuests={handleResetDailyQuests}
-            onResetStars={handleResetStars}
-            onResetCollections={handleResetCollections}
-            onResetXP={resetAllXP}
-            onResetAll={handleResetAll}
-            onNewGame={newGame}
-          />
+        <DebugPopup 
+          info={debugInfo} 
+          onClose={() => setShowDebugPanel(false)}
+          onResetDailyQuests={handleResetDailyQuests}
+          onResetStars={handleResetStars}
+          onResetCollections={handleResetCollections}
+          onResetXP={resetAllXP}
+          onResetAll={handleResetAll}
+          onNewGame={newGame}
+        />
         </div>
       )}
       
@@ -3208,24 +3332,29 @@ export function GameBoard() {
             launchTreasureStars(reward.stars, { x: startX, y: startY });
           }
           
-          // Handle pack rewards (new system)
+          // Handle pack rewards (new system) - add to queue for sequential display
           if ((reward.type === 'pack' || reward.type === 'big_win') && reward.packRarity) {
             console.log('📦 Pack reward detected, rarity:', reward.packRarity);
-            // Generate pack items and show popup
+            // Generate pack items and add to queue
             const packItems = generatePackItems(reward.packRarity, collections);
             console.log('📦 Generated pack items:', packItems);
-            // Pass chest position so pack flies from there
-            setPendingPackReward({ 
+            
+            const newPackReward = { 
               rarity: reward.packRarity, 
               items: packItems,
               sourcePosition: { x: startX, y: startY }
-            });
-            // Keep treasure hunt popup open - pack popup will appear on top
-            // Small delay for smooth transition (let stars fly first if any)
-            setTimeout(() => {
-              console.log('📦 Showing pack popup');
-              setShowPackPopup(true);
-            }, reward.stars ? 800 : 300);
+            };
+            
+            // Add to queue
+            setPackRewardsQueue(prev => [...prev, newPackReward]);
+            
+            // If popup not showing yet, show it after delay
+            if (!showPackPopup) {
+              setTimeout(() => {
+                console.log('📦 Showing pack popup');
+                setShowPackPopup(true);
+              }, reward.stars ? 800 : 300);
+            }
           }
         }}
         isLocked={!isEventAvailable(playerLevel)}
@@ -3242,24 +3371,40 @@ export function GameBoard() {
       {/* Collection Pack Popup */}
       <CollectionPackPopup
         isVisible={showPackPopup}
-        packRarity={pendingPackReward?.rarity || 1}
-        items={pendingPackReward?.items || []}
-        sourcePosition={pendingPackReward?.sourcePosition}
+        packRarity={currentPackReward?.rarity || 1}
+        items={currentPackReward?.items || []}
+        sourcePosition={currentPackReward?.sourcePosition}
         onClose={() => {
-          setShowPackPopup(false);
-          setPendingPackReward(null);
-          
-          // If we're in auto-claiming mode, try to claim next reward
-          if (autoClaimingRewardsRef.current) {
-            setTimeout(() => {
-              const hasMore = tryClaimPointsEventReward();
-              if (!hasMore) {
-                autoClaimingRewardsRef.current = false;
-                setAutoClaimingRewards(false);
-                proceedAfterPointsEventRewards();
+          // Remove current pack from queue
+          setPackRewardsQueue(prev => {
+            const newQueue = prev.slice(1);
+            console.log(`📦 Pack closed, ${newQueue.length} packs remaining in queue`);
+            
+            // If more packs in queue, keep popup open (will show next pack)
+            if (newQueue.length > 0) {
+              // Small delay before showing next pack
+              setTimeout(() => {
+                console.log('📦 Showing next pack from queue');
+              }, 300);
+            } else {
+              // No more packs - close popup
+              setShowPackPopup(false);
+              
+              // If we're in auto-claiming mode, try to claim next reward
+              if (autoClaimingRewardsRef.current) {
+                setTimeout(() => {
+                  const hasMore = tryClaimPointsEventReward();
+                  if (!hasMore) {
+                    autoClaimingRewardsRef.current = false;
+                    setAutoClaimingRewards(false);
+                    proceedAfterPointsEventRewards();
+                  }
+                }, 300);
               }
-            }, 300);
-          }
+            }
+            
+            return newQueue;
+          });
         }}
         onItemsCollected={(items) => {
           // Update collections with new items
@@ -3349,7 +3494,7 @@ export function GameBoard() {
                 clearNoMoves();
                 setShowNewGameButton(false);
                 setNoMovesShownOnce(false);
-                newGame('solvable');
+              newGame('solvable');
               };
               if (!tryShowLeaderboard(startNewGameFn)) {
                 startNewGameFn();
@@ -3456,8 +3601,8 @@ export function GameBoard() {
       {/* Single Donation Progress Bar - ALWAYS rendered via portal */}
       {ReactDOM.createPortal(
         <div 
-        style={{
-          position: 'fixed',
+          style={{ 
+            position: 'fixed',
             top: `${5 * scale}px`,
             left: '50%',
             transform: `translateX(-50%) scale(${scale})`,
@@ -3492,7 +3637,7 @@ export function GameBoard() {
        !showLeaderboard && !showTreasureHunt && !showTreasureHuntPromo && !showCollectionsUnlock && !showLockedCollectionsPopup &&
        !showLockedPointsEventPopup && !showLockedLeaderboardPopup && !showLeaderboardUnlock && !showPromoUnlock &&
        !showLevelUp && !showStreakPopup && !showDailyReward && (
-        <div className="fixed bottom-[49px] left-1/2 -translate-x-1/2 z-40 flex items-end gap-2 pb-0" style={{ paddingTop: '40px' }}>
+        <div className="fixed bottom-[49px] left-1/2 -translate-x-1/2 z-40 flex items-end gap-2 pb-0 pointer-events-none" style={{ paddingTop: '40px' }}>
           {/* New Game Button - shown when no moves available */}
           {showNewGameButton && (
             <button
@@ -3502,12 +3647,28 @@ export function GameBoard() {
                 setNoMovesShownOnce(false);
                 newGame('solvable');
               }}
-              className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-red-400 to-red-600 hover:from-red-300 hover:to-red-500 rounded-xl shadow-lg border-b-4 border-red-700 transition-all hover:scale-105 animate-pulse"
+              className="relative w-14 h-8 flex items-center justify-center bg-gradient-to-b from-red-400 to-red-600 hover:from-red-300 hover:to-red-500 rounded-xl shadow-lg border-b-4 border-red-700 transition-all hover:scale-105 animate-pulse pointer-events-auto"
               title="Новая раскладка"
             >
-              <span className="absolute -top-7 text-4xl" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>🔄</span>
+              <span className="absolute -top-9 text-[2.75rem]" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>🔄</span>
             </button>
           )}
+          
+          {/* Undo Button */}
+          <button
+            onClick={() => {
+              if (canUndo) undo();
+            }}
+            disabled={!canUndo}
+            className={`relative w-14 h-8 flex items-center justify-center rounded-xl shadow-lg border-b-4 transition-all pointer-events-auto ${
+              canUndo
+                ? 'bg-gradient-to-b from-slate-400 to-slate-500 hover:from-slate-300 hover:to-slate-400 border-slate-600 hover:scale-105'
+                : 'bg-gradient-to-b from-gray-400 to-gray-500 border-gray-600 opacity-40 cursor-not-allowed'
+            }`}
+            title="Отменить ход"
+          >
+            <span className={`absolute -top-9 text-[2.75rem] ${!canUndo ? 'opacity-40' : ''}`} style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>↩️</span>
+          </button>
           
           {/* Hint Button */}
           <button
@@ -3515,10 +3676,10 @@ export function GameBoard() {
               getHint();
               setTimeout(() => clearHint(), 350);
             }}
-            className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 rounded-xl shadow-lg border-b-4 border-amber-600 transition-all hover:scale-105"
+            className="relative w-14 h-8 flex items-center justify-center bg-gradient-to-b from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 rounded-xl shadow-lg border-b-4 border-amber-600 transition-all hover:scale-105 pointer-events-auto"
             title="Подсказка"
           >
-            <span className="absolute -top-7 text-4xl" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>💡</span>
+            <span className="absolute -top-9 text-[2.75rem]" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>💡</span>
           </button>
           
           {/* Daily Quests Button */}
@@ -3528,15 +3689,15 @@ export function GameBoard() {
               setDisplayedStars(actualTotal);
               setShowDailyQuests(true);
             }}
-            className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 rounded-xl shadow-lg border-b-4 border-purple-700 transition-all hover:scale-105"
+            className="relative w-14 h-8 flex items-center justify-center bg-gradient-to-b from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 rounded-xl shadow-lg border-b-4 border-purple-700 transition-all hover:scale-105 pointer-events-auto"
             title="Задания"
           >
-            <span className="absolute -top-7 text-4xl" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>📋</span>
+            <span className="absolute -top-9 text-[2.75rem]" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>📋</span>
             {(() => {
               const completed = dailyQuests.filter(q => q.completed).length;
               const total = dailyQuests.length;
               return (
-                <span className={`absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${completed === total ? 'bg-green-500 text-white' : 'bg-white text-gray-800'}`}>
+                <span className={`absolute top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${completed === total ? 'bg-green-500 text-white' : 'bg-white text-gray-800'}`}>
                   {completed}/{total}
                 </span>
               );
@@ -3550,12 +3711,12 @@ export function GameBoard() {
               setDisplayedStars(actualTotal);
               setShowShop(true);
             }}
-            className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 rounded-xl shadow-lg border-b-4 border-teal-700 transition-all hover:scale-105"
+            className="relative w-14 h-8 flex items-center justify-center bg-gradient-to-b from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 rounded-xl shadow-lg border-b-4 border-teal-700 transition-all hover:scale-105 pointer-events-auto"
             title="Магазин"
           >
-            <span className="absolute -top-7 text-4xl" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>🛒</span>
+            <span className="absolute -top-9 text-[2.75rem]" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>🛒</span>
             {isSubscribed && (
-              <span className="absolute -top-2 -right-1 text-lg drop-shadow-md">👑</span>
+              <span className="absolute -top-3 -right-1 text-lg drop-shadow-md">👑</span>
             )}
           </button>
           
@@ -3579,7 +3740,7 @@ export function GameBoard() {
               setCollectionsAfterWin(false);
               setShowCollections(true);
             }}
-            className={`relative w-12 h-7 flex items-center justify-center rounded-xl shadow-lg border-b-4 transition-all ${
+            className={`relative w-14 h-8 flex items-center justify-center rounded-xl shadow-lg border-b-4 transition-all pointer-events-auto ${
               collectionsUnlocked 
                 ? 'bg-gradient-to-b from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 border-orange-700 hover:scale-105' 
                 : 'bg-gradient-to-b from-gray-500 to-gray-600 border-gray-700 opacity-70'
@@ -3588,7 +3749,7 @@ export function GameBoard() {
             title={collectionsUnlocked ? 'Коллекции' : `Коллекции (LVL ${COLLECTIONS_REQUIRED_LEVEL})`}
           >
             {collectionsUnlocked ? (
-              <svg className="absolute -top-7" width="28" height="38" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>
+              <svg className="absolute -top-7" width="34" height="46" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>
                 {/* Pack background - purple/gold gradient for legendary feel */}
                 <rect x="0" y="0" width="36" height="48" rx="5" fill="url(#packGradient5)" />
                 <rect x="0" y="0" width="36" height="48" rx="5" fill="url(#packShine5)" />
@@ -3611,18 +3772,18 @@ export function GameBoard() {
                 </defs>
               </svg>
             ) : (
-              <svg className="absolute -top-7" width="28" height="38" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))', opacity: 0.5 }}>
+              <svg className="absolute -top-6" width="28" height="38" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))', opacity: 0.5 }}>
                 <rect x="0" y="0" width="36" height="48" rx="5" fill="#6b7280" />
                 <text x="18" y="20" textAnchor="middle" fontSize="8" fill="#9ca3af">★ ★ ★</text>
                 <text x="18" y="32" textAnchor="middle" fontSize="10" fill="#9ca3af">★ ★</text>
               </svg>
             )}
             {collectionsUnlocked ? (
-              <span className={`absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${completedCollectionsCount === collections.length ? 'bg-green-500 text-white' : 'bg-white text-gray-800'}`}>
-                {completedCollectionsCount}/{collections.length}
-              </span>
+              <span className={`absolute top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${completedCollectionsCount === collections.length ? 'bg-green-500 text-white' : 'bg-white text-gray-800'}`}>
+              {completedCollectionsCount}/{collections.length}
+            </span>
             ) : (
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {COLLECTIONS_REQUIRED_LEVEL}</span>
+              <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {COLLECTIONS_REQUIRED_LEVEL}</span>
             )}
             {collectionsUnlocked && hasNewCollectionItem && !allCollectionsRewarded && (
               <span className="absolute -top-2 -left-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md animate-bounce">!</span>
@@ -3644,35 +3805,35 @@ export function GameBoard() {
               setShowLeaderboard(true);
               setShowOvertakenNotification(false);
             }}
-            className={`relative w-12 h-7 flex items-center justify-center rounded-xl shadow-lg border-b-4 transition-all ${
+            className={`relative w-14 h-8 flex items-center justify-center rounded-xl shadow-lg border-b-4 transition-all pointer-events-auto ${
               leaderboardUnlocked 
                 ? `bg-gradient-to-b from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 border-blue-700 hover:scale-105 ${showOvertakenNotification ? 'animate-pulse ring-2 ring-red-500' : ''}`
                 : 'bg-gradient-to-b from-gray-500 to-gray-600 border-gray-700 opacity-70'
             }`}
             title={leaderboardUnlocked ? `Турнир ${leaderboardNewPosition}/20` : `Турнир (LVL ${LEADERBOARD_REQUIRED_LEVEL})`}
           >
-            <span className={`absolute -top-7 text-4xl ${leaderboardUnlocked ? '' : 'opacity-50'}`} style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>🏆</span>
+            <span className={`absolute -top-9 text-[2.75rem] ${leaderboardUnlocked ? '' : 'opacity-50'}`} style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>🏆</span>
             {leaderboardUnlocked ? (
               <>
-                <span className="absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold bg-white text-gray-800 shadow-md">
+                <span className="absolute top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold bg-white text-gray-800 shadow-md">
                   {leaderboardNewPosition}
                 </span>
                 {showOvertakenNotification && (
                   <span className="absolute -top-2 -left-1 flex h-5 w-5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 text-[10px] items-center justify-center shadow-md">⬇️</span>
-                  </span>
+              </span>
                 )}
               </>
             ) : (
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {LEADERBOARD_REQUIRED_LEVEL}</span>
+              <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {LEADERBOARD_REQUIRED_LEVEL}</span>
             )}
           </button>
           
           {/* Overtaken notification toast - positioned above the trophy icon */}
           {leaderboardUnlocked && showOvertakenNotification && (
             <div 
-              className="absolute -top-14 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-500/90 text-white text-xs px-3 py-1.5 rounded-lg shadow-lg"
+              className="absolute -top-[4.5rem] left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-500/90 text-white text-xs px-3 py-1.5 rounded-lg shadow-lg"
               style={{ animation: 'slideUp 0.3s ease-out' }}
             >
               😱 Вас обогнали!
@@ -3685,19 +3846,20 @@ export function GameBoard() {
       {/* Not clickable, just a target for flying collection items */}
       {showTreasureHunt && (
         <div className="fixed bottom-[49px] left-1/2 -translate-x-1/2 z-[60] flex items-end gap-2 pb-0 pointer-events-none" style={{ paddingTop: '40px' }}>
-          {/* Invisible spacers to match cushion button row layout */}
-          <div className="w-12 h-7 opacity-0"></div>
-          <div className="w-12 h-7 opacity-0"></div>
-          <div className="w-12 h-7 opacity-0"></div>
-          <div className="w-12 h-7 opacity-0"></div>
+          {/* Invisible spacers to match cushion button row layout (undo, hint, quests, shop, collections) */}
+          <div className="w-14 h-8 opacity-0"></div>
+          <div className="w-14 h-8 opacity-0"></div>
+          <div className="w-14 h-8 opacity-0"></div>
+          <div className="w-14 h-8 opacity-0"></div>
+          <div className="w-14 h-8 opacity-0"></div>
           {/* Actual visible Collections button */}
           <div
             ref={collectionsButtonRef}
             data-collections-button
-            className="relative w-12 h-7 flex items-center justify-center bg-gradient-to-b from-amber-500 to-orange-600 rounded-xl shadow-lg border-b-4 border-orange-700"
+            className="relative w-14 h-8 flex items-center justify-center bg-gradient-to-b from-amber-500 to-orange-600 rounded-xl shadow-lg border-b-4 border-orange-700"
             style={collectionButtonPulse ? { animation: 'collection-pop 0.15s ease-out' } : undefined}
           >
-            <svg className="absolute -top-7" width="28" height="38" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>
+            <svg className="absolute -top-8" width="34" height="46" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>
               <rect x="0" y="0" width="36" height="48" rx="5" fill="url(#packGradient5b)" />
               <rect x="0" y="0" width="36" height="48" rx="5" fill="url(#packShine5b)" />
               <text x="18" y="20" textAnchor="middle" fontSize="8" fill="#fbbf24" style={{ textShadow: '0 0 6px rgba(251, 191, 36, 1)' }}>★ ★ ★</text>
@@ -3716,14 +3878,14 @@ export function GameBoard() {
                 </linearGradient>
               </defs>
             </svg>
-            <span className={`absolute -top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${completedCollectionsCount === collections.length ? 'bg-green-500 text-white' : 'bg-white text-gray-800'}`}>
+            <span className={`absolute top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${completedCollectionsCount === collections.length ? 'bg-green-500 text-white' : 'bg-white text-gray-800'}`}>
               {completedCollectionsCount}/{collections.length}
             </span>
             {hasNewCollectionItem && !allCollectionsRewarded && (
               <span className="absolute -top-2 -left-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md">!</span>
             )}
           </div>
-          <div className="w-12 h-7 opacity-0"></div>
+          <div className="w-14 h-8 opacity-0"></div>
         </div>
       )}
       

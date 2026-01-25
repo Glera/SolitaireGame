@@ -128,7 +128,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       // No valid moves found - shake the card and all cards above it
       const cardsToShake = cards.slice(cardIndex).map(c => c.id);
       setShakingCardIds(cardsToShake);
-      setTimeout(() => setShakingCardIds([]), 400);
+      setTimeout(() => setShakingCardIds([]), 300);
       // Check if there are any moves at all
       setTimeout(() => useSolitaire.getState().checkForAvailableMoves(), 50);
     } else {
@@ -142,7 +142,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
         // No valid moves - shake the whole stack
         const cardsToShake = cards.slice(cardIndex).map(c => c.id);
         setShakingCardIds(cardsToShake);
-        setTimeout(() => setShakingCardIds([]), 400);
+        setTimeout(() => setShakingCardIds([]), 300);
         // Check if there are any moves at all
         setTimeout(() => useSolitaire.getState().checkForAvailableMoves(), 50);
       }
@@ -277,11 +277,22 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     const isInStack = animatingCard.stackCards && animatingCard.sourceTableauColumn === columnIndex &&
                       animatingCard.stackCards.some(stackCard => stackCard.id === card.id);
     
-    if (!isThisCard && !isInStack) return false;
+    // For undo animations, check if this card is being animated back
+    // The card is currently in this column and flying back to targetTableauColumn
+    const isUndoCard = animatingCard.isUndoAnimation && animatingCard.isTableauMove && 
+                       (animatingCard.card.id === card.id ||
+                        (animatingCard.stackCards && animatingCard.stackCards.some(sc => sc.id === card.id)));
+    
+    if (!isThisCard && !isInStack && !isUndoCard) return false;
     
     // For return animations, show cards when near complete (80%+) to avoid flicker
     if (animatingCard.isReturnAnimation && animatingCard.isNearComplete) {
       return false;
+    }
+    
+    // For undo animations, always hide the card being animated
+    if (animatingCard.isUndoAnimation) {
+      return true;
     }
     
     // For normal moves, keep cards hidden until animation FULLY completes

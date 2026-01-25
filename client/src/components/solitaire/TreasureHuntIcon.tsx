@@ -35,9 +35,9 @@ export const TreasureHuntIcon: React.FC<TreasureHuntIconProps> = ({
         </span>
         
         {/* Level requirement for locked state */}
-        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2">
-          <span className="text-[10px] font-bold text-white bg-black/70 px-1.5 py-0.5 rounded whitespace-nowrap flex items-center gap-0.5">
-            🔒 LVL {requiredLevel}
+        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
+          <span className="text-sm font-bold text-white bg-black/90 px-2 py-0.5 rounded-full whitespace-nowrap shadow-lg">
+            🔒 {requiredLevel}
           </span>
         </div>
       </button>
@@ -227,7 +227,7 @@ export const FlyingKey: React.FC<FlyingKeyProps> = ({
   return (
     <div
       ref={elementRef}
-      className="fixed pointer-events-none z-[9999]"
+      className="fixed pointer-events-none z-[10010]"
       style={{
         left: startX,
         top: startY,

@@ -47,14 +47,17 @@ if (window.Telegram?.WebApp) {
 
 // Prevent pull-to-refresh and swipe gestures on mobile
 document.addEventListener('touchmove', (e) => {
-  // If touch is on game board, prevent default to stop Telegram swipe gestures
   const target = e.target as HTMLElement;
+  
+  // Always allow scrolling inside scrollable modals
+  const isInScrollableModal = target.closest('[data-scrollable]');
+  if (isInScrollableModal) {
+    return; // Allow scroll in modals
+  }
+  
+  // If touch is on game board, prevent default to stop Telegram swipe gestures
   if (target.closest('[data-game-board]')) {
-    // Allow scrolling inside modals/popups but prevent on game board itself
-    const isInScrollableModal = target.closest('[data-scrollable]');
-    if (!isInScrollableModal) {
-      e.preventDefault();
-    }
+    e.preventDefault();
   }
 }, { passive: false });
 

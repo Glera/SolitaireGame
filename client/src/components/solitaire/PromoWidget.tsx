@@ -349,8 +349,8 @@ export function PromoWidget({ onPurchase, onStarArrived, onCollectionCardArrived
             onClick={() => !isAnimating && setShowModal(true)}
             className="relative flex flex-col items-center justify-center rounded-full transition-all duration-150 cursor-pointer hover:scale-110"
             style={{ 
-              width: '52px', 
-              height: '52px',
+              width: '62px', 
+              height: '62px',
               background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
               boxShadow: '0 3px 10px rgba(0,0,0,0.3)',
               border: '2px solid rgba(255,255,255,0.25)',
@@ -359,7 +359,7 @@ export function PromoWidget({ onPurchase, onStarArrived, onCollectionCardArrived
             disabled={isAnimating}
           >
             {/* Icon - discount percentage */}
-            <span className="text-2xl font-black text-white" style={{ 
+            <span className="text-3xl font-black text-white" style={{ 
               textShadow: '0 2px 4px rgba(0,0,0,0.3)',
             }}>%</span>
           </button>

@@ -151,31 +151,7 @@ export function Card({
       <div className="w-full h-full flex flex-col desktop-card relative px-0.5 pt-0 pb-1">
         <div className="flex justify-between items-start -mx-1 -mt-1">
           <div className={cn(
-            card.rank === '10' ? "text-3xl font-extrabold leading-none" : "text-4xl font-extrabold leading-none pl-1",
-            isRed ? "text-red-600" : "text-black"
-          )}>
-            {card.rank}
-          </div>
-          <div className={cn(
-            card.rank === '10' ? "text-xl font-extrabold leading-none" : "text-2xl font-extrabold leading-none",
-            isRed ? "text-red-600" : "text-black"
-          )}>
-            {suitSymbol}
-          </div>
-        </div>
-        <div className={cn(
-          "text-[3.25rem] font-black absolute bottom-[-10px] left-1/2 -translate-x-1/2",
-          isRed ? "text-red-600" : "text-black"
-        )}>
-          {suitSymbol}
-        </div>
-      </div>
-
-      {/* Mobile version */}
-      <div className="w-full h-full flex flex-col mobile-card relative px-0.5 pt-0 pb-1">
-        <div className="flex justify-between items-start -mx-1 -mt-1">
-          <div className={cn(
-            card.rank === '10' ? "text-4xl font-extrabold leading-none" : "text-5xl font-extrabold leading-none pl-1",
+            card.rank === '10' ? "text-2xl font-extrabold leading-none" : "text-3xl font-extrabold leading-none pl-1",
             isRed ? "text-red-600" : "text-black"
           )}>
             {card.rank}
@@ -188,7 +164,31 @@ export function Card({
           </div>
         </div>
         <div className={cn(
-          "text-[3.375rem] font-black absolute bottom-[-10px] left-1/2 -translate-x-1/2",
+          "text-[2.6rem] font-black absolute bottom-[-10px] left-1/2 -translate-x-1/2",
+          isRed ? "text-red-600" : "text-black"
+        )}>
+          {suitSymbol}
+        </div>
+      </div>
+
+      {/* Mobile version */}
+      <div className="w-full h-full flex flex-col mobile-card relative px-0.5 pt-0 pb-1">
+        <div className="flex justify-between items-start -mx-1 -mt-1">
+          <div className={cn(
+            card.rank === '10' ? "text-3xl font-extrabold leading-none" : "text-4xl font-extrabold leading-none pl-1",
+            isRed ? "text-red-600" : "text-black"
+          )}>
+            {card.rank}
+          </div>
+          <div className={cn(
+            card.rank === '10' ? "text-3xl font-extrabold leading-none" : "text-4xl font-extrabold leading-none",
+            isRed ? "text-red-600" : "text-black"
+          )}>
+            {suitSymbol}
+          </div>
+        </div>
+        <div className={cn(
+          "text-[2.7rem] font-black absolute bottom-[-10px] left-1/2 -translate-x-1/2",
           isRed ? "text-red-600" : "text-black"
         )}>
           {suitSymbol}

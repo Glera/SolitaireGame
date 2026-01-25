@@ -36,9 +36,17 @@ html, body {
 [data-scrollable],
 .overflow-y-auto,
 .overflow-auto {
-  touch-action: pan-y;
-  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch !important;
   overscroll-behavior: contain;
+  overflow-y: auto !important;
+}
+
+/* Scrollable modal content */
+[data-scrollable] {
+  -webkit-overflow-scrolling: touch !important;
+  overflow-y: auto !important;
+  overflow-x: hidden;
 }
 
 /* Mobile drag and drop improvements */
@@ -99,6 +107,22 @@ html, body {
   to { 
     opacity: 1; 
     transform: scale(1);
+  }
+}
+
+/* Reward icon drop animation */
+@keyframes rewardDrop {
+  0% { 
+    opacity: 0; 
+    transform: translateY(-30px) scale(0.5);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(5px) scale(1.1);
+  }
+  100% { 
+    opacity: 1; 
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -249,27 +273,23 @@ canvas {
 }
 */
 
-/* Card shake animation for invalid moves */
+/* Card shake animation for invalid moves - sharp and dynamic */
 @keyframes cardShake {
-  0%, 100% {
-    transform: translateX(0);
-  }
-  12.5% {
-    transform: translateX(-8px);
-  }
-  37.5% {
-    transform: translateX(8px);
-  }
-  62.5% {
-    transform: translateX(-8px);
-  }
-  87.5% {
-    transform: translateX(8px);
-  }
+  0% { transform: translateX(0); }
+  10% { transform: translateX(-5px); }
+  20% { transform: translateX(5px); }
+  30% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  50% { transform: translateX(-4px); }
+  60% { transform: translateX(4px); }
+  70% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+  90% { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
 }
 
 .animate-shake {
-  animation: cardShake 400ms ease-in-out; /* Increased from 200ms to 400ms for two oscillations */
+  animation: cardShake 280ms linear;
 }
 
 /* Collection button pop animation - quick and snappy */

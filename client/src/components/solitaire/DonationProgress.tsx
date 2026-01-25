@@ -492,14 +492,21 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
       {showInfo && ReactDOM.createPortal(
         <div 
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', touchAction: 'none' }}
           onClick={() => setShowInfo(false)}
         >
           <div 
-            className="bg-gradient-to-b from-amber-900 to-amber-950 text-white p-5 rounded-2xl shadow-2xl max-w-sm w-full border border-amber-600/30 overflow-y-auto"
+            className="bg-gradient-to-b from-amber-900 to-amber-950 text-white p-5 rounded-2xl shadow-2xl max-w-sm w-full border border-amber-600/30"
             data-scrollable
-            style={{ margin: 'auto', maxHeight: 'calc(100vh - 32px)' }}
+            style={{ 
+              margin: 'auto', 
+              maxHeight: 'calc(100vh - 32px)', 
+              overflowY: 'auto',
+              touchAction: 'pan-y',
+              WebkitOverflowScrolling: 'touch',
+            }}
             onClick={e => e.stopPropagation()}
+            onTouchMove={e => e.stopPropagation()}
           >
             {/* Header */}
             <div className="relative mb-4">

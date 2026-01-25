@@ -319,32 +319,32 @@ export function OtherPlayerNotification({
   
   return (
     <>
-      {/* Notification container - clips content that slides from under progress bar */}
-      {/* Positioned inside flex-1 container, under the h-8 (32px) + border (2px) progress bar */}
+      {/* Notification container - clips content that slides from ABOVE progress bar */}
+      {/* Positioned inside flex-1 container, ABOVE the progress bar */}
       {/* Hidden completely after slide-out animation to prevent artifacts */}
       {isContainerVisible && (
         <div
           className="absolute pointer-events-none overflow-hidden"
           style={{
-            top: '100%', // Right at bottom edge of progress bar
+            bottom: '100%', // Right at TOP edge of progress bar
             left: 0,
             right: 0,
             height: '50px', // Increased to fit 2 lines of text
             zIndex: 5,
           }}
         >
-          {/* Notification banner - slides down from hidden position */}
+          {/* Notification banner - slides UP from hidden position */}
           <div
             ref={containerRef}
-            className="flex justify-center"
+            className="flex justify-center h-full items-end"
             style={{
               // Same paddingLeft as progress bar text (24px) to align centers
               paddingLeft: '24px',
-              transform: isVisible ? 'translateY(0)' : 'translateY(calc(-100% - 2px))',
+              transform: isVisible ? 'translateY(0)' : 'translateY(calc(100% + 2px))',
               transition: 'transform 0.4s ease-out'
             }}
           >
-            <div className="bg-gradient-to-r from-indigo-600/95 to-purple-600/95 backdrop-blur-sm rounded-b-lg px-3 py-1 shadow-lg border border-white/20 border-t-0 flex items-center gap-2">
+            <div className="bg-gradient-to-r from-indigo-600/95 to-purple-600/95 backdrop-blur-sm rounded-t-lg px-3 py-1 shadow-lg border border-white/20 border-b-0 flex items-center gap-2">
               <span className="text-base">{playerIcon}</span>
               <span className="text-white text-xs font-medium">
                 {playerName}

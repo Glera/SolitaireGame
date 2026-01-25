@@ -130,9 +130,9 @@ export function PointsEventIcon({ eventState, isPulsing, isLocked = false, requi
         </span>
         
         {/* Level requirement */}
-        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2">
-          <span className="text-[10px] font-bold text-white bg-black/70 px-1.5 py-0.5 rounded whitespace-nowrap flex items-center gap-0.5">
-            🔒 LVL {requiredLevel}
+        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
+          <span className="text-sm font-bold text-white bg-black/90 px-2 py-0.5 rounded-full whitespace-nowrap shadow-lg">
+            🔒 {requiredLevel}
           </span>
         </div>
       </button>
@@ -173,19 +173,28 @@ export function PointsEventIcon({ eventState, isPulsing, isLocked = false, requi
             <CardPack color={packInfo.color} stars={packInfo.stars} />
           ) : (
             <>
-              {/* Stars reward icon */}
-              <div 
-                className="text-3xl"
-                style={{
-                  filter: hasClaimable 
-                    ? 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.8))'
-                    : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
-                }}
-              >
-                ⭐
-              </div>
-              <div className="text-[10px] font-bold text-yellow-300 mt-0.5">
-                {nextReward.stars}
+              {/* Stars reward icon with count in bottom-right corner */}
+              <div className="relative">
+                <div 
+                  className="text-3xl"
+                  style={{
+                    filter: hasClaimable 
+                      ? 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.8))'
+                      : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+                  }}
+                >
+                  ⭐
+                </div>
+                <div 
+                  className="absolute text-sm font-bold text-yellow-300"
+                  style={{
+                    right: '-7px',
+                    bottom: '-7px',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.8), 0 0 4px rgba(0,0,0,0.5)',
+                  }}
+                >
+                  {nextReward.stars}
+                </div>
               </div>
             </>
           )}

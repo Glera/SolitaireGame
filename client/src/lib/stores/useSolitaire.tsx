@@ -18,6 +18,41 @@ function clearAutoCollectingCards() {
   autoCollectingCards.clear();
 }
 
+// Move history for undo functionality (store up to 50 moves)
+interface HistoryState {
+  tableau: Card[][];
+  foundations: { hearts: Card[]; diamonds: Card[]; clubs: Card[]; spades: Card[] };
+  stock: Card[];
+  waste: Card[];
+  foundationSlotOrder: Suit[];
+}
+let moveHistory: HistoryState[] = [];
+const MAX_HISTORY = 50;
+
+function saveStateToHistory(state: HistoryState) {
+  // Deep clone the state
+  const clonedState: HistoryState = {
+    tableau: state.tableau.map(col => col.map(card => ({ ...card }))),
+    foundations: {
+      hearts: state.foundations.hearts.map(card => ({ ...card })),
+      diamonds: state.foundations.diamonds.map(card => ({ ...card })),
+      clubs: state.foundations.clubs.map(card => ({ ...card })),
+      spades: state.foundations.spades.map(card => ({ ...card })),
+    },
+    stock: state.stock.map(card => ({ ...card })),
+    waste: state.waste.map(card => ({ ...card })),
+    foundationSlotOrder: [...state.foundationSlotOrder],
+  };
+  moveHistory.push(clonedState);
+  if (moveHistory.length > MAX_HISTORY) {
+    moveHistory.shift();
+  }
+}
+
+function clearMoveHistory() {
+  moveHistory = [];
+}
+
 interface AnimatingCard {
   card: Card;
   startPosition: { x: number; y: number };
@@ -31,6 +66,19 @@ interface AnimatingCard {
   stackCards?: Card[]; // All cards in the stack for stack moves
   sourceTableauColumn?: number; // Source column for stack moves
   isNearComplete?: boolean; // Flag to indicate animation is near completion (95%+) - cards should start appearing
+  isUndoAnimation?: boolean; // Flag to indicate this is an undo animation
+  undoPreviousState?: HistoryState; // State to apply after undo animation completes
+}
+
+// Flag to track if undo is in progress (prevents rapid clicking)
+let isUndoInProgress = false;
+
+// Timestamp of last undo completion (to disable transitions briefly after undo)
+let lastUndoCompletedAt = 0;
+
+// Check if undo just completed (within the last 100ms)
+export function wasUndoJustCompleted(): boolean {
+  return Date.now() - lastUndoCompletedAt < 100;
 }
 
 interface SolitaireStore extends GameState, DragState {
@@ -73,6 +121,7 @@ interface SolitaireStore extends GameState, DragState {
   autoMoveToTableau: (card: Card, targetColumnIndex: number, startElement?: HTMLElement) => void;
   autoMoveStackToTableau: (cards: Card[], sourceColumnIndex: number, targetColumnIndex: number, startElement?: HTMLElement) => void;
   completeCardAnimation: (card: Card, suit: Suit, cardStartPosition?: { x: number; y: number } | null) => void;
+  moveFoundationToTableau: (card: Card, suit: Suit, startElement?: HTMLElement) => boolean; // Move card from foundation to tableau
   
   // Auto-collect functionality
   isAutoCollecting: boolean;
@@ -84,6 +133,10 @@ interface SolitaireStore extends GameState, DragState {
   hasNoMoves: boolean;
   checkForAvailableMoves: () => boolean;
   clearNoMoves: () => void;
+  
+  // Undo functionality
+  canUndo: boolean;
+  undo: () => void;
   
   // Hint system
   hint: { type: 'foundation' | 'tableau' | 'stock' | 'waste'; cardId?: string; from?: number; to?: number | string } | null;
@@ -107,6 +160,10 @@ interface SolitaireStore extends GameState, DragState {
 
 // Initialize game state once for reuse
 const initialGameState = initializeGame();
+
+// Reset all tracking on store initialization (fresh start)
+resetScoredCards();
+resetXPEarnedCards();
 
 export const useSolitaire = create<SolitaireStore>((set, get) => ({
   // Initial game state
@@ -142,6 +199,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   // No moves state
   hasNoMoves: false,
   
+  // Undo state
+  canUndo: false,
+  
   // Hint state
   hint: null,
   
@@ -158,15 +218,21 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   },
   
   newGame: (mode: 'random' | 'solvable' | 'unsolvable' = 'solvable') => {
+    // IMPORTANT: Reset all tracking sets BEFORE generating new game
+    // This ensures cards in new game can earn points/XP
+    resetScoredCards(); // Reset scored cards for new game
+    resetXPEarnedCards(); // Reset XP tracking for new game
+    clearAutoCollectingCards(); // Reset auto-collecting cards tracker
+    resetCardsMovedForCollection(); // Reset cards counter for collection drops
+    clearMoveHistory(); // Clear undo history for new game
+    
+    console.log('🎮 Starting new game, all tracking reset');
+    
     const newGameState = mode === 'solvable' 
       ? generateSolvableGame() 
       : mode === 'unsolvable'
       ? generateUnsolvableGame()
       : initializeGame();
-    resetScoredCards(); // Reset scored cards for new game
-    resetXPEarnedCards(); // Reset XP tracking for new game
-    clearAutoCollectingCards(); // Reset auto-collecting cards tracker
-    resetCardsMovedForCollection(); // Reset cards counter for collection drops
     set({
       ...newGameState,
       isDragging: false,
@@ -178,6 +244,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       foundationSlotOrder: [], // Reset slot order for new game
       isAutoCollecting: false, // Reset auto-collect state
       hasNoMoves: false, // Reset no moves state
+      canUndo: false, // Reset undo state
       hint: null, // Clear hint
       isDealing: true, // Start dealing animation
       dealingCardIds: new Set(newGameState.tableau.flat().map(c => c.id)) // Only these cards animate
@@ -229,8 +296,18 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   
   drawCard: () => {
     const currentState = get();
+    
+    // Save state before drawing for undo
+    saveStateToHistory({
+      tableau: currentState.tableau,
+      foundations: currentState.foundations,
+      stock: currentState.stock,
+      waste: currentState.waste,
+      foundationSlotOrder: currentState.foundationSlotOrder,
+    });
+    
     const newState = drawFromStock(currentState);
-    set(newState);
+    set({ ...newState, canUndo: true });
     
     // Trigger auto-collect after drawing from stock
     setTimeout(() => {
@@ -333,6 +410,16 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       return;
     }
     
+    // Save state before the move for undo
+    saveStateToHistory({
+      tableau: state.tableau,
+      foundations: state.foundations,
+      stock: state.stock,
+      waste: state.waste,
+      foundationSlotOrder: state.foundationSlotOrder,
+    });
+    set({ canUndo: true });
+    
     const newGameState = moveCards(
       state,
       state.draggedCards,
@@ -356,11 +443,15 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           const dropX = rect.left + rect.width / 2;
           const dropY = rect.top + rect.height / 2;
           const card = state.draggedCards[0];
-          import('../solitaire/scoring').then(({ CARD_POINTS }) => {
-            const points = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
-            import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
-              triggerCardToFoundation(dropX, dropY, points);
-            });
+          // Use isCardEventScored (separate from level-up scoring) to prevent double event points
+          import('../solitaire/scoring').then(({ CARD_POINTS, isCardEventScored, markCardEventScored }) => {
+            if (!isCardEventScored(card.id)) {
+              markCardEventScored(card.id);
+              const points = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
+              import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
+                triggerCardToFoundation(dropX, dropY, points);
+              });
+            }
           });
         }
       }
@@ -500,6 +591,17 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     }
     autoCollectingCards.add(card.id);
     
+    // Save state for undo before the move
+    const currentState = get();
+    saveStateToHistory({
+      tableau: currentState.tableau,
+      foundations: currentState.foundations,
+      stock: currentState.stock,
+      waste: currentState.waste,
+      foundationSlotOrder: currentState.foundationSlotOrder,
+    });
+    set({ canUndo: true });
+    
     // CAPTURE start position BEFORE removing card from DOM
     let savedStartRect: DOMRect | null = null;
     if (startElement) {
@@ -515,9 +617,25 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       
       const scoreX = savedStartRect.left - 20;
       const scoreY = savedStartRect.top + savedStartRect.height / 2;
-      import('../solitaire/scoring').then(({ CARD_POINTS }) => {
-        const points = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
-        get().addFloatingScore(points, scoreX, scoreY, card.rank, card.isPremium);
+      import('../solitaire/scoring').then(({ calculateCardPoints, CARD_POINTS, isCardEventScored, markCardEventScored }) => {
+        const points = calculateCardPoints(card);
+        if (points > 0) {
+          get().addFloatingScore(points, scoreX, scoreY, card.rank, card.isPremium);
+        }
+        
+        // Also trigger points event (using separate tracking from level-up scoring)
+        if (endElement && !isCardEventScored(card.id)) {
+          markCardEventScored(card.id);
+          const endRect = endElement.getBoundingClientRect();
+          const dropX = endRect.left + endRect.width / 2;
+          const dropY = endRect.top + endRect.height / 2;
+          // Use CARD_POINTS directly for event (not calculateCardPoints result which may be 0)
+          const basePoints = CARD_POINTS[card.rank];
+          const eventPoints = card.isPremium ? basePoints * 10 : basePoints;
+          import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
+            triggerCardToFoundation(dropX, dropY, eventPoints);
+          });
+        }
       });
       
       // Check if card has a key - fly from START position (before card moves)
@@ -642,9 +760,112 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     return null; // No valid placement found
   },
   
+  moveFoundationToTableau: (card, suit, startElement) => {
+    const state = get();
+    
+    // Find a valid tableau column for this card
+    const targetColumnIndex = get().findTableauPlacementForCard(card);
+    if (targetColumnIndex === null) {
+      return false; // No valid placement
+    }
+    
+    // Save state for undo
+    saveStateToHistory({
+      tableau: state.tableau,
+      foundations: state.foundations,
+      stock: state.stock,
+      waste: state.waste,
+      foundationSlotOrder: state.foundationSlotOrder,
+    });
+    
+    // Remove card from foundation
+    const newFoundations = { ...state.foundations };
+    newFoundations[suit] = state.foundations[suit].slice(0, -1);
+    
+    // Add card to target tableau column
+    const newTableau = [...state.tableau];
+    newTableau[targetColumnIndex] = [...newTableau[targetColumnIndex], card];
+    
+    // Find target element for animation
+    const targetColumn = state.tableau[targetColumnIndex];
+    let endElement: HTMLElement | null = null;
+    
+    if (targetColumn.length > 0) {
+      const lastCard = targetColumn[targetColumn.length - 1];
+      endElement = document.querySelector(`[data-card-id="${lastCard.id}"]`) as HTMLElement;
+    } else {
+      endElement = document.querySelector(`[data-tableau-column="${targetColumnIndex}"]`) as HTMLElement;
+    }
+    
+    if (startElement && endElement) {
+      const startRect = startElement.getBoundingClientRect();
+      const endRect = endElement.getBoundingClientRect();
+      
+      // Calculate vertical offset
+      const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+      let baseOffset = 0;
+      
+      if (targetColumn.length > 0) {
+        const lastCard = targetColumn[targetColumn.length - 1];
+        if (isMobile) {
+          baseOffset = lastCard.faceUp ? 28 : 12;
+        } else {
+          baseOffset = lastCard.faceUp ? 24 : 8;
+        }
+      }
+      
+      const gameBoard = document.querySelector('[data-game-board]') as HTMLElement;
+      const scale = gameBoard ? parseFloat(gameBoard.style.transform?.match(/scale\(([^)]+)\)/)?.[1] || '1') : 1;
+      const verticalOffset = baseOffset * scale;
+      
+      // ATOMIC: Update ALL state in one set() call to avoid waste pile glitch
+      set({
+        foundations: newFoundations,
+        tableau: newTableau,
+        canUndo: true,
+        animatingCard: {
+          card,
+          startPosition: { x: startRect.left, y: startRect.top },
+          endPosition: { x: endRect.left, y: endRect.top + verticalOffset },
+          targetSuit: card.suit,
+          cardStartPosition: null,
+          isTableauMove: true,
+          targetTableauColumn: targetColumnIndex
+        }
+      });
+      
+      // Just clear animation after it completes
+      setTimeout(() => {
+        const currentState = get();
+        if (currentState.animatingCard?.card.id === card.id) {
+          set({ animatingCard: null });
+        }
+      }, 200);
+    } else {
+      // No animation, move immediately
+      set({
+        foundations: newFoundations,
+        tableau: newTableau,
+        canUndo: true
+      });
+    }
+    
+    return true;
+  },
+  
   autoMoveToTableau: (card, targetColumnIndex, startElement) => {
     const state = get();
     const targetColumn = state.tableau[targetColumnIndex];
+    
+    // Save state for undo before the move
+    saveStateToHistory({
+      tableau: state.tableau,
+      foundations: state.foundations,
+      stock: state.stock,
+      waste: state.waste,
+      foundationSlotOrder: state.foundationSlotOrder,
+    });
+    set({ canUndo: true });
     
     // Immediately flip the card underneath in source tableau column
     for (let colIndex = 0; colIndex < state.tableau.length; colIndex++) {
@@ -765,6 +986,16 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     const state = get();
     const targetColumn = state.tableau[targetColumnIndex];
     
+    // Save state for undo before the move
+    saveStateToHistory({
+      tableau: state.tableau,
+      foundations: state.foundations,
+      stock: state.stock,
+      waste: state.waste,
+      foundationSlotOrder: state.foundationSlotOrder,
+    });
+    set({ canUndo: true });
+    
     // Immediately flip the card underneath in source tableau column
     const sourceColumn = state.tableau[sourceColumnIndex];
     const bottomCardIndex = sourceColumn.findIndex(c => c.id === cards[0].id);
@@ -861,6 +1092,25 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     const state = get();
     const animating = state.animatingCard;
     
+    // Check if this is an undo animation - apply previous state
+    if (animating?.isUndoAnimation && animating.undoPreviousState) {
+      const previousState = animating.undoPreviousState;
+      set({
+        tableau: previousState.tableau,
+        foundations: previousState.foundations,
+        stock: previousState.stock,
+        waste: previousState.waste,
+        foundationSlotOrder: previousState.foundationSlotOrder,
+        canUndo: moveHistory.length > 0,
+        hasNoMoves: false,
+        hint: null,
+        animatingCard: null,
+      });
+      isUndoInProgress = false;
+      lastUndoCompletedAt = Date.now();
+      return;
+    }
+    
     // Check if this is a return animation (failed drop) - just clear animation state
     if (animating?.isReturnAnimation) {
       set({ animatingCard: null });
@@ -951,21 +1201,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     const totalInFoundations = Object.values(newFoundations).reduce((sum, f) => sum + f.length, 0);
     const isWon = totalInFoundations === 52;
     
-    // Trigger collection item drop when card arrives at foundation
-    // Note: key collection was already triggered in autoMoveToFoundation (at card start position)
-    const foundationElement = document.querySelector(`[data-foundation-pile="${suit}"]`) as HTMLElement;
-    if (foundationElement) {
-      const rect = foundationElement.getBoundingClientRect();
-      const dropX = rect.left + rect.width / 2;
-      const dropY = rect.top + rect.height / 2;
-      
-      import('../solitaire/scoring').then(({ CARD_POINTS }) => {
-        const points = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
-        import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
-          triggerCardToFoundation(dropX, dropY, points);
-        });
-      });
-    }
+    // Note: triggerCardToFoundation is now called in autoMoveToFoundation (together with calculateCardPoints)
+    // to ensure points are added before isCardScored returns true
+    // Key collection was also triggered there (at card start position)
     
     // Award XP for card
     awardCardXP(card.id);
@@ -1049,6 +1287,368 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   
   clearNoMoves: () => {
     set({ hasNoMoves: false });
+  },
+  
+  undo: () => {
+    const state = get();
+    
+    // Block undo if animation is in progress or undo is already in progress
+    if (state.animatingCard || isUndoInProgress) {
+      return;
+    }
+    
+    if (moveHistory.length === 0) {
+      return;
+    }
+    
+    isUndoInProgress = true;
+    const previousState = moveHistory.pop()!;
+    
+    // Try to detect if last move was to foundation (for animated undo)
+    const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
+    let movedToFoundation: { card: Card; suit: Suit; fromTableauCol?: number; fromWaste?: boolean } | null = null;
+    
+    for (const suit of suits) {
+      const currentCount = state.foundations[suit].length;
+      const previousCount = previousState.foundations[suit].length;
+      
+      if (currentCount > previousCount) {
+        // Card was moved TO foundation - we need to animate it back
+        const card = state.foundations[suit][currentCount - 1];
+        
+        // Find where it came from in previous state
+        // Check tableau columns
+        for (let colIdx = 0; colIdx < previousState.tableau.length; colIdx++) {
+          const prevCol = previousState.tableau[colIdx];
+          if (prevCol.length > 0) {
+            const topCard = prevCol[prevCol.length - 1];
+            if (topCard.id === card.id) {
+              movedToFoundation = { card, suit, fromTableauCol: colIdx };
+              break;
+            }
+          }
+        }
+        
+        // Check waste
+        if (!movedToFoundation && previousState.waste.length > 0) {
+          const wasteTop = previousState.waste[previousState.waste.length - 1];
+          if (wasteTop.id === card.id) {
+            movedToFoundation = { card, suit, fromWaste: true };
+          }
+        }
+        
+        break;
+      }
+    }
+    
+    // If we found a card that was moved to foundation, animate it back
+    if (movedToFoundation) {
+      const { card, suit, fromTableauCol, fromWaste } = movedToFoundation;
+      
+      // Find the actual card element in foundation for precise start position
+      const cardInFoundation = document.querySelector(`[data-foundation-pile="${suit}"] [data-card-id="${card.id}"]`) as HTMLElement;
+      const foundationEl = document.querySelector(`[data-foundation-pile="${suit}"]`) as HTMLElement;
+      
+      let targetEl: HTMLElement | null = null;
+      if (fromTableauCol !== undefined) {
+        targetEl = document.querySelector(`[data-tableau-column="${fromTableauCol}"]`) as HTMLElement;
+      } else if (fromWaste) {
+        targetEl = document.querySelector('[data-waste-pile]') as HTMLElement;
+      }
+      
+      const startEl = cardInFoundation || foundationEl;
+      
+      if (startEl && targetEl) {
+        const startRect = startEl.getBoundingClientRect();
+        const targetRect = targetEl.getBoundingClientRect();
+        
+        // Calculate end position (where the card should go)
+        let endX = targetRect.left;
+        let endY = targetRect.top;
+        
+        if (fromTableauCol !== undefined) {
+          // For tableau, find the last card in current column and position below it
+          const currentCol = state.tableau[fromTableauCol];
+          if (currentCol.length > 0) {
+            const lastCard = currentCol[currentCol.length - 1];
+            const lastCardEl = document.querySelector(`[data-card-id="${lastCard.id}"]`) as HTMLElement;
+            if (lastCardEl) {
+              const lastCardRect = lastCardEl.getBoundingClientRect();
+              endX = lastCardRect.left;
+              // Position below the last card with appropriate offset
+              const offset = lastCard.faceUp ? 28 : 12;
+              endY = lastCardRect.top + offset;
+            }
+          }
+        }
+        
+        // Start animation from actual card position
+        set({
+          animatingCard: {
+            card,
+            startPosition: { 
+              x: startRect.left, 
+              y: startRect.top 
+            },
+            endPosition: { x: endX, y: endY },
+            targetSuit: suit,
+            isUndoAnimation: true,
+            undoPreviousState: previousState,
+          },
+          canUndo: moveHistory.length > 0,
+        });
+        
+        return; // Animation will complete in completeCardAnimation
+      }
+    }
+    
+    // Try to detect tableau-to-tableau moves
+    // Find which column gained cards and which lost cards
+    let movedBetweenTableau: { 
+      cards: Card[]; 
+      fromCol: number; 
+      toCol: number;
+      fromCardIndex: number;
+    } | null = null;
+    
+    for (let toCol = 0; toCol < state.tableau.length; toCol++) {
+      const currentCol = state.tableau[toCol];
+      const previousCol = previousState.tableau[toCol];
+      
+      // This column gained cards
+      if (currentCol.length > previousCol.length) {
+        // Find the cards that were added
+        const addedCount = currentCol.length - previousCol.length;
+        const addedCards = currentCol.slice(-addedCount);
+        
+        // Find which column they came from
+        for (let fromCol = 0; fromCol < previousState.tableau.length; fromCol++) {
+          if (fromCol === toCol) continue;
+          
+          const prevFromCol = previousState.tableau[fromCol];
+          const currFromCol = state.tableau[fromCol];
+          
+          // This column lost cards
+          if (prevFromCol.length > currFromCol.length) {
+            const lostCount = prevFromCol.length - currFromCol.length;
+            if (lostCount === addedCount) {
+              // Verify it's the same cards
+              const lostCards = prevFromCol.slice(-lostCount);
+              if (lostCards[0]?.id === addedCards[0]?.id) {
+                movedBetweenTableau = {
+                  cards: addedCards,
+                  fromCol,
+                  toCol,
+                  fromCardIndex: currFromCol.length // Where in the source column cards should return
+                };
+                break;
+              }
+            }
+          }
+        }
+        if (movedBetweenTableau) break;
+      }
+    }
+    
+    // Animate tableau-to-tableau move back
+    if (movedBetweenTableau) {
+      const { cards, fromCol, toCol } = movedBetweenTableau;
+      
+      // Find the actual first card element for precise start position
+      const firstCardEl = document.querySelector(`[data-card-id="${cards[0].id}"]`) as HTMLElement;
+      const fromColEl = document.querySelector(`[data-tableau-column="${fromCol}"]`) as HTMLElement;
+      
+      if (fromColEl && firstCardEl) {
+        const startRect = firstCardEl.getBoundingClientRect();
+        const fromColRect = fromColEl.getBoundingClientRect();
+        
+        // Calculate end position - find where the card should land
+        // If fromCol has cards, find the last one and position below it
+        // If empty, position at column top
+        let endX = fromColRect.left;
+        let endY = fromColRect.top;
+        
+        const currentFromCol = state.tableau[fromCol];
+        if (currentFromCol.length > 0) {
+          // Find the last card in the source column and position below it
+          const lastCardInFromCol = currentFromCol[currentFromCol.length - 1];
+          const lastCardEl = document.querySelector(`[data-card-id="${lastCardInFromCol.id}"]`) as HTMLElement;
+          if (lastCardEl) {
+            const lastCardRect = lastCardEl.getBoundingClientRect();
+            endX = lastCardRect.left;
+            // Position below the last card with appropriate offset
+            // Use the card's visible height portion (face-up cards show more)
+            const offset = lastCardInFromCol.faceUp ? 28 : 12;
+            endY = lastCardRect.top + offset;
+          }
+        }
+        
+        // Start animation with the first card (or stack)
+        set({
+          animatingCard: {
+            card: cards[0],
+            startPosition: { 
+              x: startRect.left, 
+              y: startRect.top 
+            },
+            endPosition: { 
+              x: endX, 
+              y: endY 
+            },
+            targetSuit: cards[0].suit,
+            isUndoAnimation: true,
+            undoPreviousState: previousState,
+            isTableauMove: true,
+            targetTableauColumn: fromCol,
+            stackCards: cards.length > 1 ? cards : undefined,
+            isStackMove: cards.length > 1,
+          },
+          canUndo: moveHistory.length > 0,
+        });
+        
+        return; // Animation will complete in completeCardAnimation
+      }
+    }
+    
+    // Try to detect waste-to-tableau moves (card taken from waste and placed on tableau)
+    // Check if waste lost a card and tableau gained it
+    if (previousState.waste.length > state.waste.length) {
+      // Waste had more cards - find where it went
+      const wasteCardThatMoved = previousState.waste[previousState.waste.length - 1];
+      
+      // Check each tableau column for this card
+      for (let colIdx = 0; colIdx < state.tableau.length; colIdx++) {
+        const currentCol = state.tableau[colIdx];
+        const previousCol = previousState.tableau[colIdx];
+        
+        // This column gained a card
+        if (currentCol.length > previousCol.length) {
+          const addedCard = currentCol[currentCol.length - 1];
+          if (addedCard.id === wasteCardThatMoved.id) {
+            // Found: card moved from waste to this tableau column
+            const cardEl = document.querySelector(`[data-card-id="${addedCard.id}"]`) as HTMLElement;
+            
+            // Find the current top card in waste to get precise end position
+            // After undo, the card will be at top of waste
+            let endX: number;
+            let endY: number;
+            
+            if (state.waste.length > 0) {
+              // There are cards in waste - find the top one's position
+              const currentTopWasteCard = state.waste[state.waste.length - 1];
+              const topWasteCardEl = document.querySelector(`[data-card-id="${currentTopWasteCard.id}"]`) as HTMLElement;
+              if (topWasteCardEl) {
+                const topWasteRect = topWasteCardEl.getBoundingClientRect();
+                // Card will go to the same position as current top (replacing it visually)
+                endX = topWasteRect.left;
+                endY = topWasteRect.top;
+              } else {
+                // Fallback to waste pile
+                const wasteEl = document.querySelector('[data-waste-pile]') as HTMLElement;
+                if (wasteEl) {
+                  const wasteRect = wasteEl.getBoundingClientRect();
+                  endX = wasteRect.left;
+                  endY = wasteRect.top;
+                } else {
+                  continue;
+                }
+              }
+            } else {
+              // Waste is empty - use waste pile position
+              const wasteEl = document.querySelector('[data-waste-pile]') as HTMLElement;
+              if (wasteEl) {
+                const wasteRect = wasteEl.getBoundingClientRect();
+                endX = wasteRect.left;
+                endY = wasteRect.top;
+              } else {
+                continue;
+              }
+            }
+            
+            if (cardEl) {
+              const startRect = cardEl.getBoundingClientRect();
+              
+              set({
+                animatingCard: {
+                  card: addedCard,
+                  startPosition: { 
+                    x: startRect.left, 
+                    y: startRect.top 
+                  },
+                  endPosition: { 
+                    x: endX, 
+                    y: endY 
+                  },
+                  targetSuit: addedCard.suit,
+                  isUndoAnimation: true,
+                  undoPreviousState: previousState,
+                },
+                canUndo: moveHistory.length > 0,
+              });
+              
+              return; // Animation will complete in completeCardAnimation
+            }
+          }
+        }
+      }
+    }
+    
+    // Try to detect draw card (stock to waste) - animate card back to stock
+    if (state.waste.length > previousState.waste.length && 
+        state.stock.length < previousState.stock.length) {
+      // Cards were drawn from stock to waste - animate back
+      const drawnCards: Card[] = [];
+      for (let i = previousState.waste.length; i < state.waste.length; i++) {
+        drawnCards.push(state.waste[i]);
+      }
+      
+      if (drawnCards.length > 0) {
+        // Find the top waste card element
+        const topWasteCard = drawnCards[drawnCards.length - 1];
+        const cardEl = document.querySelector(`[data-card-id="${topWasteCard.id}"]`) as HTMLElement;
+        const stockEl = document.querySelector('[data-stock-pile]') as HTMLElement;
+        
+        if (cardEl && stockEl) {
+          const startRect = cardEl.getBoundingClientRect();
+          const stockRect = stockEl.getBoundingClientRect();
+          
+          set({
+            animatingCard: {
+              card: topWasteCard,
+              startPosition: { 
+                x: startRect.left, 
+                y: startRect.top 
+              },
+              endPosition: { 
+                x: stockRect.left, 
+                y: stockRect.top 
+              },
+              targetSuit: topWasteCard.suit,
+              isUndoAnimation: true,
+              undoPreviousState: previousState,
+            },
+            canUndo: moveHistory.length > 0,
+          });
+          
+          return; // Animation will complete in completeCardAnimation
+        }
+      }
+    }
+    
+    // No animated undo possible - apply state immediately
+    set({
+      tableau: previousState.tableau,
+      foundations: previousState.foundations,
+      stock: previousState.stock,
+      waste: previousState.waste,
+      foundationSlotOrder: previousState.foundationSlotOrder,
+      canUndo: moveHistory.length > 0,
+      hasNoMoves: false,
+      hint: null,
+    });
+    
+    isUndoInProgress = false;
+    lastUndoCompletedAt = Date.now();
   },
   
   clearHint: () => {
@@ -1440,6 +2040,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       return;
     }
     
+    // Note: We save history BEFORE EACH card move (inside animation callback)
+    // This allows undo to return cards one by one, not all at once
+    
     // Launch all card animations with staggered delays
     let completedCards = 0;
     const totalCards = cardsToMove.length;
@@ -1513,12 +2116,21 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           return;
         }
         
+        // Save state BEFORE updating foundation for undo (allows undo one card at a time)
+        const stateForFoundation = get();
+        saveStateToHistory({
+          tableau: stateForFoundation.tableau,
+          foundations: stateForFoundation.foundations,
+          stock: stateForFoundation.stock,
+          waste: stateForFoundation.waste,
+          foundationSlotOrder: stateForFoundation.foundationSlotOrder,
+        });
+        
         // NOW update foundations - only after all DOM elements are validated
         // Other cards checking canAdd will see this card already in foundation
-        const stateForFoundation = get();
         const newFoundations = { ...stateForFoundation.foundations };
         newFoundations[targetSuit] = [...newFoundations[targetSuit], card];
-        set({ foundations: newFoundations });
+        set({ foundations: newFoundations, canUndo: true });
         
         const endRect = foundationElement.getBoundingClientRect();
         
@@ -1528,7 +2140,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
             movedCardIds.add(card.id);
             completedCards++;
             
-            // Update source (remove card) - foundation already updated
+            // Update source (remove card) - foundation already updated, history already saved
             const currentState = get();
             
             if (sourceType === 'tableau' && sourceIndex !== undefined) {
@@ -1550,12 +2162,21 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
             // Trigger collection item drop and add points
             const dropX = endRect.left + endRect.width / 2;
             const dropY = endRect.top + endRect.height / 2;
-            import('../solitaire/scoring').then(({ CARD_POINTS }) => {
-              const points = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
-              get().addPointsToProgress(points);
-              import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
-                triggerCardToFoundation(dropX, dropY, points);
-              });
+            import('../solitaire/scoring').then(({ calculateCardPoints, CARD_POINTS, isCardEventScored, markCardEventScored }) => {
+              // For level-up scoring
+              const points = calculateCardPoints(card);
+              if (points > 0) {
+                get().addPointsToProgress(points);
+              }
+              
+              // For event scoring (separate tracking)
+              if (!isCardEventScored(card.id)) {
+                markCardEventScored(card.id);
+                const eventPoints = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
+                import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
+                  triggerCardToFoundation(dropX, dropY, eventPoints);
+                });
+              }
             });
             
             // Check if all done
@@ -1694,6 +2315,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     
     if (cardsToMove.length === 0) return;
     
+    // Note: We save history BEFORE EACH card move (inside animation callback)
+    // This allows undo to return cards one by one, not all at once
+    
     // Animation settings
     const FLIGHT_DURATION = 150;
     const STAGGER_DELAY = 80;
@@ -1756,9 +2380,11 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           import('../flyingSuitIconManager').then(({ addFlyingSuitIcon }) => {
             addFlyingSuitIcon(card.suit, centerX, centerY);
           });
-          import('../solitaire/scoring').then(({ CARD_POINTS }) => {
-            const points = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
-            get().addFloatingScore(points, startRect.left - 20, startRect.top + startRect.height / 2, card.rank, card.isPremium);
+          import('../solitaire/scoring').then(({ calculateCardPoints }) => {
+            const points = calculateCardPoints(card);
+            if (points > 0) {
+              get().addFloatingScore(points, startRect.left - 20, startRect.top + startRect.height / 2, card.rank, card.isPremium);
+            }
           });
           
           const endRect = foundationElement.getBoundingClientRect();
@@ -1767,9 +2393,19 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           import('../../components/solitaire/FlyingCard').then(({ launchFlyingCard }) => {
             launchFlyingCard({ ...card, faceUp: true }, startRect, endRect, FLIGHT_DURATION, () => {
               // AFTER animation completes:
-              // 1. Remove card from source
-              // 2. Add card to foundation
+              // 1. Save state for undo (before each card move)
+              // 2. Remove card from source
+              // 3. Add card to foundation
               const stateAfterFlight = get();
+              
+              // Save state BEFORE this move for undo (allows undo one card at a time)
+              saveStateToHistory({
+                tableau: stateAfterFlight.tableau,
+                foundations: stateAfterFlight.foundations,
+                stock: stateAfterFlight.stock,
+                waste: stateAfterFlight.waste,
+                foundationSlotOrder: stateAfterFlight.foundationSlotOrder,
+              });
               
               // Remove from source
               if (source === 'tableau' && columnIndex !== undefined) {
@@ -1792,7 +2428,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
                 set({ 
                   tableau: newTableau,
                   foundations: newFoundations,
-                  moves: stateAfterFlight.moves + 1 
+                  moves: stateAfterFlight.moves + 1,
+                  canUndo: true
                 });
               } else if (source === 'waste') {
                 const newWaste = stateAfterFlight.waste.filter(c => c.id !== card.id);
@@ -1803,7 +2440,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
                 set({ 
                   waste: newWaste,
                   foundations: newFoundations,
-                  moves: stateAfterFlight.moves + 1 
+                  moves: stateAfterFlight.moves + 1,
+                  canUndo: true
                 });
               }
               
@@ -1812,11 +2450,15 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
               const dropX = fRect.left + fRect.width / 2;
               const dropY = fRect.top + fRect.height / 2;
               
-              import('../solitaire/scoring').then(({ CARD_POINTS }) => {
-                const points = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
-                import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
-                  triggerCardToFoundation(dropX, dropY, points);
-                });
+              import('../solitaire/scoring').then(({ CARD_POINTS, isCardEventScored, markCardEventScored }) => {
+                // Only trigger collection if card hasn't earned event points yet
+                if (!isCardEventScored(card.id)) {
+                  markCardEventScored(card.id);
+                  const points = card.isPremium ? CARD_POINTS[card.rank] * 10 : CARD_POINTS[card.rank];
+                  import('../../components/solitaire/FlyingCollectionIcon').then(({ triggerCardToFoundation }) => {
+                    triggerCardToFoundation(dropX, dropY, points);
+                  });
+                }
               });
               
               // Collect key if card has one

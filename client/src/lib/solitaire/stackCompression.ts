@@ -13,8 +13,8 @@ export function calculateStackOffsets(
   
   // Standard offsets (will be compressed if needed)
   // Reduced to hide center suit when cards overlap
-  const standardFaceUpOffset = isMobile ? 45 : 41;
-  const standardFaceDownOffset = isMobile ? 13 : 10;
+  const standardFaceUpOffset = isMobile ? 36 : 33;
+  const standardFaceDownOffset = isMobile ? 10 : 8;
   const cardHeight = 104; // h-26 = 104px
   
   // Calculate total height with standard offsets
@@ -55,13 +55,13 @@ export function calculateStackOffsets(
 export function getStackCardOffset(isMobile: boolean, availableHeight?: number): number {
   // If availableHeight is provided, calculate with compression
   if (availableHeight !== undefined) {
-    const standardOffset = isMobile ? 45 : 41;
+    const standardOffset = isMobile ? 36 : 33;
     // This is a simplified version - for precise compression, use calculateStackOffsets
     return standardOffset;
   }
   
   // Default offsets without compression
-  return isMobile ? 45 : 41;
+  return isMobile ? 36 : 33;
 }
 
 
