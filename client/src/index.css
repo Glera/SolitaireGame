@@ -25,6 +25,32 @@ html, body {
   -webkit-backface-visibility: hidden;
 }
 
+/* GPU acceleration for all cards - critical for Telegram WebView performance */
+[data-card-id] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform, opacity;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* GPU layer for card containers in tableau */
+[data-tableau-column] > div {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* GPU layer for waste pile cards */
+[data-waste-pile] > div {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
 /* Game board specific - disable all scroll gestures */
 [data-game-board] {
   touch-action: none;

@@ -59,8 +59,9 @@ export function CardAnimation({
       
       // OPTIMIZATION: Update position directly via transform instead of state
       // This avoids React re-renders on every frame, massively improving mobile performance
+      // Using translate3d for GPU acceleration in WebView
       if (elementRef.current) {
-        elementRef.current.style.transform = `translate(${newX}px, ${newY}px) scale(${scale})`;
+        elementRef.current.style.transform = `translate3d(${newX}px, ${newY}px, 0) scale(${scale})`;
       }
       
       // At 95%, mark animation as near complete so cards can start appearing
@@ -98,9 +99,12 @@ export function CardAnimation({
         top: 0,
         zIndex: 9999,
         pointerEvents: 'none',
-        transform: `translate(${startPosition.x}px, ${startPosition.y}px) scale(${scale})`,
+        transform: `translate3d(${startPosition.x}px, ${startPosition.y}px, 0) scale(${scale})`,
         transformOrigin: 'top left',
-        willChange: 'transform'
+        willChange: 'transform',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
+        WebkitFontSmoothing: 'antialiased',
       }}
     >
       {stackCards && stackCards.length > 1 ? (

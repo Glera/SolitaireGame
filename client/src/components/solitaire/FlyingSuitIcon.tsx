@@ -88,7 +88,8 @@ export function FlyingSuitIcon({ suit, startPosition, direction, onComplete }: F
         if (frameCount === 1) {
           console.log(`📍 First frame position: x=${Math.round(x)}, y=${Math.round(y)}, scale=${scale.toFixed(2)}`);
         }
-        elementRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale}) rotate(${rotation}deg)`;
+        // Using translate3d for GPU acceleration in WebView
+        elementRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale}) rotate(${rotation}deg)`;
         elementRef.current.style.opacity = String(opacity);
       }
       
@@ -113,12 +114,14 @@ export function FlyingSuitIcon({ suit, startPosition, direction, onComplete }: F
       style={{
         top: 0,
         left: 0,
-        transform: `translate(${startPosition.x}px, ${startPosition.y}px)`,
+        transform: `translate3d(${startPosition.x}px, ${startPosition.y}px, 0)`,
         color: SUIT_COLORS[suit],
         fontSize: '24px',
         fontWeight: 'bold',
         textShadow: '0 2px 4px rgba(0,0,0,0.3)',
         willChange: 'transform, opacity',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
       }}
     >
       {SUIT_SYMBOLS[suit]}

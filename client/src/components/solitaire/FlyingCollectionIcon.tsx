@@ -128,6 +128,9 @@ export function FlyingCollectionIcon({
         filter: isUnique 
           ? `drop-shadow(0 0 8px ${glowColors.main}) drop-shadow(0 0 16px ${glowColors.main}) drop-shadow(0 0 24px ${glowColors.secondary})`
           : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+        willChange: 'transform, left, top',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
       }}
     >
       {/* Pulsing ring for unique items - color based on rarity */}

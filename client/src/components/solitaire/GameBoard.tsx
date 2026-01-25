@@ -2432,6 +2432,47 @@ export function GameBoard() {
         overflow: 'hidden',
         boxSizing: 'border-box'
       }}
+      onDoubleClick={(e) => {
+        // Double-click on empty area (anywhere on the board) collects all available cards
+        const target = e.target as HTMLElement;
+        // Ignore clicks on interactive elements
+        const isOnCard = target.closest('[data-card-id]');
+        const isOnPile = target.closest('[data-pile]');
+        const isOnStock = target.closest('[data-stock-pile]');
+        const isOnButton = target.closest('button');
+        const isOnPopup = target.closest('[data-popup]');
+        if (!isOnCard && !isOnPile && !isOnStock && !isOnButton && !isOnPopup && !isAutoCollecting) {
+          collectAllAvailable();
+        }
+      }}
+      onTouchEnd={(e) => {
+        // Double-tap detection for mobile (anywhere on the board)
+        const target = e.target as HTMLElement;
+        // Ignore taps on interactive elements
+        const isOnCard = target.closest('[data-card-id]');
+        const isOnPile = target.closest('[data-pile]');
+        const isOnStock = target.closest('[data-stock-pile]');
+        const isOnButton = target.closest('button');
+        const isOnPopup = target.closest('[data-popup]');
+        
+        if (isOnCard || isOnPile || isOnStock || isOnButton || isOnPopup) {
+          return; // Let the element handle its own tap
+        }
+        
+        const now = Date.now();
+        const DOUBLE_TAP_DELAY = 300; // ms
+        
+        if (now - lastTapTimeRef.current < DOUBLE_TAP_DELAY) {
+          // Double tap detected on empty area
+          if (!isAutoCollecting) {
+            e.preventDefault();
+            collectAllAvailable();
+          }
+          lastTapTimeRef.current = 0; // Reset to prevent triple tap triggering
+        } else {
+          lastTapTimeRef.current = now;
+        }
+      }}
     >
       {/* Hint highlight style */}
       {hint && <style>{hintStyle}</style>}

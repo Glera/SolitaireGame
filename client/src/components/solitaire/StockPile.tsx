@@ -146,7 +146,7 @@ export function StockPile({ cards }: StockPileProps) {
     const currentY = startY + (deltaY * animationProgress);
     
     return {
-      transform: `translate(${currentX}px, ${currentY}px)`,
+      transform: `translate3d(${currentX}px, ${currentY}px, 0)`,
       transition: 'none' // Using manual animation
     };
   };
@@ -183,6 +183,8 @@ export function StockPile({ cards }: StockPileProps) {
             zIndex: 10000,
             pointerEvents: 'none',
             willChange: 'transform',
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
             ...getAnimationStyle()
           }}
         >

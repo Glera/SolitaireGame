@@ -234,7 +234,9 @@ export const FlyingKey: React.FC<FlyingKeyProps> = ({
         transform: 'translate(-50%, -50%)',
         fontSize: '28px',
         filter: 'drop-shadow(0 2px 8px rgba(255, 200, 0, 0.8))',
-        willChange: 'transform, left, top'
+        willChange: 'transform, left, top',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
       }}
     >
       🔑
