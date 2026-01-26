@@ -1856,6 +1856,22 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       }
     }
     
+    // Before showing "no moves", check if game is actually won
+    // (all 52 cards in foundations - animation might still be in progress)
+    const totalInFoundations = Object.values(state.foundations).reduce((sum, f) => sum + f.length, 0);
+    if (totalInFoundations === 52) {
+      // Game is won, not "no moves"
+      if (!state.isWon) {
+        set({ isWon: true });
+      }
+      return;
+    }
+    
+    // Also check if animation is in progress - don't show "no moves" while cards are flying
+    if (state.animatingCard || state.isAutoCollecting) {
+      return;
+    }
+    
     // No useful moves at all - show no moves popup
     set({ hasNoMoves: true });
   },

@@ -1433,7 +1433,7 @@ export function GameBoard() {
   // Track if we're waiting for flying icons before showing win screen
   const [pendingWinScreen, setPendingWinScreen] = useState(false);
   
-  // Handle win condition - wait for flying icons to finish
+  // Handle win condition - wait for flying icons AND card animations to finish
   useEffect(() => {
     if (isWon && !winHandled) {
       playSuccess();
@@ -1441,27 +1441,29 @@ export function GameBoard() {
       // Add stars for winning immediately (persisted via localStorage effect)
       addStars(STARS_PER_WIN);
       
-      // Check if there are flying icons
-      if (flyingIcons.length > 0) {
-        // Wait for icons to finish
+      // Check if there are flying icons or card animations
+      if (flyingIcons.length > 0 || animatingCard) {
+        // Wait for animations to finish
         setPendingWinScreen(true);
       } else {
-        // No flying icons, show win screen immediately
-        setShowWinScreen(true);
+        // No animations, show win screen with small delay for visual polish
+        setTimeout(() => {
+          setShowWinScreen(true);
+        }, 300);
       }
     }
-  }, [isWon, winHandled, playSuccess, flyingIcons.length]);
+  }, [isWon, winHandled, playSuccess, flyingIcons.length, animatingCard]);
   
-  // Show win screen when all flying icons have landed (if pending)
+  // Show win screen when all flying icons have landed AND card animations finished (if pending)
   useEffect(() => {
-    if (pendingWinScreen && flyingIcons.length === 0) {
+    if (pendingWinScreen && flyingIcons.length === 0 && !animatingCard) {
       setPendingWinScreen(false);
       // Add 0.5s delay before showing win screen
       setTimeout(() => {
         setShowWinScreen(true);
       }, 500);
     }
-  }, [pendingWinScreen, flyingIcons.length]);
+  }, [pendingWinScreen, flyingIcons.length, animatingCard]);
   
   // Reset win handled when starting new game
   useEffect(() => {
@@ -1484,6 +1486,10 @@ export function GameBoard() {
       // Skip if animations are running - will be triggered again when they complete
       if (currentState.animatingCard || currentState.isStockAnimating || currentState.isAutoCollecting || currentState.isDealing) return;
       if (currentState.isWon || currentState.hasNoMoves) return;
+      
+      // Check if game is won (all 52 cards in foundations) - don't show "no moves" in this case
+      const totalInFoundations = Object.values(currentState.foundations).reduce((sum, f) => sum + f.length, 0);
+      if (totalInFoundations === 52) return;
       
       checkForAvailableMoves();
     }, 300); // Reduced delay
