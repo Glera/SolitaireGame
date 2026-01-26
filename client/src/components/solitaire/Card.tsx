@@ -168,6 +168,7 @@ export function Card({
     <div
       data-card-id={card.id}
       data-face-up={showFace ? 'true' : 'false'}
+      data-has-key={hasKey ? 'true' : 'false'}
       className={cn(
         "w-20 h-[104px] cursor-pointer select-none relative",
         isDragging && "opacity-0",

@@ -23,7 +23,7 @@ import { FloatingScore } from '../FloatingScore';
 import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 import { setAddPointsFunction } from '../../lib/solitaire/progressManager';
 import { setAddFloatingScoreFunction } from '../../lib/solitaire/floatingScoreManager';
-import { resetAllXP, setOnLevelUpCallback } from '../../lib/solitaire/experienceManager';
+import { resetAllXP, setOnLevelUpCallback, forceNextLevel } from '../../lib/solitaire/experienceManager';
 import { LevelUpScreen } from './LevelUpScreen';
 import { PromoWidget } from './PromoWidget';
 import { Shop, type ShopItem } from './Shop';
@@ -748,7 +748,7 @@ export function GameBoard() {
   };
   
   // Force re-render counter for key distribution updates
-  const [, forceKeyUpdate] = useState(0);
+  const [keyUpdateCounter, forceKeyUpdate] = useState(0);
   
   // Flying key drops for animation
   const [flyingKeyDrops, setFlyingKeyDrops] = useState<Array<{ id: number; cardId: string; targetX: number; targetY: number }>>([]);
@@ -770,25 +770,28 @@ export function GameBoard() {
     return () => setOnKeyDropCallback(() => {});
   }, []);
   
-  // Track which game layout we've already distributed keys for
-  const keysDistributedForLayoutRef = useRef<string | null>(null);
+  // Track if keys have been distributed for current game
+  const keysDistributedRef = useRef<boolean>(false);
+  const prevIsDealingRef = useRef<boolean>(true);
   
-  // Distribute keys when game starts (after dealing animation completes)
+  // Reset keys distributed flag when new game starts (isDealing becomes true)
+  useEffect(() => {
+    if (isDealing && !prevIsDealingRef.current) {
+      // New game started - reset flag
+      keysDistributedRef.current = false;
+    }
+    prevIsDealingRef.current = isDealing;
+  }, [isDealing]);
+  
+  // Distribute keys ONCE when dealing completes (isDealing becomes false)
   // Keys are only placed on tableau cards, not on stock/waste pile
   useEffect(() => {
     if (!treasureHuntEvent.active) return;
     if (isDealing) return; // Wait for dealing to complete
+    if (keysDistributedRef.current) return; // Already distributed for this game
     
-    // Create a unique identifier for this layout based on tableau cards
-    const layoutId = tableau.flat().map(c => c.id).join(',');
-    
-    // Skip if we've already distributed keys for this layout
-    if (keysDistributedForLayoutRef.current === layoutId) {
-      return;
-    }
-    
-    // Mark this layout as having keys distributed
-    keysDistributedForLayoutRef.current = layoutId;
+    // Mark as distributed BEFORE calling distributeKeys
+    keysDistributedRef.current = true;
     
     // Get face-down cards from tableau only (preferred for keys)
     const faceDownCards = tableau
@@ -2148,15 +2151,13 @@ export function GameBoard() {
     }
   };
   
-  // Test level up function (debug)
+  // Test level up function (debug) - actually increases level
   const handleTestLevelUp = () => {
-    // Get current level and simulate next level
-    const currentXP = parseInt(localStorage.getItem('solitaire_player_xp') || '0', 10);
-    const currentLevel = Math.floor(currentXP / 100) + 1; // Simplified calculation
-    const nextLevel = currentLevel + 1;
+    // Force next level (updates XP in localStorage)
+    const newLevel = forceNextLevel();
     
-    // Set pending level up and show screen
-    setPendingLevelUp(nextLevel);
+    // Show level up screen
+    setPendingLevelUp(newLevel);
     setShowLevelUp(true);
   };
   
@@ -2835,7 +2836,7 @@ export function GameBoard() {
                 ))}
               </div>
                 <div className="flex gap-1" style={{ marginRight: '8px' }}>
-                <WastePile cards={waste} />
+                <WastePile key={`waste-${keyUpdateCounter}`} cards={waste} />
                 <StockPile cards={stock} />
               </div>
             </div>
@@ -2843,7 +2844,7 @@ export function GameBoard() {
             {/* Bottom row: Tableau columns */}
             <div className="flex gap-1" style={{ minHeight: '400px', paddingBottom: '20px' }}>
               {tableau.map((column, index) => (
-                <div key={index} className="min-h-32">
+                <div key={`${index}-${keyUpdateCounter}`} className="min-h-32">
                   <TableauColumn cards={column} columnIndex={index} />
                 </div>
               ))}

@@ -42,6 +42,13 @@ export function DebugPopup({ info, onClose, onResetDailyQuests, onResetStars, on
     <div 
       className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4"
       onClick={onClose}
+      style={{ touchAction: 'none' }}
+      onTouchMove={e => {
+        const target = e.target as HTMLElement;
+        if (!target.closest('[data-scrollable]')) {
+          e.preventDefault();
+        }
+      }}
     >
       <div 
         className="bg-gray-900 text-white p-4 rounded-lg shadow-xl max-w-md w-full max-h-[70vh] flex flex-col"
@@ -58,7 +65,16 @@ export function DebugPopup({ info, onClose, onResetDailyQuests, onResetStars, on
         </div>
         
         {/* Scrollable content */}
-        <div className="overflow-y-auto flex-1 pr-1">
+        <div 
+          className="overflow-y-auto flex-1 pr-1"
+          data-scrollable
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-y',
+            overscrollBehavior: 'contain',
+          }}
+          onTouchMove={e => e.stopPropagation()}
+        >
         <div className="space-y-2 text-sm font-mono">
           {Object.entries(info.data).map(([key, value]) => (
             <div key={key} className="flex justify-between">

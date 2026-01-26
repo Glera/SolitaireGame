@@ -127,13 +127,15 @@ export function FlyingKeyDrop({ id, cardId, targetX, targetY, onComplete }: Flyi
         if (progress < 1) {
           rafRef.current = requestAnimationFrame(animate);
         } else {
-          // Flight complete - start bounce phase (only for face-up cards)
+          // Flight complete - trigger glow on "impact"
+          triggerCardGlow(cardId);
+          
+          // Start bounce phase (only for face-up cards)
           if (!isFaceDown) {
             startTimeRef.current = null;
             setPhase('bounce');
           } else {
             // For face-down, just complete
-            triggerCardGlow(cardId);
             setIsVisible(false);
             onComplete();
           }
@@ -152,8 +154,7 @@ export function FlyingKeyDrop({ id, cardId, targetX, targetY, onComplete }: Flyi
         if (progress < 1) {
           rafRef.current = requestAnimationFrame(animate);
         } else {
-          // Bounce complete - trigger glow and finish
-          triggerCardGlow(cardId);
+          // Bounce complete - finish (glow already triggered on impact)
           setIsVisible(false);
           onComplete();
         }

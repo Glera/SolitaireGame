@@ -346,13 +346,14 @@ export function WastePile({ cards }: WastePileProps) {
               // Hide if being dragged or animating (but not stock animation - that's handled above)
               opacity: (shouldHideTop && !isStockAnimating) ? 0 : 1
             }}
-            className={isTop && isShaking ? 'animate-shake' : ''}
+            className=""
             data-card-is-top={isTop ? "true" : undefined}
           >
             <Card
               card={card}
               onClick={isTop ? handleCardClick : undefined}
               onDoubleClick={isTop ? handleCardClick : undefined}
+              className={isTop && isShaking ? 'animate-shake' : ''}
               onDragStart={isTop ? handleDragStart : undefined}
               onDragEnd={isTop ? handleDragEnd : undefined}
               onTouchStart={isTop ? (e) => {

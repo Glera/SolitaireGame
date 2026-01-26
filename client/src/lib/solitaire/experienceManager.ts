@@ -100,6 +100,25 @@ export function resetAllXP(): void {
   }
 }
 
+/**
+ * Force level up (for debugging)
+ * Adds enough XP to reach the next level
+ */
+export function forceNextLevel(): number {
+  const currentXP = getTotalXP();
+  const { level } = calculateLevel(currentXP);
+  const nextLevelXP = getXPForLevel(level + 1);
+  
+  // Set XP to exactly reach next level
+  localStorage.setItem('solitaire_player_xp', nextLevelXP.toString());
+  
+  if (onXPChangeCallback) {
+    onXPChangeCallback(nextLevelXP);
+  }
+  
+  return level + 1;
+}
+
 // Level system: 
 // - Level 1→2: 2 games max
 // - Level 2→3: 2 games max (TEMP: same as level 2)

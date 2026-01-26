@@ -300,26 +300,25 @@ canvas {
 */
 
 /* Card shake animation for invalid moves - sharp and dynamic */
-/* Using translate3d for consistent GPU-accelerated rendering across all cards */
+/* Using margin-left to avoid transform conflicts with parent transforms */
 @keyframes cardShake {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  10% { transform: translate3d(-5px, 0, 0); }
-  20% { transform: translate3d(5px, 0, 0); }
-  30% { transform: translate3d(-5px, 0, 0); }
-  40% { transform: translate3d(5px, 0, 0); }
-  50% { transform: translate3d(-4px, 0, 0); }
-  60% { transform: translate3d(4px, 0, 0); }
-  70% { transform: translate3d(-3px, 0, 0); }
-  80% { transform: translate3d(3px, 0, 0); }
-  90% { transform: translate3d(-2px, 0, 0); }
+  0%, 100% { margin-left: 0; }
+  10% { margin-left: -5px; }
+  20% { margin-left: 5px; }
+  30% { margin-left: -5px; }
+  40% { margin-left: 5px; }
+  50% { margin-left: -4px; }
+  60% { margin-left: 4px; }
+  70% { margin-left: -3px; }
+  80% { margin-left: 3px; }
+  90% { margin-left: -2px; }
 }
 
 .animate-shake {
   animation: cardShake 280ms linear;
-  will-change: transform;
 }
 
-/* Gold glow effect when key lands on card */
+/* Gold glow effect when key lands on card - faster decay */
 @keyframes keyGlow {
   0% {
     box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
@@ -327,14 +326,25 @@ canvas {
   20% {
     box-shadow: 0 0 20px 8px rgba(255, 215, 0, 0.8), 0 0 40px 16px rgba(255, 200, 0, 0.4);
   }
+  60% {
+    box-shadow: 0 0 8px 4px rgba(255, 215, 0, 0.3);
+  }
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+    box-shadow: none;
   }
 }
 
 .key-glow-effect {
-  animation: keyGlow 600ms ease-out forwards;
+  animation: keyGlow 400ms ease-out forwards;
   border-radius: 0.5rem; /* Match card border radius */
+}
+
+/* Golden tint for cards with keys - visible on both face-up and face-down */
+[data-has-key="true"] {
+  outline: 3px solid rgba(255, 180, 0, 1);
+  outline-offset: -3px;
+  border-radius: 0.5rem;
+  background-color: rgba(255, 215, 0, 0.15) !important;
 }
 
 /* Collection button pop animation - quick and snappy */
