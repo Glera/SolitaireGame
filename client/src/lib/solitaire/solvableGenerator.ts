@@ -842,8 +842,9 @@ function generateGuaranteedSolvableLayout(): GameState {
       }
     });
     
-    // Decide how many aces to place on top (2-3, higher win rate)
-    const acesOnTop = 2 + Math.floor(Math.random() * 2); // 2 or 3 aces visible
+    // Decide how many aces to place on top (1-2 mostly, rarely 3 for naturalness)
+    const acesRoll = Math.random();
+    const acesOnTop = acesRoll < 0.4 ? 1 : (acesRoll < 0.85 ? 2 : 3); // 40% = 1 ace, 45% = 2 aces, 15% = 3 aces
     
     // Build tableau
     const tableau: Card[][] = [[], [], [], [], [], [], []];

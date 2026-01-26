@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 
 interface TreasureHuntIconProps {
   keys: number;
@@ -274,7 +275,7 @@ export function removeFlyingKey(id: number) {
   }
 }
 
-// Container component for flying keys
+// Container component for flying keys - rendered via portal to ensure proper z-index
 export const FlyingKeysContainer: React.FC = () => {
   const [keys, setKeys] = React.useState<typeof flyingKeysContainer>([]);
   
@@ -285,7 +286,9 @@ export const FlyingKeysContainer: React.FC = () => {
     };
   }, []);
   
-  return (
+  if (keys.length === 0) return null;
+  
+  return ReactDOM.createPortal(
     <>
       {keys.map(({ id, props }) => (
         <FlyingKey
@@ -294,6 +297,7 @@ export const FlyingKeysContainer: React.FC = () => {
           onComplete={() => removeFlyingKey(id)}
         />
       ))}
-    </>
+    </>,
+    document.body
   );
 };

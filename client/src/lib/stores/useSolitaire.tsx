@@ -10,6 +10,7 @@ import { generateSolvableGame, generateUnsolvableGame, markFirstWin, ensureSolva
 import { awardWinXP, awardCardXP, resetXPEarnedCards } from '../solitaire/experienceManager';
 import { resetCardsMovedForCollection } from '../../components/solitaire/FlyingCollectionIcon';
 import { collectKeyFromCard } from '../liveops/keyManager';
+import { getCardOffset, isMobileDevice } from '../solitaire/cardConstants';
 
 // Track cards currently being auto-collected to prevent duplicates
 const autoCollectingCards = new Set<string>();
@@ -496,7 +497,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       if (!isMovingFromFoundation) {
         setTimeout(() => {
           get().triggerAutoCollect();
-        }, 100); // Small delay to let state update
+        }, 50); // Small delay to let state update
       }
     } else {
       // Find source element for return animation
@@ -802,16 +803,12 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       const endRect = endElement.getBoundingClientRect();
       
       // Calculate vertical offset
-      const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+      const isMobile = isMobileDevice();
       let baseOffset = 0;
       
       if (targetColumn.length > 0) {
         const lastCard = targetColumn[targetColumn.length - 1];
-        if (isMobile) {
-          baseOffset = lastCard.faceUp ? 28 : 12;
-        } else {
-          baseOffset = lastCard.faceUp ? 24 : 8;
-        }
+        baseOffset = getCardOffset(lastCard.faceUp, isMobile);
       }
       
       const gameBoard = document.querySelector('[data-game-board]') as HTMLElement;
@@ -903,17 +900,13 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       
       // Calculate vertical offset for the new card position
       // Card should land BELOW the last card, not ON it
-      const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+      const isMobile = isMobileDevice();
       let baseOffset = 0;
       
       if (targetColumn.length > 0) {
         const lastCard = targetColumn[targetColumn.length - 1];
-        // Use smart spacing: more for face-up cards, less for face-down
-        if (isMobile) {
-          baseOffset = lastCard.faceUp ? 28 : 12;
-        } else {
-          baseOffset = lastCard.faceUp ? 24 : 8;
-        }
+        // Use smart spacing from central constants
+        baseOffset = getCardOffset(lastCard.faceUp, isMobile);
       }
       
       // Get scale from the game board container
@@ -1027,17 +1020,13 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       
       // Calculate vertical offset for the new card position
       // Card should land BELOW the last card, not ON it
-      const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+      const isMobile = isMobileDevice();
       let baseOffset = 0;
       
       if (targetColumn.length > 0) {
         const lastCard = targetColumn[targetColumn.length - 1];
-        // Use smart spacing: more for face-up cards, less for face-down
-        if (isMobile) {
-          baseOffset = lastCard.faceUp ? 28 : 12;
-        } else {
-          baseOffset = lastCard.faceUp ? 24 : 8;
-        }
+        // Use smart spacing from central constants
+        baseOffset = getCardOffset(lastCard.faceUp, isMobile);
       }
       
       // Get scale from the game board container
@@ -1375,8 +1364,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
             if (lastCardEl) {
               const lastCardRect = lastCardEl.getBoundingClientRect();
               endX = lastCardRect.left;
-              // Position below the last card with appropriate offset
-              const offset = lastCard.faceUp ? 28 : 12;
+              // Position below the last card with appropriate offset from central constants
+              const offset = getCardOffset(lastCard.faceUp, isMobileDevice());
               endY = lastCardRect.top + offset;
             }
           }
@@ -1476,9 +1465,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           if (lastCardEl) {
             const lastCardRect = lastCardEl.getBoundingClientRect();
             endX = lastCardRect.left;
-            // Position below the last card with appropriate offset
-            // Use the card's visible height portion (face-up cards show more)
-            const offset = lastCardInFromCol.faceUp ? 28 : 12;
+            // Position below the last card with appropriate offset from central constants
+            const offset = getCardOffset(lastCardInFromCol.faceUp, isMobileDevice());
             endY = lastCardRect.top + offset;
           }
         }
@@ -1632,6 +1620,60 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           
           return; // Animation will complete in completeCardAnimation
         }
+      }
+    }
+    
+    // Try to detect foundation-to-tableau moves (card moved from foundation to tableau via click)
+    // Check if any foundation lost a card and tableau gained it
+    for (const suit of suits) {
+      const currentCount = state.foundations[suit].length;
+      const previousCount = previousState.foundations[suit].length;
+      
+      if (currentCount < previousCount) {
+        // Foundation lost a card - find which tableau column gained it
+        const lostCard = previousState.foundations[suit][previousCount - 1];
+        
+        for (let colIdx = 0; colIdx < state.tableau.length; colIdx++) {
+          const currentCol = state.tableau[colIdx];
+          const previousCol = previousState.tableau[colIdx];
+          
+          // This column gained a card
+          if (currentCol.length > previousCol.length) {
+            const addedCard = currentCol[currentCol.length - 1];
+            if (addedCard.id === lostCard.id) {
+              // Found: card moved from foundation to this tableau column
+              const cardEl = document.querySelector(`[data-card-id="${addedCard.id}"]`) as HTMLElement;
+              const foundationEl = document.querySelector(`[data-foundation-pile="${suit}"]`) as HTMLElement;
+              
+              if (cardEl && foundationEl) {
+                const startRect = cardEl.getBoundingClientRect();
+                const foundationRect = foundationEl.getBoundingClientRect();
+                
+                set({
+                  animatingCard: {
+                    card: addedCard,
+                    startPosition: { 
+                      x: startRect.left, 
+                      y: startRect.top 
+                    },
+                    endPosition: { 
+                      x: foundationRect.left, 
+                      y: foundationRect.top 
+                    },
+                    targetSuit: suit,
+                    isUndoAnimation: true,
+                    undoPreviousState: previousState,
+                  },
+                  canUndo: moveHistory.length > 0,
+                });
+                
+                return; // Animation will complete in completeCardAnimation
+              }
+            }
+          }
+        }
+        
+        break; // Only one card can be moved at a time
       }
     }
     
@@ -1937,9 +1979,10 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         return false;
       };
       
-      // Check tableau top cards
+      // Check tableau top cards (only face-up cards)
       for (const column of state.tableau) {
-        if (column.length > 0 && checkCard(column[column.length - 1])) return true;
+        const topCard = column[column.length - 1];
+        if (column.length > 0 && topCard.faceUp && checkCard(topCard)) return true;
       }
       // Check waste
       if (state.waste.length > 0 && checkCard(state.waste[state.waste.length - 1])) return true;
@@ -1958,9 +2001,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     // Set auto-collecting state to block user input
     set({ isAutoCollecting: true });
     
-    // Animation settings for ~2-3 second total time
-    const FLIGHT_DURATION = 150; // Flight time per card
-    const STAGGER_DELAY = 40; // Delay between card launches (50 cards * 40ms = 2 sec)
+    // Animation settings - smooth and consistent pace
+    const FLIGHT_DURATION = 180; // Flight time per card (slightly longer for smoothness)
+    const STAGGER_DELAY = 85; // Delay between card launches (52 cards * 85ms = ~4.4 sec for full collect)
     
     // Collect ALL cards that need to move to foundations
     const cardsToMove: Array<{
@@ -2006,10 +2049,17 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         const column = simTableau[i];
         if (column.length > 0) {
           const topCard = column[column.length - 1];
+          // Only check face-up cards
+          if (!topCard.faceUp) continue;
           const suit = canMoveToFoundation(topCard);
           if (suit) {
             cardsToMove.push({ card: topCard, targetSuit: suit, sourceType: 'tableau', sourceIndex: i });
-            simTableau[i] = column.slice(0, -1);
+            // Remove card and flip the one underneath if face-down
+            const newColumn = column.slice(0, -1);
+            if (newColumn.length > 0 && !newColumn[newColumn.length - 1].faceUp) {
+              newColumn[newColumn.length - 1] = { ...newColumn[newColumn.length - 1], faceUp: true };
+            }
+            simTableau[i] = newColumn;
             simFoundations[suit] = [...(simFoundations[suit] || []), topCard];
             foundCard = true;
             break;
@@ -2087,13 +2137,13 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           completedCards++;
           if (completedCards >= totalCards) {
             set({ isAutoCollecting: false });
-            // Retry auto-collect in case there are other cards to move
+            // Immediately retry auto-collect in case there are other cards to move
             setTimeout(() => {
               const checkState = get();
               if (!checkState.isWon && !checkState.isAutoCollecting) {
                 get().triggerAutoCollect();
               }
-            }, 100);
+            }, 10); // Minimal delay for smooth continuation
           }
           return;
         }
@@ -2159,10 +2209,29 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
             // Update source (remove card) - foundation already updated, history already saved
             const currentState = get();
             
+            // Check if undo was performed - card should still be in foundation
+            // If card is not in foundation, undo was done and we shouldn't modify state
+            const cardStillInFoundation = currentState.foundations[targetSuit].some(c => c.id === card.id);
+            if (!cardStillInFoundation) {
+              // Undo was performed, don't modify state
+              if (completedCards >= totalCards) {
+                set({ isAutoCollecting: false });
+              }
+              return;
+            }
+            
             if (sourceType === 'tableau' && sourceIndex !== undefined) {
-              const newTableau = currentState.tableau.map((col, i) => 
-                i === sourceIndex ? col.filter(c => c.id !== card.id) : col
-              );
+              const newTableau = currentState.tableau.map((col, i) => {
+                if (i === sourceIndex) {
+                  let filtered = col.filter(c => c.id !== card.id);
+                  // Flip card underneath if face down
+                  if (filtered.length > 0 && !filtered[filtered.length - 1].faceUp) {
+                    filtered = [...filtered.slice(0, -1), { ...filtered[filtered.length - 1], faceUp: true }];
+                  }
+                  return filtered;
+                }
+                return col;
+              });
               awardCardXP(card.id);
               set({ tableau: newTableau, moves: currentState.moves + 1 });
             } else if (sourceType === 'waste') {
@@ -2214,13 +2283,13 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
               } else {
                 // Not won yet - check if we should continue auto-collecting
                 set({ isAutoCollecting: false });
-                // Re-trigger auto-collect after a short delay to pick up any remaining cards
+                // Re-trigger auto-collect immediately for smooth continuation
                 setTimeout(() => {
                   const checkState = get();
                   if (!checkState.isWon && !checkState.isAutoCollecting) {
                     get().triggerAutoCollect();
                   }
-                }, 100);
+                }, 10);
               }
             }
           });
@@ -2239,7 +2308,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     });
     
     // Safety timeout - ensure auto-collect ends and retries if needed
-    const maxTime = cardsToMove.length * STAGGER_DELAY + FLIGHT_DURATION + 500;
+    const maxTime = cardsToMove.length * STAGGER_DELAY + FLIGHT_DURATION + 300;
     setTimeout(() => {
       const currentState = get();
       if (currentState.isAutoCollecting) {
@@ -2251,7 +2320,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
             if (!checkState.isWon && !checkState.isAutoCollecting) {
               get().triggerAutoCollect();
             }
-          }, 100);
+          }, 10);
         }
       }
     }, maxTime);
@@ -2413,6 +2482,19 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
               // 2. Remove card from source
               // 3. Add card to foundation
               const stateAfterFlight = get();
+              
+              // Check if card is still in source - if not, undo was performed
+              let cardStillInSource = false;
+              if (source === 'tableau' && columnIndex !== undefined) {
+                cardStillInSource = stateAfterFlight.tableau[columnIndex].some(c => c.id === card.id);
+              } else if (source === 'waste') {
+                cardStillInSource = stateAfterFlight.waste.some(c => c.id === card.id);
+              }
+              
+              if (!cardStillInSource) {
+                // Undo was performed, don't modify state
+                return;
+              }
               
               // Save state BEFORE this move for undo (allows undo one card at a time)
               saveStateToHistory({

@@ -317,7 +317,14 @@ export function tryCollectionDrop(
     rarity: number;
   }> = [];
   
-  for (const collection of collections) {
+  // Check if first collection is complete
+  const firstCollection = collections[0];
+  const isFirstCollectionComplete = firstCollection ? firstCollection.items.every(i => i.collected) : true;
+  
+  for (let collectionIndex = 0; collectionIndex < collections.length; collectionIndex++) {
+    const collection = collections[collectionIndex];
+    const isFirstCollection = collectionIndex === 0;
+    
     for (const item of collection.items) {
       // Get rarity weight (default to 1-star if rarity not set)
       const rarity = item.rarity || 1;
@@ -326,6 +333,12 @@ export function tryCollectionDrop(
       // Slight boost to uncollected items (1.5x)
       if (!item.collected) {
         itemWeight *= 1.5;
+      }
+      
+      // BIG boost for first collection until it's complete (to collect it in 1-2 sessions)
+      if (isFirstCollection && !isFirstCollectionComplete) {
+        // If item not collected: 10x boost, if already collected: 3x boost (for duplicates less)
+        itemWeight *= item.collected ? 3 : 10;
       }
       
       allItems.push({

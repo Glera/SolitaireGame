@@ -2620,7 +2620,7 @@ export function GameBoard() {
                               </span>
                               <span 
                                 className="absolute text-sm font-bold text-yellow-400"
-                                style={{ right: '-7px', bottom: '-7px', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
+                                style={{ right: '-9px', bottom: '-9px', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
                               >
                                 {currentReward.stars}
                               </span>
@@ -2650,7 +2650,7 @@ export function GameBoard() {
                               <span className="text-2xl">⭐</span>
                               <span 
                                 className="absolute text-sm font-bold text-yellow-400"
-                                style={{ right: '-7px', bottom: '-7px', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
+                                style={{ right: '-9px', bottom: '-9px', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
                               >
                                 {nextReward.stars}
                               </span>
@@ -2770,6 +2770,7 @@ export function GameBoard() {
           </div>
           
           {/* Game field container - no side panels */}
+          {/* Note: onDoubleClick and onTouchEnd handlers moved to parent data-game-board to cover entire screen */}
           <div 
             className="inline-block space-y-3" 
             data-game-field 
@@ -2780,37 +2781,6 @@ export function GameBoard() {
                 pointerEvents: 'auto',
                 userSelect: 'none',
                 WebkitUserSelect: 'none'
-              }}
-              onDoubleClick={(e) => {
-                // Double-click on empty area collects all available cards
-                // Check if click was on a card or pile (cards have data-card-id, piles have data-pile)
-                const target = e.target as HTMLElement;
-                const isOnCard = target.closest('[data-card-id]');
-                const isOnPile = target.closest('[data-pile]');
-                const isOnStock = target.closest('[data-stock-pile]');
-                if (!isOnCard && !isOnPile && !isOnStock && !isAutoCollecting) {
-                  collectAllAvailable();
-                }
-              }}
-              onTouchEnd={(e) => {
-                // Double-tap detection for mobile (Telegram WebApp)
-                const now = Date.now();
-                const DOUBLE_TAP_DELAY = 300; // ms
-                
-                if (now - lastTapTimeRef.current < DOUBLE_TAP_DELAY) {
-                  // Double tap detected - check if on empty area
-                  const target = e.target as HTMLElement;
-                  const isOnCard = target.closest('[data-card-id]');
-                  const isOnPile = target.closest('[data-pile]');
-                  const isOnStock = target.closest('[data-stock-pile]');
-                  if (!isOnCard && !isOnPile && !isOnStock && !isAutoCollecting) {
-                    e.preventDefault();
-                    collectAllAvailable();
-                  }
-                  lastTapTimeRef.current = 0; // Reset to prevent triple tap triggering
-                } else {
-                  lastTapTimeRef.current = now;
-                }
               }}
             >
             {/* Background layer for double-click detection */}

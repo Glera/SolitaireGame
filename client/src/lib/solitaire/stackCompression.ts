@@ -1,4 +1,9 @@
 import { Card } from './types';
+import { 
+  getFaceUpOffset, 
+  getFaceDownOffset, 
+  CARD_HEIGHT 
+} from './cardConstants';
 
 /**
  * Calculate vertical offsets for a stack of cards with dynamic compression
@@ -11,11 +16,10 @@ export function calculateStackOffsets(
 ): number[] {
   if (cards.length === 0) return [];
   
-  // Standard offsets (will be compressed if needed)
-  // Reduced to hide center suit when cards overlap
-  const standardFaceUpOffset = isMobile ? 36 : 33;
-  const standardFaceDownOffset = isMobile ? 10 : 8;
-  const cardHeight = 104; // h-26 = 104px
+  // Standard offsets from central constants (will be compressed if needed)
+  const standardFaceUpOffset = getFaceUpOffset(isMobile);
+  const standardFaceDownOffset = getFaceDownOffset(isMobile);
+  const cardHeight = CARD_HEIGHT;
   
   // Calculate total height with standard offsets
   let totalHeightNeeded = cardHeight; // First card height
@@ -53,15 +57,8 @@ export function calculateStackOffsets(
  * Get the vertical offset between stacked cards (for animations and drag previews)
  */
 export function getStackCardOffset(isMobile: boolean, availableHeight?: number): number {
-  // If availableHeight is provided, calculate with compression
-  if (availableHeight !== undefined) {
-    const standardOffset = isMobile ? 36 : 33;
-    // This is a simplified version - for precise compression, use calculateStackOffsets
-    return standardOffset;
-  }
-  
-  // Default offsets without compression
-  return isMobile ? 36 : 33;
+  // Use central constants for face-up offset
+  return getFaceUpOffset(isMobile);
 }
 
 

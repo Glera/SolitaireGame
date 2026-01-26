@@ -277,9 +277,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     const isInStack = animatingCard.stackCards && animatingCard.sourceTableauColumn === columnIndex &&
                       animatingCard.stackCards.some(stackCard => stackCard.id === card.id);
     
-    // For undo animations, check if this card is being animated back
-    // The card is currently in this column and flying back to targetTableauColumn
-    const isUndoCard = animatingCard.isUndoAnimation && animatingCard.isTableauMove && 
+    // For undo animations, hide any card that matches the animating card
+    // This covers both tableau-to-tableau and foundation-to-tableau undo
+    const isUndoCard = animatingCard.isUndoAnimation && 
                        (animatingCard.card.id === card.id ||
                         (animatingCard.stackCards && animatingCard.stackCards.some(sc => sc.id === card.id)));
     
@@ -381,7 +381,8 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
               className={`absolute ${shakingCardIds.includes(card.id) ? 'animate-shake' : ''} ${shouldAnimate ? 'card-dealing' : ''}`}
               style={{ 
                 top: `${cumulativeOffset}px`,
-                animationDelay: shouldAnimate ? `${dealDelay}ms` : undefined
+                animationDelay: shouldAnimate ? `${dealDelay}ms` : undefined,
+                transform: 'translate3d(0, 0, 0)', // Base transform for consistent shake animation
               }}
               data-card-id={card.id}
               data-card-is-top={index === cards.length - 1}

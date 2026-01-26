@@ -326,7 +326,7 @@ export function OtherPlayerNotification({
         <div
           className="absolute pointer-events-none overflow-hidden"
           style={{
-            bottom: '100%', // Right at TOP edge of progress bar
+            bottom: '100%', // Positioned directly above progress bar
             left: 0,
             right: 0,
             height: '50px', // Increased to fit 2 lines of text

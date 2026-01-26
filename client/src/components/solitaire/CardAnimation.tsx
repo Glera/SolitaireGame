@@ -4,6 +4,7 @@ import { Card } from './Card';
 import { createPortal } from 'react-dom';
 import { useGameScaleContext } from '../../contexts/GameScaleContext';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
+import { getCardOffset, isMobileDevice } from '../../lib/solitaire/cardConstants';
 
 interface CardAnimationProps {
   card: CardType;
@@ -30,8 +31,8 @@ export function CardAnimation({
   const { scale } = useGameScaleContext();
   const { setAnimationNearComplete } = useSolitaire();
   
-  // Determine if we're on mobile for card spacing
-  const isMobile = window.innerWidth <= 768;
+  // Determine if we're on mobile for card spacing - use central constants
+  const isMobile = isMobileDevice();
   
   useEffect(() => {
     // Calculate delta for animation
@@ -112,15 +113,11 @@ export function CardAnimation({
         <div style={{ position: 'relative' }}>
           {stackCards.map((stackCard, index) => {
             // Calculate vertical offset for each card in the stack
-            // Use smart spacing: less for face-down, more for face-up
+            // Use central constants for consistent spacing
             let cumulativeOffset = 0;
             for (let i = 0; i < index; i++) {
               const prevCard = stackCards[i];
-              if (isMobile) {
-                cumulativeOffset += prevCard.faceUp ? 52 : 12; // Mobile spacing (updated to 52px)
-              } else {
-                cumulativeOffset += prevCard.faceUp ? 48 : 8; // Desktop spacing (updated to 48px)
-              }
+              cumulativeOffset += getCardOffset(prevCard.faceUp, isMobile);
             }
             
             return (

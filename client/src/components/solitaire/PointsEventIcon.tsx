@@ -188,8 +188,8 @@ export function PointsEventIcon({ eventState, isPulsing, isLocked = false, requi
                 <div 
                   className="absolute text-sm font-bold text-yellow-300"
                   style={{
-                    right: '-7px',
-                    bottom: '-7px',
+                    right: '-9px',
+                    bottom: '-9px',
                     textShadow: '0 1px 2px rgba(0,0,0,0.8), 0 0 4px rgba(0,0,0,0.5)',
                   }}
                 >

@@ -65,7 +65,20 @@ interface FlyingChip {
 }
 
 // Max flying star icons
-const MAX_FLYING_ICONS = 10;
+const MAX_FLYING_ICONS = 30;
+
+// Calculate how many star icons to show based on reward value
+// Up to 10: show as-is (1 star = 1 icon)
+// After 10: each additional icon represents 10 stars
+// Example: 19 = 10 + 1 = 11 icons, 25 = 10 + 2 = 12 icons, 150 = 10 + 14 = 24 icons
+function calculateIconCount(totalStars: number): number {
+  if (totalStars <= 10) {
+    return totalStars;
+  }
+  // First 10 stars = 10 icons, then every 10 additional stars = 1 more icon
+  const additionalIcons = Math.ceil((totalStars - 10) / 10);
+  return Math.min(10 + additionalIcons, MAX_FLYING_ICONS);
+}
 
 interface DailyQuestsProps {
   isVisible: boolean;
@@ -318,10 +331,10 @@ export function DailyQuests({
     const centerX = iconRect.left + iconRect.width / 2;
     const centerY = iconRect.top + iconRect.height / 2;
     
-    // Create stars with two-phase animation (with limit)
+    // Create stars with two-phase animation (with smart scaling)
     const stars: FlyingStar[] = [];
     const totalStars = quest.reward;
-    const iconCount = Math.min(totalStars, MAX_FLYING_ICONS);
+    const iconCount = calculateIconCount(totalStars);
     const starsPerIcon = Math.ceil(totalStars / iconCount);
     let remainingStars = totalStars;
     
@@ -406,7 +419,7 @@ export function DailyQuests({
     }
     
     // Create one chip that bounces off and falls down
-    // Gentle upward impulse for smooth parabolic arc (1-2 seconds total)
+    // Fast upward impulse for quick parabolic arc
     const chip: FlyingChip = {
       id: Date.now(),
       questId,
@@ -414,8 +427,8 @@ export function DailyQuests({
       startY,
       targetX,
       targetY,
-      velocityX: -1.5 + Math.random() * 1, // Gentle left drift
-      velocityY: -5 - Math.random() * 2  // Smooth upward arc
+      velocityX: -2.5 + Math.random() * 1.5, // Faster left drift  
+      velocityY: -9 - Math.random() * 3  // Faster upward arc
     };
     
     setFlyingChips(prev => [...prev, chip]);
@@ -768,19 +781,8 @@ function QuestFlyingStar({ star, onArrived }: { star: FlyingStar; onArrived: () 
   
   if (!isVisible) return null;
   
-  // Determine star color based on value
-  const getStarStyle = (value: number) => {
-    if (value >= 100) {
-      // Purple star for x100
-      return 'hue-rotate(260deg) brightness(1.2) saturate(1.5) drop-shadow(0 0 8px rgba(147, 51, 234, 0.9))';
-    } else if (value >= 10) {
-      // Blue star for x10
-      return 'hue-rotate(180deg) brightness(1.2) drop-shadow(0 0 8px rgba(59, 130, 246, 0.9))';
-    } else {
-      // Gold star (default)
-      return 'drop-shadow(0 0 4px rgba(250, 204, 21, 0.8))';
-    }
-  };
+  // All stars are gold colored (no recoloring based on value)
+  const starStyle = 'drop-shadow(0 0 4px rgba(250, 204, 21, 0.8))';
   
   // Render via portal to ensure it's above everything
   return ReactDOM.createPortal(
@@ -792,7 +794,7 @@ function QuestFlyingStar({ star, onArrived }: { star: FlyingStar; onArrived: () 
         left: star.startX,
         top: star.startY,
         transform: 'translate(-50%, -50%) translateZ(0)',
-        filter: getStarStyle(star.value),
+        filter: starStyle,
         willChange: 'transform, left, top'
       }}
     >
@@ -809,10 +811,11 @@ function QuestFlyingChip({ chip, onArrived }: { chip: FlyingChip; onArrived: () 
   const arrivedRef = useRef(false);
   const rafRef = useRef<number | null>(null);
   const onArrivedRef = useRef(onArrived);
+  const lastTimeRef = useRef<number | null>(null);
   
-  // Physics state
+  // Physics state - now time-based (pixels per second)
   const posRef = useRef({ x: chip.startX, y: chip.startY });
-  const velRef = useRef({ x: chip.velocityX, y: chip.velocityY });
+  const velRef = useRef({ x: chip.velocityX * 60, y: chip.velocityY * 60 }); // Convert to per-second
   const rotationRef = useRef(0);
   
   onArrivedRef.current = onArrived;
@@ -820,24 +823,32 @@ function QuestFlyingChip({ chip, onArrived }: { chip: FlyingChip; onArrived: () 
   useEffect(() => {
     setIsVisible(true);
     
-    const gravity = 0.12; // Slower acceleration for smoother arc (1-2 sec flight)
-    const rotationSpeed = 4; // Slower rotation for elegance
+    // Physics constants - now per second (not per frame)
+    const gravity = 800; // pixels per second squared - fast falling
+    const rotationSpeed = 360; // degrees per second - faster rotation
     
-    const animate = () => {
+    const animate = (timestamp: number) => {
       if (!elementRef.current) {
         rafRef.current = requestAnimationFrame(animate);
         return;
       }
       
-      // Apply gravity - creates smooth parabolic arc
-      velRef.current.y += gravity;
+      // Calculate delta time in seconds
+      if (lastTimeRef.current === null) {
+        lastTimeRef.current = timestamp;
+      }
+      const deltaTime = Math.min((timestamp - lastTimeRef.current) / 1000, 0.05); // Cap at 50ms to prevent jumps
+      lastTimeRef.current = timestamp;
       
-      // Update position
-      posRef.current.x += velRef.current.x;
-      posRef.current.y += velRef.current.y;
+      // Apply gravity - time-based
+      velRef.current.y += gravity * deltaTime;
       
-      // Update rotation
-      rotationRef.current += rotationSpeed;
+      // Update position - time-based
+      posRef.current.x += velRef.current.x * deltaTime;
+      posRef.current.y += velRef.current.y * deltaTime;
+      
+      // Update rotation - time-based
+      rotationRef.current += rotationSpeed * deltaTime;
       
       // Update element position
       elementRef.current.style.left = `${posRef.current.x}px`;

@@ -1852,7 +1852,7 @@ export function Collections({
                         <div 
                           className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide"
                           style={{
-                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                             color: '#fff',
                             boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
                             animation: isRevealed ? 'none' : 'pulse 1s ease-in-out infinite'

@@ -7,6 +7,7 @@ import { useGameScaleContext } from '../../contexts/GameScaleContext';
 import { findBestDropTarget, DropTarget, setCurrentBestTarget, getCurrentBestTarget } from '../../lib/solitaire/dropTargets';
 import { clearAllDropTargetHighlights, applyDropTargetHighlight } from '../../lib/solitaire/styleManager';
 import { perfMonitor } from '../../lib/solitaire/performanceMonitor';
+import { getFaceUpOffset, isMobileDevice } from '../../lib/solitaire/cardConstants';
 import type { Suit } from '../../lib/types/solitaire';
 
 interface DragPreviewProps {
@@ -28,6 +29,10 @@ export function DragPreview({ cards, startPosition, offset = { x: 32, y: 48 } }:
   const rafIdRef = useRef<number | null>(null);
 const { sourceType, sourceIndex, sourceFoundation, draggedCards, collisionHighlightEnabled } = useSolitaire();
   const { scale } = useGameScaleContext();
+  
+  // Calculate card offset to match tableau column spacing - use central constants
+  const isMobile = isMobileDevice();
+  const cardOffset = getFaceUpOffset(isMobile);
   
   useEffect(() => {
     let collisionCheckTimer: number;
@@ -213,7 +218,7 @@ const { sourceType, sourceIndex, sourceFoundation, draggedCards, collisionHighli
     >
       <div className="relative" style={{ 
         width: '64px', 
-        height: `${96 + (cards.length - 1) * 48}px`, // 96px base card height + 48px per additional card (matches face-up spacing)
+        height: `${96 + (cards.length - 1) * cardOffset}px`, // 96px base card height + offset per additional card
         minHeight: '96px' // Ensure at least one card height
       }}>
         {cards.map((card, index) => (
@@ -221,7 +226,7 @@ const { sourceType, sourceIndex, sourceFoundation, draggedCards, collisionHighli
             key={card.id}
             style={{ 
               position: 'absolute',
-              top: `${index * 48}px`, // 48px vertical offset matches face-up cards in tableau
+              top: `${index * cardOffset}px`, // Matches face-up cards spacing in tableau
               left: 0,
               opacity: 0.95,
               filter: highlightedTarget ? 'brightness(1.1)' : 'none',

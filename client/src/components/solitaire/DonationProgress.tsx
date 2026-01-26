@@ -399,7 +399,12 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
           {showDebugMenu && (
             <div 
               className="absolute top-full right-0 mt-1 flex flex-col gap-1.5"
-              style={{ zIndex: 100 }}
+              style={{ 
+                zIndex: 100,
+                maxHeight: 'calc(100vh - 60px)',
+                overflowY: 'auto',
+                WebkitOverflowScrolling: 'touch',
+              }}
             >
               {/* Info button - closes menu because it opens a modal */}
               <button
@@ -492,7 +497,7 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
       {showInfo && ReactDOM.createPortal(
         <div 
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', touchAction: 'none' }}
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
           onClick={() => setShowInfo(false)}
         >
           <div 
@@ -502,11 +507,10 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
               margin: 'auto', 
               maxHeight: 'calc(100vh - 32px)', 
               overflowY: 'auto',
-              touchAction: 'pan-y',
               WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
             }}
             onClick={e => e.stopPropagation()}
-            onTouchMove={e => e.stopPropagation()}
           >
             {/* Header */}
             <div className="relative mb-4">
