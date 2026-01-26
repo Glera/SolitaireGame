@@ -338,7 +338,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
         )}
       </Pile>
       
-      <div className="absolute top-0 left-0 z-10">
+      <div className="absolute top-0 left-0 z-10" data-cards-container="true">
         {(() => {
           // Calculate offsets once for all cards with dynamic compression
           const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
@@ -381,10 +381,12 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
               className={`absolute ${shakingCardIds.includes(card.id) ? 'animate-shake' : ''} ${shouldAnimate ? 'card-dealing' : ''}`}
               style={{ 
                 top: `${cumulativeOffset}px`,
+                zIndex: (index + 1) * 10, // Explicit z-index (10, 20, 30...) - allows keys to have z-index between cards (e.g. 15, 25)
                 animationDelay: shouldAnimate ? `${dealDelay}ms` : undefined,
                 transform: 'translate3d(0, 0, 0)', // Base transform for consistent shake animation
               }}
               data-card-id={card.id}
+              data-card-index={index}
               data-card-is-top={index === cards.length - 1}
               onDragOver={(e) => { 
                 e.preventDefault();

@@ -561,8 +561,8 @@ export function Collections({
       return;
     }
     
-    const collection = collections.find(c => c.id === pendingRewardCollectionId);
-    if (collection) {
+      const collection = collections.find(c => c.id === pendingRewardCollectionId);
+      if (collection) {
       // IMPORTANT: If transitioning from a previous collection, add it to animation queue
       // This happens when auto-transitioning between multiple reward collections
       // Use lastRewardedCollectionRef because currentAnimatingCollectionRef is already null at this point
@@ -583,29 +583,29 @@ export function Collections({
       // Mark this collection as being animated
       currentAnimatingCollectionRef.current = pendingRewardCollectionId;
       
-      // Reset reward animation state
-      setFlyingStars([]);
-      setRewardIconHidden(false);
-      setShowRewardClaimed(false);
-      setRewardProgress(0);
-      starsArrivedCountRef.current = 0;
-      expectedStarsRef.current = 0;
-      rewardGivenRef.current = false;
+        // Reset reward animation state
+        setFlyingStars([]);
+        setRewardIconHidden(false);
+        setShowRewardClaimed(false);
+        setRewardProgress(0);
+        starsArrivedCountRef.current = 0;
+        expectedStarsRef.current = 0;
+        rewardGivenRef.current = false;
       rewardAnimationStartedRef.current = false;
       // Reset animation sets to prevent carryover from previous collection
       // IMPORTANT: Reset visible indices BEFORE selecting collection to prevent flash
       setCollectingItemIndex(null);
       setAnimatingIconIndices(new Set());
       setVisibleIconIndices(new Set());
-      
-      // Auto-select the collection
-      setSelectedCollection(collection);
-      
+        
+        // Auto-select the collection
+        setSelectedCollection(collection);
+        
       // Start animation immediately
-      setTimeout(() => {
-        startRewardAnimation(collection);
+        setTimeout(() => {
+          startRewardAnimation(collection);
       }, 100);
-    }
+      }
   }, [isVisible, pendingRewardCollectionId, collections]);
   
   // When pendingRewardCollectionId becomes null, add the last rewarded collection to animation queue
@@ -626,7 +626,7 @@ export function Collections({
       lastRewardedCollectionRef.current = null;
     }
   }, [isVisible, pendingRewardCollectionId, collections]);
-
+  
   // Auto-trigger grand prize when all conditions are met
   useEffect(() => {
     if (!isVisible) return;
@@ -731,12 +731,12 @@ export function Collections({
       setCollectingItemIndex(null);
       
       // Phase 2: Progress bar animation from 0 to 100
-      setRewardProgress(0);
+    setRewardProgress(0);
       setTimeout(() => setRewardProgress(100), 20);
-      
+    
       // Phase 3: After progress bar fills (700ms transition), launch stars immediately
-      setTimeout(() => {
-        launchRewardStars(collection);
+    setTimeout(() => {
+      launchRewardStars(collection);
       }, 700);
     }, totalAnimationTime);
   };
@@ -1723,15 +1723,15 @@ export function Collections({
               onClick={(e) => { e.stopPropagation(); navigateToNext(); }}
               className="absolute -right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white/80 hover:text-white transition-all z-10"
               style={{ fontSize: '20px' }}
-            >
+      >
               ›
             </button>
           )}
           
-          <div 
+        <div 
             className="bg-gradient-to-b from-indigo-900 to-slate-900 text-white p-5 rounded-2xl shadow-2xl w-full border border-indigo-500/30"
-            onClick={e => e.stopPropagation()}
-          >
+          onClick={e => e.stopPropagation()}
+        >
           {/* Header with title */}
           <div className="flex items-center justify-between mb-3">
             <button 
@@ -1763,33 +1763,33 @@ export function Collections({
             <div className="flex items-center gap-2">
               <span className="text-xs text-white/60">{progress.collected}/{progress.total}</span>
               <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
-                <div 
-                  className="h-full rounded-full transition-all duration-700 ease-out"
-                  style={{ 
-                    width: pendingRewardCollectionId === selectedCollection.id 
-                      ? `${rewardProgress}%` 
-                      : `${progress.percent}%`,
-                    background: isComplete 
-                      ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)'
-                      : 'linear-gradient(90deg, #8b5cf6 0%, #6366f1 100%)'
-                  }}
-                />
-              </div>
+              <div 
+                className="h-full rounded-full transition-all duration-700 ease-out"
+                style={{ 
+                  width: pendingRewardCollectionId === selectedCollection.id 
+                    ? `${rewardProgress}%` 
+                    : `${progress.percent}%`,
+                  background: isComplete 
+                    ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)'
+                    : 'linear-gradient(90deg, #8b5cf6 0%, #6366f1 100%)'
+                }}
+              />
             </div>
+          </div>
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-white/50">Награда:</span>
               {/* Show reward if not yet claimed, hide during animation or after claimed */}
               {!(rewardedCollections?.has(selectedCollection.id) || showRewardClaimed) ? (
-                <div 
-                  ref={rewardIconRef}
+            <div 
+              ref={rewardIconRef}
                   className="text-base font-bold text-yellow-400"
-                  style={{ visibility: rewardIconHidden && pendingRewardCollectionId === selectedCollection.id ? 'hidden' : 'visible' }}
-                >
-                  +{selectedCollection.reward} ⭐
-                </div>
+              style={{ visibility: rewardIconHidden && pendingRewardCollectionId === selectedCollection.id ? 'hidden' : 'visible' }}
+            >
+              +{selectedCollection.reward} ⭐
+            </div>
               ) : (
                 <span className="text-green-400 text-xs font-semibold">✓ Получено</span>
-              )}
+            )}
             </div>
           </div>
           
@@ -1846,7 +1846,7 @@ export function Collections({
                         }}
                       >
                         {item.icon}
-                      </div>
+                  </div>
                       {/* NEW badge - shown for items that are being revealed by animation */}
                       {(isPendingReveal || isRevealed) && (
                         <div 
@@ -1881,8 +1881,8 @@ export function Collections({
                         className="text-[11px] leading-tight text-white/80 text-center mt-0.5 transition-opacity duration-200"
                         style={{ opacity: (isPendingReveal && !isNameRevealed) ? 0 : 1 }}
                       >
-                        {item.name}
-                      </div>
+                    {item.name}
+                  </div>
                     </>
                   ) : (
                     <>
@@ -1913,7 +1913,7 @@ export function Collections({
               );
             })}
           </div>
-        </div>
+          </div>
         </div>
         
         {/* Flying stars for collection detail view */}
@@ -2037,42 +2037,42 @@ export function Collections({
             </button>
           )}
           {!onDebugCompleteAll && <div className="w-6" />}
-          
-          {/* Tabs */}
+        
+        {/* Tabs */}
           <div className="flex gap-1.5 flex-1">
-            <button
-              onClick={() => setActiveTab('collections')}
+          <button
+            onClick={() => setActiveTab('collections')}
               className={`flex-1 py-1.5 px-3 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === 'collections'
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-slate-700/50 text-white/60 hover:text-white hover:bg-slate-700'
-              }`}
-            >
-              📦 Коллекции
-            </button>
-            <button
-              ref={trophiesTabRef}
-              onClick={() => {
-                setActiveTab('trophies');
+              activeTab === 'collections'
+                ? 'bg-amber-600 text-white'
+                : 'bg-slate-700/50 text-white/60 hover:text-white hover:bg-slate-700'
+            }`}
+          >
+            📦 Коллекции
+          </button>
+          <button
+            ref={trophiesTabRef}
+            onClick={() => {
+              setActiveTab('trophies');
                 setHasNewTrophy(false);
                 // Mark animation as shown after a delay (to let it play first time)
                 setTimeout(() => setTrophyAnimationShown(true), 600);
-              }}
+            }}
               className={`flex-1 py-1.5 px-3 rounded-lg text-sm font-semibold transition-all relative ${
-                activeTab === 'trophies'
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-slate-700/50 text-white/60 hover:text-white hover:bg-slate-700'
-              }`}
-            >
-              🏆 Трофеи
-              {hasNewTrophy && (
+              activeTab === 'trophies'
+                ? 'bg-amber-600 text-white'
+                : 'bg-slate-700/50 text-white/60 hover:text-white hover:bg-slate-700'
+            }`}
+          >
+            🏆 Трофеи
+            {hasNewTrophy && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold animate-pulse">
-                  !
-                </span>
-              )}
-            </button>
-          </div>
-          
+                !
+              </span>
+            )}
+          </button>
+        </div>
+        
           {/* Close button */}
           <button 
             onClick={onClose}
@@ -2227,26 +2227,26 @@ export function Collections({
                           ✓ Собрано
                         </div>
                       ) : showProgressBar ? (
-                        <>
+                      <>
                           {/* Progress bar with count overlay */}
                           <div className="relative h-4 bg-slate-600 rounded-full overflow-hidden mt-1">
-                            <div 
+                          <div 
                               className={`h-full rounded-full bg-gradient-to-r ${isRewardAnimating ? 'from-green-500 to-emerald-500' : 'from-indigo-500 to-purple-500'} transition-all duration-700 ease-out`}
                               style={{ width: `${isRewardAnimating ? rewardProgress : Math.min(displayProgress + overshoot, 100)}%` }}
-                            />
+                          />
                             {/* Count text centered on progress bar */}
                             {!isRewardAnimating && (
                               <div className="absolute inset-0 flex items-center justify-center">
                                 <span className="text-[10px] font-semibold text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
                                   {progress.collected}/{progress.total}
                                 </span>
-                              </div>
+                        </div>
                             )}
                           </div>
-                        </>
+                      </>
                       ) : (
                         <div className="h-full" />
-                      )}
+                    )}
                     </div>
                   </button>
                 );

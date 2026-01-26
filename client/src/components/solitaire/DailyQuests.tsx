@@ -419,7 +419,7 @@ export function DailyQuests({
     }
     
     // Create one chip that bounces off and falls down
-    // Fast upward impulse for quick parabolic arc
+    // Lower arc for faster arrival
     const chip: FlyingChip = {
       id: Date.now(),
       questId,
@@ -427,8 +427,8 @@ export function DailyQuests({
       startY,
       targetX,
       targetY,
-      velocityX: -2.5 + Math.random() * 1.5, // Faster left drift  
-      velocityY: -9 - Math.random() * 3  // Faster upward arc
+      velocityX: -2 + Math.random() * 1, // Gentle left drift  
+      velocityY: -4 - Math.random() * 2  // Lower arc (was -9..-12)
     };
     
     setFlyingChips(prev => [...prev, chip]);

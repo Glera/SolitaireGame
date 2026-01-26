@@ -66,8 +66,10 @@ import {
   collectKeyFromCard, 
   setOnKeyCollectedCallback,
   setOnKeysChangedCallback,
+  setOnKeyDropCallback,
   clearAllKeys 
 } from '../../lib/liveops/keyManager';
+import { FlyingKeyDrop } from './FlyingKeyDrop';
 import { TreasureHuntIcon, FlyingKeysContainer, launchFlyingKey, setOnFlyingKeyCompleteCallback } from './TreasureHuntIcon';
 import { TreasureHuntPromo } from './TreasureHuntPromo';
 import { TreasureHuntPopup } from './TreasureHuntPopup';
@@ -748,6 +750,9 @@ export function GameBoard() {
   // Force re-render counter for key distribution updates
   const [, forceKeyUpdate] = useState(0);
   
+  // Flying key drops for animation
+  const [flyingKeyDrops, setFlyingKeyDrops] = useState<Array<{ id: number; cardId: string; targetX: number; targetY: number }>>([]);
+  
   // Register callback for key distribution updates
   useEffect(() => {
     setOnKeysChangedCallback(() => {
@@ -756,11 +761,34 @@ export function GameBoard() {
     return () => setOnKeysChangedCallback(() => {});
   }, []);
   
+  // Register callback for key drop animations
+  useEffect(() => {
+    setOnKeyDropCallback((cardId, targetX, targetY) => {
+      const dropId = Date.now() + Math.random();
+      setFlyingKeyDrops(prev => [...prev, { id: dropId, cardId, targetX, targetY }]);
+    });
+    return () => setOnKeyDropCallback(() => {});
+  }, []);
+  
+  // Track which game layout we've already distributed keys for
+  const keysDistributedForLayoutRef = useRef<string | null>(null);
+  
   // Distribute keys when game starts (after dealing animation completes)
   // Keys are only placed on tableau cards, not on stock/waste pile
   useEffect(() => {
     if (!treasureHuntEvent.active) return;
     if (isDealing) return; // Wait for dealing to complete
+    
+    // Create a unique identifier for this layout based on tableau cards
+    const layoutId = tableau.flat().map(c => c.id).join(',');
+    
+    // Skip if we've already distributed keys for this layout
+    if (keysDistributedForLayoutRef.current === layoutId) {
+      return;
+    }
+    
+    // Mark this layout as having keys distributed
+    keysDistributedForLayoutRef.current = layoutId;
     
     // Get face-down cards from tableau only (preferred for keys)
     const faceDownCards = tableau
@@ -775,7 +803,7 @@ export function GameBoard() {
       .map(c => c.id);
     
     distributeKeys(faceDownCards, faceUpCards, treasureHuntEvent.active);
-  }, [treasureHuntEvent.active, isDealing]);
+  }, [treasureHuntEvent.active, isDealing, tableau]);
   
   // End initial dealing animation after cards have animated in
   useEffect(() => {
@@ -3461,6 +3489,18 @@ export function GameBoard() {
       
       {/* Flying Keys Container */}
       <FlyingKeysContainer />
+      
+      {/* Flying Key Drops (keys falling onto cards) */}
+      {flyingKeyDrops.map(drop => (
+        <FlyingKeyDrop
+          key={drop.id}
+          id={drop.id}
+          cardId={drop.cardId}
+          targetX={drop.targetX}
+          targetY={drop.targetY}
+          onComplete={() => setFlyingKeyDrops(prev => prev.filter(d => d.id !== drop.id))}
+        />
+      ))}
       
       {/* Flying Stars from Treasure Hunt */}
       {treasureFlyingStars.map(star => (

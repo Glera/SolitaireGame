@@ -20,6 +20,17 @@ export function setOnKeysChangedCallback(callback: () => void): void {
   onKeysChangedCallback = callback;
 }
 
+// Callback for key drop animation (when key lands on a card)
+let onKeyDropCallback: ((cardId: string, targetX: number, targetY: number) => void) | null = null;
+
+export function setOnKeyDropCallback(callback: (cardId: string, targetX: number, targetY: number) => void): void {
+  onKeyDropCallback = callback;
+}
+
+export function getOnKeyDropCallback() {
+  return onKeyDropCallback;
+}
+
 /**
  * Distribute keys to random cards at game start
  * Prefers face-down cards to create more anticipation
@@ -62,14 +73,28 @@ export function distributeKeys(faceDownCardIds: string[], faceUpCardIds: string[
     }
   }
   
-  // Add keys sequentially with delay
-  const KEY_DROP_DELAY = 300; // ms between each key drop
+  // Add keys sequentially with delay and animation
+  const KEY_DROP_DELAY = 350; // ms between each key drop
   
   cardsToGetKeys.forEach((cardId, index) => {
     setTimeout(() => {
-      cardsWithKeys.add(cardId);
-      onKeysChangedCallback?.();
-      console.log(`🔑 Key ${index + 1}/${cardsToGetKeys.length} dropped on card ${cardId}`);
+      // Find card element position for drop animation
+      const cardEl = document.querySelector(`[data-card-id="${cardId}"]`) as HTMLElement;
+      if (cardEl && onKeyDropCallback) {
+        const rect = cardEl.getBoundingClientRect();
+        // Target position: bottom-left corner of card where key will land
+        const targetX = rect.left + 12;
+        const targetY = rect.bottom - 12;
+        onKeyDropCallback(cardId, targetX, targetY);
+      }
+      
+      // Add key to card after animation completes (500ms flight + 200ms bounce)
+      setTimeout(() => {
+        cardsWithKeys.add(cardId);
+        onKeysChangedCallback?.();
+      }, 720); // Slightly after animation ends to ensure FlyingKeyDrop is gone
+      
+      console.log(`🔑 Key ${index + 1}/${cardsToGetKeys.length} dropping on card ${cardId}`);
     }, index * KEY_DROP_DELAY);
   });
   

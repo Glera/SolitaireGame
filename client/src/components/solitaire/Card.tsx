@@ -41,42 +41,9 @@ export function Card({
   const [isFlipping, setIsFlipping] = useState(false);
   const [showFace, setShowFace] = useState(card.faceUp);
   const prevFaceUpRef = useRef(card.faceUp);
-  const [keyAnimating, setKeyAnimating] = useState(false);
-  const [keyVisible, setKeyVisible] = useState(false);
-  const [showGlow, setShowGlow] = useState(false);
-  const prevHasKeyRef = useRef(hasKey);
-  
-  // Key drop animation
-  useEffect(() => {
-    if (hasKey && !prevHasKeyRef.current) {
-      // Key just appeared - start drop animation
-      setKeyAnimating(true);
-      setKeyVisible(true);
-      setShowGlow(false); // Glow starts hidden
-      
-      // End key animation and show glow (impact moment)
-      const glowTimer = setTimeout(() => {
-        setShowGlow(true); // Glow appears on "impact"
-      }, 350);
-      
-      const animTimer = setTimeout(() => {
-        setKeyAnimating(false);
-      }, 500);
-      
-      prevHasKeyRef.current = hasKey;
-      return () => {
-        clearTimeout(glowTimer);
-        clearTimeout(animTimer);
-      };
-    } else if (hasKey) {
-      setKeyVisible(true);
-      setShowGlow(true);
-    } else {
-      setKeyVisible(false);
-      setShowGlow(false);
-    }
-    prevHasKeyRef.current = hasKey;
-  }, [hasKey]);
+  // Key visibility - no animation, just show/hide
+  // Animation is handled by FlyingKeyDrop component
+  const keyVisible = hasKey;
   
   // Flip animation (150ms) - only when card changes from faceDown to faceUp
   useEffect(() => {
@@ -200,6 +167,7 @@ export function Card({
   return (
     <div
       data-card-id={card.id}
+      data-face-up={showFace ? 'true' : 'false'}
       className={cn(
         "w-20 h-[104px] cursor-pointer select-none relative",
         isDragging && "opacity-0",
@@ -239,28 +207,12 @@ export function Card({
             left: '2px',
             bottom: '2px',
             filter: 'drop-shadow(0 1px 0 rgba(0,0,0,0.7)) drop-shadow(0 0 1px rgba(0,0,0,0.5))',
-            animation: keyAnimating 
-              ? (showFace 
-                  ? 'keyDrop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' 
-                  : 'keyDropFaceDown 0.35s ease-in forwards')
-              : 'none'
           }}
         >
           <span style={{ fontSize: '0.8rem' }}>🔑</span>
         </div>
       )}
       
-      {/* Golden border for cards with keys - appears on impact */}
-      {showGlow && (
-        <div 
-          className="absolute inset-0 rounded-lg pointer-events-none"
-          style={{
-            boxShadow: 'inset 0 0 0 2px rgba(255, 200, 50, 0.5), 0 0 8px rgba(255, 180, 0, 0.3)',
-            borderRadius: '0.5rem',
-            animation: keyAnimating ? 'keyPulse 0.3s ease-out' : 'none'
-          }}
-        />
-      )}
     </div>
   );
 }

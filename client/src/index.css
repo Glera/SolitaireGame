@@ -319,6 +319,24 @@ canvas {
   will-change: transform;
 }
 
+/* Gold glow effect when key lands on card */
+@keyframes keyGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+  }
+  20% {
+    box-shadow: 0 0 20px 8px rgba(255, 215, 0, 0.8), 0 0 40px 16px rgba(255, 200, 0, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+  }
+}
+
+.key-glow-effect {
+  animation: keyGlow 600ms ease-out forwards;
+  border-radius: 0.5rem; /* Match card border radius */
+}
+
 /* Collection button pop animation - quick and snappy */
 @keyframes collection-pop {
   0% {

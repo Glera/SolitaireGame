@@ -15,6 +15,12 @@ interface FloatingScoreProps {
 export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingScoreProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [mounted, setMounted] = useState(false);
+  
+  // Random offset to prevent scores from stacking in a line during fast auto-collect
+  const [randomOffset] = useState(() => ({
+    x: (Math.random() - 0.5) * 40, // -20 to +20 px
+    y: (Math.random() - 0.5) * 20  // -10 to +10 px
+  }));
 
   useEffect(() => {
     setMounted(true);
@@ -38,10 +44,10 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
 
   return createPortal(
     <div
-      className="fixed pointer-events-none animate-float-up"
+      className="fixed pointer-events-none animate-float-up-delayed"
       style={{
-        left: `${x}px`,
-        top: `${y}px`,
+        left: `${x + randomOffset.x}px`,
+        top: `${y + randomOffset.y}px`,
         transform: 'translateX(-50%)',
         willChange: 'transform, opacity',
         isolation: 'isolate',
@@ -51,10 +57,12 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
     >
       <div 
         style={{
-          color: isEmpty ? '#9ca3af' : '#f8fafc', // Gray for empty
-          fontSize: isEmpty ? '1.25rem' : '1.5rem',
+          color: isEmpty ? '#9ca3af' : '#fb923c', // Gray for empty, orange for score
+          fontSize: isEmpty ? '1rem' : '1.15rem', // Smaller text
           fontWeight: 900,
-          textShadow: '1px 0 0 #000000, -1px 0 0 #000000, 0 1px 0 #000000, 0 -1px 0 #000000',
+          textShadow: isEmpty 
+            ? '1px 0 0 #4b5563, -1px 0 0 #4b5563, 0 1px 0 #4b5563, 0 -1px 0 #4b5563'
+            : '1px 0 0 #9a3412, -1px 0 0 #9a3412, 0 1px 0 #9a3412, 0 -1px 0 #9a3412, 0 2px 4px rgba(0,0,0,0.3)', // Dark orange outline
           transform: 'translate3d(0,0,0)',
           backfaceVisibility: 'hidden',
           whiteSpace: 'nowrap',
@@ -72,19 +80,23 @@ export function FloatingScore({ score, x, y, onComplete, breakdown }: FloatingSc
 // Add CSS animation styles
 const styleSheet = document.createElement('style');
 styleSheet.textContent = `
-  @keyframes float-up {
+  @keyframes float-up-delayed {
     0% {
       transform: translateX(-50%) translateY(0);
       opacity: 1;
     }
+    25% {
+      transform: translateX(-50%) translateY(-10px);
+      opacity: 1;
+    }
     100% {
-      transform: translateX(-50%) translateY(-60px);
+      transform: translateX(-50%) translateY(-50px);
       opacity: 0;
     }
   }
   
-  .animate-float-up {
-    animation: float-up 1.5s ease-out forwards;
+  .animate-float-up-delayed {
+    animation: float-up-delayed 1.5s ease-out forwards;
   }
   
   .text-shadow-glow {
