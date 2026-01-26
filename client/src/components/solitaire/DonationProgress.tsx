@@ -404,6 +404,7 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
                 maxHeight: 'calc(100vh - 60px)',
                 overflowY: 'auto',
                 WebkitOverflowScrolling: 'touch',
+                touchAction: 'pan-y',
               }}
             >
               {/* Info button - closes menu because it opens a modal */}
@@ -497,8 +498,15 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
       {showInfo && ReactDOM.createPortal(
         <div 
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', touchAction: 'none' }}
           onClick={() => setShowInfo(false)}
+          onTouchMove={e => {
+            // Allow scroll inside modal content, block outside
+            const target = e.target as HTMLElement;
+            if (!target.closest('[data-scrollable]')) {
+              e.preventDefault();
+            }
+          }}
         >
           <div 
             className="bg-gradient-to-b from-amber-900 to-amber-950 text-white p-5 rounded-2xl shadow-2xl max-w-sm w-full border border-amber-600/30"
@@ -509,8 +517,10 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
               overflowY: 'auto',
               WebkitOverflowScrolling: 'touch',
               overscrollBehavior: 'contain',
+              touchAction: 'pan-y',
             }}
             onClick={e => e.stopPropagation()}
+            onTouchMove={e => e.stopPropagation()}
           >
             {/* Header */}
             <div className="relative mb-4">
