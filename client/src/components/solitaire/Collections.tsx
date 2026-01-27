@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
+import { useTelegramViewport } from '../../hooks/useTelegramViewport';
 
 // Collection item type
 export interface CollectionItem {
@@ -421,6 +422,7 @@ export function Collections({
   onDebugCompleteAll,
   resetKey
 }: CollectionsProps) {
+  const { height: viewportHeight, isCompact } = useTelegramViewport();
   const [activeTab, setActiveTab] = useState<'collections' | 'trophies'>('collections');
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
   const [selectedTrophy, setSelectedTrophy] = useState<Trophy | null>(null);
@@ -1695,17 +1697,17 @@ export function Collections({
       <div 
         className="fixed inset-0 z-[9997] flex items-center justify-center"
         style={{ 
-          paddingTop: '50px',
-          paddingBottom: '55px',
-          paddingLeft: '16px',
-          paddingRight: '16px'
+          paddingTop: isCompact ? '40px' : '50px',
+          paddingBottom: isCompact ? '45px' : '55px',
+          paddingLeft: '12px',
+          paddingRight: '12px'
         }}
         onClick={handleCloseDetailView}
       >
         {/* Backdrop */}
         <div className="absolute inset-0 bg-black/80" />
         {/* Wrapper for modal + navigation arrows */}
-        <div className="relative max-w-md w-full">
+        <div className="relative max-w-md w-full" style={{ maxHeight: `${viewportHeight - (isCompact ? 85 : 105)}px` }}>
           {/* Left navigation arrow - positioned at left edge of modal */}
           {hasPrevious && (
             <button
@@ -1935,18 +1937,19 @@ export function Collections({
       <div 
         className="fixed inset-0 z-[9997] flex items-center justify-center"
         style={{ 
-          paddingTop: '50px',
-          paddingBottom: '55px',
-          paddingLeft: '16px',
-          paddingRight: '16px'
+          paddingTop: isCompact ? '40px' : '50px',
+          paddingBottom: isCompact ? '45px' : '55px',
+          paddingLeft: '12px',
+          paddingRight: '12px'
         }}
         onClick={() => setSelectedTrophy(null)}
       >
         {/* Backdrop */}
         <div className="absolute inset-0 bg-black/80" />
         <div 
-          className="relative bg-gradient-to-b from-amber-900 to-slate-900 text-white p-5 rounded-2xl shadow-2xl max-w-sm w-full border border-amber-500/30"
-          style={{ maxHeight: 'calc(100vh - 150px)', overflowY: 'auto' }}
+          className={`relative bg-gradient-to-b from-amber-900 to-slate-900 text-white rounded-2xl shadow-2xl max-w-sm w-full border border-amber-500/30 ${isCompact ? 'p-3' : 'p-4'}`}
+          style={{ maxHeight: `${viewportHeight - (isCompact ? 85 : 105)}px`, overflowY: 'auto' }}
+          data-scrollable
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
@@ -2010,18 +2013,22 @@ export function Collections({
     <div 
       className="fixed inset-0 z-[9997] flex items-center justify-center"
       style={{ 
-        paddingTop: '50px',
-        paddingBottom: '55px',
-        paddingLeft: '16px',
-        paddingRight: '16px'
+        paddingTop: isCompact ? '40px' : '50px',
+        paddingBottom: isCompact ? '45px' : '55px',
+        paddingLeft: '12px',
+        paddingRight: '12px'
       }}
       onClick={onClose}
     >
       {/* Backdrop - separate layer, no animation */}
       <div className="absolute inset-0 bg-black/80" />
       <div 
-        className="relative bg-gradient-to-b from-indigo-900 to-slate-900 text-white p-5 rounded-2xl shadow-2xl max-w-md w-full border border-indigo-500/30"
-        style={{ animation: 'modalSlideIn 0.2s ease-out' }}
+        className={`relative bg-gradient-to-b from-indigo-900 to-slate-900 text-white rounded-2xl shadow-2xl max-w-md w-full border border-indigo-500/30 flex flex-col ${isCompact ? 'p-3' : 'p-4'}`}
+        style={{ 
+          animation: 'modalSlideIn 0.2s ease-out',
+          maxHeight: `${viewportHeight - (isCompact ? 85 : 105)}px`
+        }}
+        data-scrollable
         onClick={e => e.stopPropagation()}
       >
         {/* Header with Tabs */}

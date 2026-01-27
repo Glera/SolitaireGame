@@ -1,24 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom';
-
-// Hook to detect if we need compact mode
-function useCompactMode() {
-  const [isCompact, setIsCompact] = useState(false);
-  
-  useEffect(() => {
-    const checkHeight = () => {
-      // If screen height is less than 580px, use compact mode
-      // This ensures everything fits without scrolling on very small screens
-      setIsCompact(window.innerHeight < 580);
-    };
-    
-    checkHeight();
-    window.addEventListener('resize', checkHeight);
-    return () => window.removeEventListener('resize', checkHeight);
-  }, []);
-  
-  return isCompact;
-}
+import { useTelegramViewport } from '../../hooks/useTelegramViewport';
 
 interface Quest {
   id: string;
@@ -112,7 +94,7 @@ export function DailyQuests({
   monthlyRewardClaimed = false,
   onMonthlyProgressIncrement
 }: DailyQuestsProps) {
-  const isCompact = useCompactMode();
+  const { height: viewportHeight, isCompact, isTelegramWeb } = useTelegramViewport();
   const [isAnimating, setIsAnimating] = useState(false);
   const [animatedProgress, setAnimatedProgress] = useState<Record<string, number>>({});
   const [displayedCount, setDisplayedCount] = useState<Record<string, number>>({});
@@ -478,13 +460,20 @@ export function DailyQuests({
         className="fixed inset-0 z-[9997] flex items-center justify-center"
         style={{ 
           backgroundColor: 'rgba(0, 0, 0, 0.85)',
-          paddingTop: isCompact ? '50px' : '65px',
-          paddingBottom: isCompact ? '50px' : '70px'
+          paddingTop: isCompact ? '40px' : '55px',
+          paddingBottom: isCompact ? '40px' : '60px',
+          paddingLeft: '12px',
+          paddingRight: '12px'
         }}
         onClick={handleClick}
       >
         <div 
-          className={`bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl mx-4 max-w-sm w-full shadow-2xl border border-slate-600/50 ${isAnimating ? 'animate-quest-appear' : ''} ${isCompact ? 'p-3' : 'p-5'}`}
+          className={`bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl max-w-sm w-full shadow-2xl border border-slate-600/50 ${isAnimating ? 'animate-quest-appear' : ''} ${isCompact ? 'p-3' : 'p-4'}`}
+          style={{
+            maxHeight: `${viewportHeight - (isCompact ? 80 : 115)}px`,
+            overflowY: 'auto'
+          }}
+          data-scrollable
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}

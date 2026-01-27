@@ -11,7 +11,8 @@ export function useTouchDrag(
   getDraggedCards: () => Card[],
   getSourceType: () => 'tableau' | 'waste' | 'foundation',
   getSourceIndex: () => number | undefined,
-  getSourceFoundation: () => Suit | undefined
+  getSourceFoundation: () => Suit | undefined,
+  onTap?: () => void // Optional callback for tap (non-drag touch)
 ) {
   const touchState = useRef<{
     isDragging: boolean;
@@ -128,13 +129,14 @@ export function useTouchDrag(
       collisionCheckInterval.current = null;
     }
 
+    const wasMoved = touchState.current.moved;
     touchState.current.isDragging = false;
     
     // Get the drop target
     const target = (window as any).__currentTouchDropTarget;
     
-    if (target) {
-      // Perform drop
+    if (target && wasMoved) {
+      // Only drop if it was actually a drag (moved)
       onDrop(target.type, target.index, target.suit);
     }
 
@@ -146,7 +148,24 @@ export function useTouchDrag(
 
     // Hide drag preview
     setShowDragPreview(false);
-  }, [onDragEnd, onDrop, setShowDragPreview]);
+    
+    // If it was just a tap (no movement), call onTap callback and prevent synthetic click
+    if (!wasMoved) {
+      // Prevent the synthetic click event from firing
+      (window as any).__preventNextClick = true;
+      setTimeout(() => {
+        delete (window as any).__preventNextClick;
+      }, 400);
+      
+      // Call tap handler after drag state is cleaned up
+      if (onTap) {
+        // Small delay to ensure drag state is fully cleared
+        setTimeout(() => {
+          onTap();
+        }, 10);
+      }
+    }
+  }, [onDragEnd, onDrop, setShowDragPreview, onTap]);
 
   return {
     handleTouchStart,

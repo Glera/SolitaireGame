@@ -95,13 +95,7 @@ export function distributeKeys(faceDownCardIds: string[], faceUpCardIds: string[
       if (pos && onKeyDropCallback) {
         onKeyDropCallback(cardId, pos.x, pos.y);
       }
-      
-      // Add key to card after animation completes (500ms flight + 200ms bounce)
-      setTimeout(() => {
-        cardsWithKeys.add(cardId);
-        onKeysChangedCallback?.();
-      }, 720); // Slightly after animation ends to ensure FlyingKeyDrop is gone
-      
+      // Note: Key is added to cardsWithKeys by FlyingKeyDrop when animation ends (via addKeyToCard)
       console.log(`🔑 Key ${index + 1}/${cardsToGetKeys.length} dropping on card ${cardId}`);
     }, index * KEY_DROP_DELAY);
   });
@@ -109,6 +103,18 @@ export function distributeKeys(faceDownCardIds: string[], faceUpCardIds: string[
   console.log(`🔑 Scheduling ${cardsToGetKeys.length} keys to drop on cards:`, cardsToGetKeys);
   
   return cardsWithKeys;
+}
+
+/**
+ * Immediately add a key to a card (used by FlyingKeyDrop when key lands)
+ * Uses setTimeout to defer the UI update callback so it doesn't block animations
+ */
+export function addKeyToCard(cardId: string): void {
+  cardsWithKeys.add(cardId);
+  // Defer callback to next tick to avoid blocking animation frames
+  setTimeout(() => {
+    onKeysChangedCallback?.();
+  }, 0);
 }
 
 /**

@@ -5,7 +5,7 @@ import { Card as CardType } from '../../lib/solitaire/types';
 import { useSolitaire, wasUndoJustCompleted } from '../../lib/stores/useSolitaire';
 import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 import { useTouchDrag } from '../../hooks/useTouchDrag';
-import { cardHasKey } from '../../lib/liveops/keyManager';
+// Note: Keys are only distributed to tableau cards, never to stock/waste pile
 
 interface WastePileProps {
   cards: CardType[];
@@ -67,7 +67,10 @@ export function WastePile({ cards }: WastePileProps) {
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   
-  // Touch drag handlers
+  // Ref for tap handler (to avoid dependency issues with useTouchDrag)
+  const handleTapRef = useRef<() => void>(() => {});
+  
+  // Touch drag handlers - with onTap for handling taps properly
   const { handleTouchStart, handleTouchMove, handleTouchEnd } = useTouchDrag(
     startDrag,
     endDrag,
@@ -77,7 +80,8 @@ export function WastePile({ cards }: WastePileProps) {
     () => useSolitaire.getState().draggedCards,
     () => useSolitaire.getState().sourceType,
     () => useSolitaire.getState().sourceIndex,
-    () => useSolitaire.getState().sourceFoundation
+    () => useSolitaire.getState().sourceFoundation,
+    () => handleTapRef.current() // onTap callback via ref
   );
   
   // Track if a new card just appeared (for animation)
@@ -157,15 +161,16 @@ export function WastePile({ cards }: WastePileProps) {
     return true;
   };
 
-  const handleCardClick = () => {
+  // Core card action logic (used by both click and tap handlers)
+  const performCardAction = () => {
     if (!topCard) return;
     
-    // Block clicks during auto-collect
+    // Block during auto-collect
     if (isAutoCollecting) {
       return;
     }
 
-    console.log('🎯 WastePile: Card clicked', topCard);
+    console.log('🎯 WastePile: Card action', topCard);
 
     // Special case: Aces and 2s always go to foundation immediately (no point putting them on tableau)
     if (topCard.rank === 'A' || topCard.rank === '2') {
@@ -206,6 +211,19 @@ export function WastePile({ cards }: WastePileProps) {
     console.log(`⚠️ No valid moves for ${topCard.suit}-${topCard.rank}`);
     setIsShaking(true);
     setTimeout(() => setIsShaking(false), 300);
+  };
+  
+  // Update tap ref to always use latest performCardAction
+  handleTapRef.current = performCardAction;
+
+  // Click handler (for desktop) - checks for synthetic click prevention
+  const handleCardClick = () => {
+    // Prevent synthetic click from touch events (tap was handled by touch end)
+    if ((window as any).__preventNextClick) {
+      delete (window as any).__preventNextClick;
+      return;
+    }
+    performCardAction();
   };
 
   const handleDragStart = (e: React.DragEvent) => {
@@ -309,7 +327,7 @@ export function WastePile({ cards }: WastePileProps) {
             card={fourthCard}
             isPlayable={false}
             isClickable={false}
-            hasKey={cardHasKey(fourthCard.id)}
+            hasKey={false}
           />
         </div>
       )}
@@ -369,7 +387,7 @@ export function WastePile({ cards }: WastePileProps) {
               isDragging={isTop && isTopCardBeingDragged()}
               isAnimating={isTop && isTopCardAnimating()}
               isClickable={isTop}
-              hasKey={cardHasKey(card.id)}
+              hasKey={false}
             />
           </div>
         );

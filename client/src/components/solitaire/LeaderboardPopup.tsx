@@ -265,6 +265,12 @@ export function LeaderboardPopup({
         <div 
           ref={containerRef} 
           className="flex-1 space-y-1 overflow-y-auto custom-scrollbar pr-1 relative"
+          data-scrollable
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-y',
+            overscrollBehavior: 'contain'
+          }}
         >
           {/* Loading overlay - completely opaque to hide list until ready */}
           {isLoading && (

@@ -2742,15 +2742,16 @@ export function GameBoard() {
                 ))}
               </div>
                 <div className="flex gap-1" style={{ marginRight: '8px' }}>
-                <WastePile key={`waste-${keyUpdateCounter}`} cards={waste} />
+                <WastePile cards={waste} />
                 <StockPile cards={stock} />
               </div>
             </div>
             
             {/* Bottom row: Tableau columns */}
-            <div className="flex gap-1" style={{ minHeight: '400px', paddingBottom: '20px' }}>
+            {/* keyUpdateCounter triggers re-render when keys change, without remounting */}
+            <div className="flex gap-1" style={{ minHeight: '400px', paddingBottom: '20px' }} data-key-update={keyUpdateCounter}>
               {tableau.map((column, index) => (
-                <div key={`${index}-${keyUpdateCounter}`} className="min-h-32">
+                <div key={index} className="min-h-32">
                   <TableauColumn cards={column} columnIndex={index} />
                 </div>
               ))}

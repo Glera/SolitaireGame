@@ -202,8 +202,8 @@ export function Card({
         {cardBack}
       </div>
       
-      {/* Key indicator for Treasure Hunt event - show on all cards with keys (face up or face down) */}
-      {keyVisible && (
+      {/* Key indicator for Treasure Hunt event - only show on face-up cards */}
+      {keyVisible && showFace && (
         <div 
           className="absolute flex items-center justify-center z-10 pointer-events-none"
           style={{

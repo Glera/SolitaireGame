@@ -2005,8 +2005,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       return;
     }
     
-    // Before showing "no moves" - check if ANY tableau-to-tableau move is possible
-    // Player should be able to make all available moves before we declare "no moves"
+    // Priority 5: ANY tableau-to-tableau move (even if not strategic)
+    // This ensures we show a hint for any available move before declaring "no moves"
     for (let srcCol = 0; srcCol < state.tableau.length; srcCol++) {
       const srcColumn = state.tableau[srcCol];
       if (srcColumn.length === 0) continue;
@@ -2026,14 +2026,15 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
               // Only count as valid move if it's not the bottom card of a column
               // (moving bottom King to empty column is pointless)
               if (cardIdx > 0) {
-                // There's a valid move - don't show no moves
+                set({ hint: { type: 'tableau', cardId: card.id, from: srcCol, to: dstCol } });
                 return;
               }
             }
           } else {
             const dstTop = dstColumn[dstColumn.length - 1];
             if (dstTop.faceUp && canPlaceOnTableau(dstTop, card)) {
-              // Any valid move between tableau columns - don't show no moves
+              // Found a valid tableau-to-tableau move - show hint for it
+              set({ hint: { type: 'tableau', cardId: card.id, from: srcCol, to: dstCol } });
               return;
             }
           }

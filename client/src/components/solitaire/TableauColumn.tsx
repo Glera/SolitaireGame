@@ -50,6 +50,12 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   // Track shaking cards for invalid moves (store array of card IDs)
   const [shakingCardIds, setShakingCardIds] = useState<string[]>([]);
   
+  // Ref to track which card index was touched (for tap handling)
+  const touchedCardIndexRef = useRef<number>(-1);
+  
+  // Ref for tap handler (to avoid dependency issues with useTouchDrag)
+  const handleTapRef = useRef<() => void>(() => {});
+  
   // Touch drag handlers
   const { handleTouchStart, handleTouchMove, handleTouchEnd } = useTouchDrag(
     startDrag,
@@ -60,7 +66,8 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     () => useSolitaire.getState().draggedCards,
     () => useSolitaire.getState().sourceType,
     () => useSolitaire.getState().sourceIndex,
-    () => useSolitaire.getState().sourceFoundation
+    () => useSolitaire.getState().sourceFoundation,
+    () => handleTapRef.current() // onTap callback via ref
   );
   
   // Register this column as drop target
@@ -92,11 +99,12 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     };
   }, [columnIndex, cards.length]); // Re-register when cards change
 
-  const handleCardClick = (cardIndex: number) => {
+  // Core card action logic (used by both click and tap handlers)
+  const performCardAction = (cardIndex: number) => {
     const card = cards[cardIndex];
-    if (!card.faceUp) return;
+    if (!card || !card.faceUp) return;
     
-    // Block clicks during auto-collect
+    // Block during auto-collect
     if (isAutoCollecting) {
       return;
     }
@@ -147,6 +155,23 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
         setTimeout(() => useSolitaire.getState().checkForAvailableMoves(), 50);
       }
     }
+  };
+  
+  // Update tap ref to use the stored card index
+  handleTapRef.current = () => {
+    if (touchedCardIndexRef.current >= 0) {
+      performCardAction(touchedCardIndexRef.current);
+    }
+  };
+  
+  // Click handler (for desktop) - checks for synthetic click prevention
+  const handleCardClick = (cardIndex: number) => {
+    // Prevent synthetic click from touch events (tap handled by touch end)
+    if ((window as any).__preventNextClick) {
+      delete (window as any).__preventNextClick;
+      return;
+    }
+    performCardAction(cardIndex);
   };
 
   const handleDragStart = (e: React.DragEvent, cardIndex: number) => {
@@ -408,6 +433,8 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
                 const movableCards = getMovableCardsFromTableau(columnIndex);
                 const cardPosition = cards.length - movableCards.length;
                 if (index >= cardPosition) {
+                  // Store the touched card index for tap handling
+                  touchedCardIndexRef.current = index;
                   const cardsToMove = movableCards.slice(index - cardPosition);
                   handleTouchStart(e, cardsToMove, 'tableau', columnIndex);
                   setIsActuallyDragging(true);

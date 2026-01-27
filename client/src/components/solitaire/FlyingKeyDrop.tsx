@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
+import { addKeyToCard } from '../../lib/liveops/keyManager';
 
 interface FlyingKeyDropProps {
   id: number;
@@ -126,8 +127,13 @@ export function FlyingKeyDrop({ id, cardId, targetX, targetY, onComplete }: Flyi
         if (progress < 1) {
           rafRef.current = requestAnimationFrame(animate);
         } else {
-          // Flight complete - trigger pulse on "impact"
-          triggerCardPulse(cardId);
+          // Flight complete - first add key to card (updates border)
+          addKeyToCard(cardId);
+          
+          // Then trigger pulse on "impact" (after a frame for border to render)
+          requestAnimationFrame(() => {
+            triggerCardPulse(cardId);
+          });
           
           // Start bounce phase (only for face-up cards)
           if (!isFaceDown) {
