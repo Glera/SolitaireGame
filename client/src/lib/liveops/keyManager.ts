@@ -76,16 +76,24 @@ export function distributeKeys(faceDownCardIds: string[], faceUpCardIds: string[
   // Add keys sequentially with delay and animation
   const KEY_DROP_DELAY = 350; // ms between each key drop
   
+  // Pre-calculate card positions in a single batch to avoid reflows
+  const cardPositions: Map<string, { x: number; y: number }> = new Map();
+  cardsToGetKeys.forEach(cardId => {
+    const cardEl = document.querySelector(`[data-card-id="${cardId}"]`) as HTMLElement;
+    if (cardEl) {
+      const rect = cardEl.getBoundingClientRect();
+      cardPositions.set(cardId, {
+        x: rect.left + 12,
+        y: rect.bottom - 12
+      });
+    }
+  });
+  
   cardsToGetKeys.forEach((cardId, index) => {
     setTimeout(() => {
-      // Find card element position for drop animation
-      const cardEl = document.querySelector(`[data-card-id="${cardId}"]`) as HTMLElement;
-      if (cardEl && onKeyDropCallback) {
-        const rect = cardEl.getBoundingClientRect();
-        // Target position: bottom-left corner of card where key will land
-        const targetX = rect.left + 12;
-        const targetY = rect.bottom - 12;
-        onKeyDropCallback(cardId, targetX, targetY);
+      const pos = cardPositions.get(cardId);
+      if (pos && onKeyDropCallback) {
+        onKeyDropCallback(cardId, pos.x, pos.y);
       }
       
       // Add key to card after animation completes (500ms flight + 200ms bounce)

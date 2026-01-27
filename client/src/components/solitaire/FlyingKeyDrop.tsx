@@ -120,9 +120,8 @@ export function FlyingKeyDrop({ id, cardId, targetX, targetY, onComplete }: Flyi
         const x = startX + wobble + (endX - startX) * easedProgress;
         const y = startY + (endY - startY) * easedProgress;
         
-        elementRef.current.style.left = `${x}px`;
-        elementRef.current.style.top = `${y}px`;
-        elementRef.current.style.transform = `translate(-50%, -50%)`;
+        // Use transform for GPU acceleration instead of left/top
+        elementRef.current.style.transform = `translate3d(${x - startX}px, ${y - startY}px, 0) translate(-50%, -50%)`;
         
         if (progress < 1) {
           rafRef.current = requestAnimationFrame(animate);
@@ -147,9 +146,10 @@ export function FlyingKeyDrop({ id, cardId, targetX, targetY, onComplete }: Flyi
         // Use sine wave for smooth bounce
         const bounceY = Math.sin(progress * Math.PI) * 4;
         
-        elementRef.current.style.left = `${endX}px`;
-        elementRef.current.style.top = `${endY - bounceY}px`;
-        elementRef.current.style.transform = `translate(-50%, -50%)`;
+        // Use transform for GPU acceleration
+        const totalX = endX - startX;
+        const totalY = endY - startY - bounceY;
+        elementRef.current.style.transform = `translate3d(${totalX}px, ${totalY}px, 0) translate(-50%, -50%)`;
         
         if (progress < 1) {
           rafRef.current = requestAnimationFrame(animate);
@@ -181,11 +181,14 @@ export function FlyingKeyDrop({ id, cardId, targetX, targetY, onComplete }: Flyi
         left: setup.startX,
         top: setup.startY,
         zIndex: 10001,
-        filter: 'drop-shadow(0 1px 0 rgba(0,0,0,0.7)) drop-shadow(0 0 1px rgba(0,0,0,0.5))',
-        willChange: 'transform, left, top',
+        willChange: 'transform',
+        backfaceVisibility: 'hidden',
       }}
     >
-      <span style={{ fontSize: '0.8rem' }}>🔑</span>
+      <span style={{ 
+        fontSize: '0.8rem',
+        textShadow: '0 1px 1px rgba(0,0,0,0.5)',
+      }}>🔑</span>
     </div>,
     document.body
   );

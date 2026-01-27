@@ -8,6 +8,7 @@ import { findBestDropTarget, DropTarget, setCurrentBestTarget, getCurrentBestTar
 import { clearAllDropTargetHighlights, applyDropTargetHighlight } from '../../lib/solitaire/styleManager';
 import { perfMonitor } from '../../lib/solitaire/performanceMonitor';
 import { getFaceUpOffset, isMobileDevice } from '../../lib/solitaire/cardConstants';
+import { cardHasKey } from '../../lib/liveops/keyManager';
 import type { Suit } from '../../lib/types/solitaire';
 
 interface DragPreviewProps {
@@ -238,6 +239,7 @@ const { sourceType, sourceIndex, sourceFoundation, draggedCards, collisionHighli
               card={card} 
               isClickable={false}
               isDragging={false}
+              hasKey={cardHasKey(card.id)}
               style={{
                 cursor: 'grabbing',
                 boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2)'

@@ -4,6 +4,7 @@ import {
   getRewardAtIndex,
   COLLECTION_PACKS,
 } from '../../lib/liveops/pointsEvent';
+import { StarsReward } from './StarsReward';
 
 interface PointsEventIconProps {
   eventState: PointsEventState;
@@ -172,32 +173,11 @@ export function PointsEventIcon({ eventState, isPulsing, isLocked = false, requi
           {packInfo.isPack ? (
             <CardPack color={packInfo.color} stars={packInfo.stars} />
           ) : (
-            <>
-              {/* Stars reward icon with count in bottom-right corner */}
-              <div className="relative">
-                <div 
-                  className="text-3xl"
-                  style={{
-                    filter: hasClaimable 
-                      ? 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.8))'
-                      : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
-                  }}
-                >
-                  ⭐
-                </div>
-                <div 
-                  className="absolute font-bold text-white"
-                  style={{
-                    fontSize: '0.95rem',
-                    right: '-10px',
-                    bottom: '-10px',
-                    textShadow: '0 0 3px rgba(0,0,0,1), 0 1px 2px rgba(0,0,0,0.9), 1px 1px 0 rgba(0,0,0,0.8), -1px -1px 0 rgba(0,0,0,0.8)',
-                  }}
-                >
-                  {nextReward.stars}
-                </div>
-              </div>
-            </>
+            <StarsReward 
+              stars={nextReward.stars || 0} 
+              size="lg" 
+              glow={hasClaimable}
+            />
           )}
         </div>
         

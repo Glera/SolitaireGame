@@ -93,6 +93,8 @@ import {
 import { PointsEventIcon } from './PointsEventIcon';
 import { PointsEventPopup } from './PointsEventPopup';
 import { CollectionPackPopup } from './CollectionPackPopup';
+import { StarsReward } from './StarsReward';
+import { MiniCardPack } from './MiniCardPack';
 
 // Stars reward for level up (same as most expensive collection)
 const STARS_PER_LEVELUP = 50;
@@ -118,86 +120,6 @@ interface Quest {
 // Stars earned per win
 const STARS_PER_WIN = 3;
 
-// Mini single card SVG for flying and miniatures
-function MiniCardPack({ color, stars, size = 48 }: { color: string; stars: number; size?: number }) {
-  const topRow = stars > 3 ? Math.ceil(stars / 2) : stars;
-  const bottomRow = stars > 3 ? stars - topRow : 0;
-  const scale = size / 48;
-  const cardHeight = size * 1.33; // Card aspect ratio ~3:4
-  
-  return (
-    <div 
-      className="relative flex items-center justify-center" 
-      style={{ width: size, height: cardHeight }}
-    >
-      <svg 
-        width={size} 
-        height={cardHeight} 
-        viewBox="0 0 36 48" 
-        fill="none"
-        style={{
-          filter: `drop-shadow(0 2px 4px ${color}60)`,
-        }}
-      >
-        {/* Single card */}
-        <rect x="0" y="0" width="36" height="48" rx="4" fill={color} />
-        {/* Shine effect */}
-        <rect x="0" y="0" width="36" height="48" rx="4" fill="url(#packShineMini)" />
-        <defs>
-          <linearGradient id="packShineMini" x1="0" y1="0" x2="36" y2="48" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.3)" />
-            <stop offset="50%" stopColor="rgba(255,255,255,0)" />
-            <stop offset="100%" stopColor="rgba(0,0,0,0.15)" />
-          </linearGradient>
-        </defs>
-      </svg>
-      {/* Rarity stars centered on the card */}
-      {stars > 0 && (
-        <div 
-          className="absolute flex flex-col items-center justify-center"
-          style={{
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-          }}
-        >
-          <div className="flex justify-center gap-0">
-            {Array.from({ length: topRow }).map((_, i) => (
-              <span 
-                key={i} 
-                style={{ 
-                  fontSize: `${10 * scale}px`,
-                  color: '#fbbf24',
-                  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))',
-                  textShadow: '0 0 4px rgba(251, 191, 36, 0.8)',
-                }}
-              >
-                ★
-              </span>
-            ))}
-          </div>
-          {bottomRow > 0 && (
-            <div className="flex justify-center gap-0" style={{ marginTop: -2 * scale }}>
-              {Array.from({ length: bottomRow }).map((_, i) => (
-                <span 
-                  key={i} 
-                  style={{ 
-                    fontSize: `${10 * scale}px`,
-                    color: '#fbbf24',
-                    filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))',
-                    textShadow: '0 0 4px rgba(251, 191, 36, 0.8)',
-                  }}
-                >
-                  ★
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // Flying reward animation component (from button to miniature row)
 function FlyingRewardToMiniature({ 
@@ -2641,24 +2563,11 @@ export function GameBoard() {
                           }}
                         >
                           {isStars ? (
-                            <div className="relative">
-                              <span 
-                                className={`text-2xl transition-transform duration-150 inline-block ${pointsEventPulse ? 'scale-125' : 'scale-100'}`}
-                              >
-                                ⭐
-                              </span>
-                              <span 
-                                className="absolute font-bold text-white"
-                                style={{ 
-                                  fontSize: '0.95rem',
-                                  right: '-10px', 
-                                  bottom: '-10px', 
-                                  textShadow: '0 0 3px rgba(0,0,0,1), 0 1px 2px rgba(0,0,0,0.9), 1px 1px 0 rgba(0,0,0,0.8), -1px -1px 0 rgba(0,0,0,0.8)' 
-                                }}
-                              >
-                                {currentReward.stars}
-                              </span>
-                            </div>
+                            <StarsReward 
+                              stars={currentReward.stars || 0} 
+                              size="md" 
+                              pulse={pointsEventPulse}
+                            />
                           ) : (
                             <span className={`transition-transform duration-150 inline-block ${pointsEventPulse ? 'scale-110' : 'scale-100'}`}>
                               <MiniCardPack 
@@ -2680,20 +2589,7 @@ export function GameBoard() {
                           }}
                         >
                           {nextIsStars ? (
-                            <div className="relative">
-                              <span className="text-2xl">⭐</span>
-                              <span 
-                                className="absolute font-bold text-white"
-                                style={{ 
-                                  fontSize: '0.95rem',
-                                  right: '-10px', 
-                                  bottom: '-10px', 
-                                  textShadow: '0 0 3px rgba(0,0,0,1), 0 1px 2px rgba(0,0,0,0.9), 1px 1px 0 rgba(0,0,0,0.8), -1px -1px 0 rgba(0,0,0,0.8)' 
-                                }}
-                              >
-                                {nextReward.stars}
-                              </span>
-                            </div>
+                            <StarsReward stars={nextReward.stars || 0} size="md" />
                           ) : (
                             <MiniCardPack 
                               color={COLLECTION_PACKS[nextPackRarity as 1|2|3|4|5]?.color || '#9ca3af'} 

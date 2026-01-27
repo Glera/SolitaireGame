@@ -321,18 +321,19 @@ canvas {
 /* Key impact animation - quick pulse/scale effect */
 @keyframes keyImpact {
   0% {
-    transform: scale(1);
+    transform: scale3d(1, 1, 1);
   }
   40% {
-    transform: scale(1.08);
+    transform: scale3d(1.08, 1.08, 1);
   }
   100% {
-    transform: scale(1);
+    transform: scale3d(1, 1, 1);
   }
 }
 
 .key-impact-effect {
   animation: keyImpact 250ms ease-out;
+  will-change: transform;
 }
 
 /* Collection button pop animation - quick and snappy */
