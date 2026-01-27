@@ -186,11 +186,12 @@ export function PointsEventIcon({ eventState, isPulsing, isLocked = false, requi
                   ⭐
                 </div>
                 <div 
-                  className="absolute text-sm font-bold text-yellow-300"
+                  className="absolute font-bold text-white"
                   style={{
-                    right: '-9px',
-                    bottom: '-9px',
-                    textShadow: '0 1px 2px rgba(0,0,0,0.8), 0 0 4px rgba(0,0,0,0.5)',
+                    fontSize: '0.95rem',
+                    right: '-10px',
+                    bottom: '-10px',
+                    textShadow: '0 0 3px rgba(0,0,0,1), 0 1px 2px rgba(0,0,0,0.9), 1px 1px 0 rgba(0,0,0,0.8), -1px -1px 0 rgba(0,0,0,0.8)',
                   }}
                 >
                   {nextReward.stars}

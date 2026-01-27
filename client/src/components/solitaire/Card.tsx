@@ -84,13 +84,14 @@ export function Card({
       className={cn(
         "absolute inset-0 w-full h-full bg-green-950 flex items-center justify-center",
         "shadow-md outline-none focus:outline-none",
-        "rounded-lg border border-green-900",
+        "rounded-lg border-2",
         "backface-hidden"
       )}
       style={{ 
         borderRadius: '0.5rem',
         backfaceVisibility: 'hidden',
-        transform: 'rotateY(180deg)'
+        transform: 'rotateY(180deg)',
+        borderColor: hasKey ? '#a3b550' : '#14532d' // muted yellow-green for keys, green-900 default
       }}
     >
       <div 
@@ -106,12 +107,13 @@ export function Card({
       className={cn(
         "absolute inset-0 w-full h-full bg-amber-50 p-1",
         "shadow-md outline-none focus:outline-none",
-        "rounded-lg border border-stone-900",
+        "rounded-lg border-2",
         "backface-hidden"
       )}
       style={{ 
         borderRadius: '0.5rem',
-        backfaceVisibility: 'hidden'
+        backfaceVisibility: 'hidden',
+        borderColor: hasKey ? '#fbbf24' : '#1c1917' // amber-400 for keys, stone-900 default
       }}
     >
       {/* Desktop version */}

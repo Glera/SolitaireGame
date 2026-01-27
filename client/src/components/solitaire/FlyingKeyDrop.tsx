@@ -9,14 +9,14 @@ interface FlyingKeyDropProps {
   onComplete: () => void;
 }
 
-// Function to trigger gold glow effect on a card
-function triggerCardGlow(cardId: string) {
+// Function to trigger pulse/scale effect on a card when key lands
+function triggerCardPulse(cardId: string) {
   const cardEl = document.querySelector(`[data-card-id="${cardId}"]`) as HTMLElement;
   if (cardEl) {
-    cardEl.classList.add('key-glow-effect');
+    cardEl.classList.add('key-impact-effect');
     setTimeout(() => {
-      cardEl.classList.remove('key-glow-effect');
-    }, 600);
+      cardEl.classList.remove('key-impact-effect');
+    }, 300);
   }
 }
 
@@ -127,8 +127,8 @@ export function FlyingKeyDrop({ id, cardId, targetX, targetY, onComplete }: Flyi
         if (progress < 1) {
           rafRef.current = requestAnimationFrame(animate);
         } else {
-          // Flight complete - trigger glow on "impact"
-          triggerCardGlow(cardId);
+          // Flight complete - trigger pulse on "impact"
+          triggerCardPulse(cardId);
           
           // Start bounce phase (only for face-up cards)
           if (!isFaceDown) {

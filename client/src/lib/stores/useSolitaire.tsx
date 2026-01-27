@@ -2005,40 +2005,36 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       return;
     }
     
-    // Before showing "no moves" - check if there are face-down cards that can still be revealed
-    // If player can still make tableau-to-tableau moves to reveal cards, don't show "no moves"
-    const hasFaceDownCards = state.tableau.some(col => col.some(c => !c.faceUp));
-    
-    if (hasFaceDownCards) {
-      // Check if ANY tableau-to-tableau move is possible (not just revealing moves)
-      for (let srcCol = 0; srcCol < state.tableau.length; srcCol++) {
-        const srcColumn = state.tableau[srcCol];
-        if (srcColumn.length === 0) continue;
+    // Before showing "no moves" - check if ANY tableau-to-tableau move is possible
+    // Player should be able to make all available moves before we declare "no moves"
+    for (let srcCol = 0; srcCol < state.tableau.length; srcCol++) {
+      const srcColumn = state.tableau[srcCol];
+      if (srcColumn.length === 0) continue;
+      
+      // Check each face-up card stack
+      for (let cardIdx = 0; cardIdx < srcColumn.length; cardIdx++) {
+        const card = srcColumn[cardIdx];
+        if (!card.faceUp) continue;
         
-        // Check each face-up card stack
-        for (let cardIdx = 0; cardIdx < srcColumn.length; cardIdx++) {
-          const card = srcColumn[cardIdx];
-          if (!card.faceUp) continue;
+        for (let dstCol = 0; dstCol < state.tableau.length; dstCol++) {
+          if (srcCol === dstCol) continue;
           
-          for (let dstCol = 0; dstCol < state.tableau.length; dstCol++) {
-            if (srcCol === dstCol) continue;
-            
-            const dstColumn = state.tableau[dstCol];
-            if (dstColumn.length === 0) {
-              // Can move King to empty column (only useful if it reveals a card)
-              if (card.rank === 'K' && cardIdx > 0) {
-                // There's a move that reveals a card - don't show no moves
+          const dstColumn = state.tableau[dstCol];
+          if (dstColumn.length === 0) {
+            // Can move King to empty column
+            if (card.rank === 'K') {
+              // Only count as valid move if it's not the bottom card of a column
+              // (moving bottom King to empty column is pointless)
+              if (cardIdx > 0) {
+                // There's a valid move - don't show no moves
                 return;
               }
-            } else {
-              const dstTop = dstColumn[dstColumn.length - 1];
-              if (dstTop.faceUp && canPlaceOnTableau(dstTop, card)) {
-                // Check if this move would reveal a face-down card
-                if (cardIdx > 0 && !srcColumn[cardIdx - 1].faceUp) {
-                  // This move reveals a card - don't show no moves
-                  return;
-                }
-              }
+            }
+          } else {
+            const dstTop = dstColumn[dstColumn.length - 1];
+            if (dstTop.faceUp && canPlaceOnTableau(dstTop, card)) {
+              // Any valid move between tableau columns - don't show no moves
+              return;
             }
           }
         }
