@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Card } from './Card';
 import { Pile } from './Pile';
 import { Card as CardType, Suit } from '../../lib/solitaire/types';
@@ -37,7 +37,25 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   
-  // Touch drag handlers
+  // Touch drag handlers - tap callback to return card to tableau
+  const handleTap = useCallback(() => {
+    const cardToMove = cards && cards.length > 0 ? cards[cards.length - 1] : null;
+    if (!cardToMove) return;
+    
+    console.log('📱 Foundation tap detected, checking placement for:', cardToMove.rank, cardToMove.suit);
+    
+    // Check if there's a valid tableau placement for this card
+    const targetColumn = findTableauPlacementForCard(cardToMove);
+    if (targetColumn !== null) {
+      console.log('📱 Found valid tableau placement at column:', targetColumn);
+      // Move card from foundation back to tableau
+      const startElement = cardRef.current;
+      moveFoundationToTableau(cardToMove, suit, startElement || undefined);
+    } else {
+      console.log('📱 No valid tableau placement found');
+    }
+  }, [cards, findTableauPlacementForCard, moveFoundationToTableau, suit]);
+  
   const { handleTouchStart, handleTouchMove, handleTouchEnd } = useTouchDrag(
     startDrag,
     endDrag,
@@ -47,7 +65,8 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
     () => useSolitaire.getState().draggedCards,
     () => useSolitaire.getState().sourceType,
     () => useSolitaire.getState().sourceIndex,
-    () => useSolitaire.getState().sourceFoundation
+    () => useSolitaire.getState().sourceFoundation,
+    handleTap // Tap callback for returning card to tableau
   );
   
   // Register this foundation as a drop target

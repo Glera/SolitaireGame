@@ -15,9 +15,12 @@ import { getCardOffset, isMobileDevice } from '../solitaire/cardConstants';
 
 // Track cards currently being auto-collected to prevent duplicates
 const autoCollectingCards = new Set<string>();
+// Track cards being processed in triggerAutoCollect batch
+const batchAutoCollectingCards = new Set<string>();
 
 function clearAutoCollectingCards() {
   autoCollectingCards.clear();
+  batchAutoCollectingCards.clear();
 }
 
 // Move history for undo functionality (store up to 50 moves)
@@ -2271,6 +2274,15 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       setTimeout(() => {
         const { card, targetSuit, sourceType, sourceIndex, stockIndex, wasteIndex } = moveInfo;
         
+        // Skip if this card is already being processed
+        if (batchAutoCollectingCards.has(card.id)) {
+          console.log('⚠️ triggerAutoCollect: skipping card already in batch:', card.rank, card.suit);
+          completedCards++;
+          if (completedCards >= totalCards) set({ isAutoCollecting: false });
+          return;
+        }
+        batchAutoCollectingCards.add(card.id);
+        
         // Check if card can still be added to foundation (state might have changed)
         const stateBeforeAnim = get();
         const foundation = stateBeforeAnim.foundations[targetSuit];
@@ -2283,10 +2295,34 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           canAdd = rankOrder.indexOf(card.rank) === rankOrder.indexOf(topCard.rank) + 1;
         }
         
-        // Skip this card if it can no longer be added
-        if (!canAdd) {
+        // Also verify card still exists in source
+        let cardExistsInSource = false;
+        if (sourceType === 'tableau' && sourceIndex !== undefined) {
+          cardExistsInSource = stateBeforeAnim.tableau[sourceIndex]?.some(c => c.id === card.id) ?? false;
+        } else if (sourceType === 'waste') {
+          cardExistsInSource = stateBeforeAnim.waste.some(c => c.id === card.id);
+        } else if (sourceType === 'stock') {
+          cardExistsInSource = stateBeforeAnim.stock.some(c => c.id === card.id);
+        }
+        
+        if (!cardExistsInSource) {
+          console.log('⚠️ triggerAutoCollect: card no longer in source:', card.rank, card.suit, sourceType);
+          batchAutoCollectingCards.delete(card.id);
           completedCards++;
           if (completedCards >= totalCards) {
+            batchAutoCollectingCards.clear();
+            set({ isAutoCollecting: false });
+          }
+          return;
+        }
+        
+        // Skip this card if it can no longer be added
+        if (!canAdd) {
+          console.log('⚠️ triggerAutoCollect: card can no longer be added:', card.rank, card.suit);
+          batchAutoCollectingCards.delete(card.id);
+          completedCards++;
+          if (completedCards >= totalCards) {
+            batchAutoCollectingCards.clear();
             set({ isAutoCollecting: false });
             setTimeout(() => {
               const checkState = get();
@@ -2413,8 +2449,12 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
               }
             });
             
+            // Remove from batch tracking
+            batchAutoCollectingCards.delete(card.id);
+            
             // Check if all done
             if (completedCards >= totalCards) {
+              batchAutoCollectingCards.clear(); // Clear batch on completion
               const finalState = get();
               const totalInFoundations = Object.values(finalState.foundations).reduce((sum, f) => sum + f.length, 0);
               
