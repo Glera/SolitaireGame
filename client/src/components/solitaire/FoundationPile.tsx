@@ -37,9 +37,6 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   
-  // Track recently clicked cards to prevent duplication
-  const recentlyClickedRef = useRef<string | null>(null);
-  
   // Touch drag handlers
   const { handleTouchStart, handleTouchMove, handleTouchEnd } = useTouchDrag(
     startDrag,
@@ -183,16 +180,7 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   const handleCardClick = () => {
     if (!topCard) return;
     
-    // Block if this card was recently clicked (prevents duplication)
-    if (recentlyClickedRef.current === topCard.id) {
-      return;
-    }
-    
-    // Mark card as recently clicked and clear after animation time
-    recentlyClickedRef.current = topCard.id;
-    setTimeout(() => {
-      recentlyClickedRef.current = null;
-    }, 300);
+    // Note: pointer-events-none on animating cards prevents duplication
     
     // Check if there's a valid tableau placement for this card
     const targetColumn = findTableauPlacementForCard(topCard);

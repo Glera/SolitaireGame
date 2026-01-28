@@ -48,10 +48,6 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   
-  // Track if this column is currently processing a click (prevents duplication bug)
-  // When a card is clicked, we block the entire column for a short time
-  const columnBlockedUntilRef = useRef<number>(0);
-  
   // Track shaking cards for invalid moves (store array of card IDs)
   const [shakingCardIds, setShakingCardIds] = useState<string[]>([]);
   
@@ -106,33 +102,18 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
 
   // Core card action logic (used by both click and tap handlers)
   const performCardAction = (cardIndex: number) => {
-    const now = Date.now();
-    console.log('📱 performCardAction called, cardIndex:', cardIndex, 'column:', columnIndex, 'blockedUntil:', columnBlockedUntilRef.current, 'now:', now);
-    
-    // Block if this column is currently processing a click (prevents duplication bug)
-    // Check this FIRST before anything else
-    if (now < columnBlockedUntilRef.current) {
-      console.log('📱 performCardAction: BLOCKED - column cooldown active, remaining:', columnBlockedUntilRef.current - now, 'ms');
-      return;
-    }
-    
     const card = cards[cardIndex];
     if (!card || !card.faceUp) {
-      console.log('📱 performCardAction: card not found or face down');
       return;
     }
     
     // Block during auto-collect
     if (isAutoCollecting) {
-      console.log('📱 performCardAction: blocked by isAutoCollecting');
       return;
     }
     
-    // Block this column for 400ms (enough for animation to complete and state to update)
-    columnBlockedUntilRef.current = now + 400;
-    console.log('📱 performCardAction: SET blockedUntil to', columnBlockedUntilRef.current);
-    
-    console.log('📱 performCardAction: proceeding with action for card', card.rank, card.suit);
+    // Note: pointer-events-none on animating cards prevents the duplication bug
+    // No additional blocking needed here
 
     // Get all cards from this index to the end (the stack we want to move)
     const cardsToMove = cards.slice(cardIndex);
