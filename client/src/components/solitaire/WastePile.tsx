@@ -170,10 +170,7 @@ export function WastePile({ cards }: WastePileProps) {
       return;
     }
     
-    // Block if THIS card is currently animating (to prevent duplicates)
-    if (animatingCard && animatingCard.card.id === topCard.id) {
-      return;
-    }
+    // Don't block on animatingCard - it was causing issues on mobile
 
     console.log('🎯 WastePile: Card action', topCard);
 

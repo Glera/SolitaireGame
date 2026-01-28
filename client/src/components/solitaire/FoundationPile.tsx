@@ -180,10 +180,7 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   const handleCardClick = () => {
     if (!topCard) return;
     
-    // Block if THIS card is currently animating (to prevent duplicates)
-    if (animatingCard && animatingCard.card.id === topCard.id) {
-      return;
-    }
+    // Don't block on animatingCard - it was causing issues on mobile
     
     // Check if there's a valid tableau placement for this card
     const targetColumn = findTableauPlacementForCard(topCard);

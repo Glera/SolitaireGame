@@ -115,12 +115,14 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       return;
     }
     
-    // Block if THIS card is currently animating (to prevent duplicates)
-    // But allow other cards to be clicked
-    if (animatingCard && animatingCard.card.id === card.id) {
-      console.log('📱 performCardAction: blocked by animatingCard');
-      return;
+    // Log animating card state for debugging
+    if (animatingCard) {
+      console.log('📱 animatingCard exists:', animatingCard.card.rank, animatingCard.card.suit, 'id:', animatingCard.card.id, 'clicked card id:', card.id);
     }
+    
+    // Don't block on animatingCard - it was causing issues on mobile
+    // The animation system should handle preventing duplicates differently
+    
     console.log('📱 performCardAction: proceeding with action for card', card.rank, card.suit);
 
     // Get all cards from this index to the end (the stack we want to move)
