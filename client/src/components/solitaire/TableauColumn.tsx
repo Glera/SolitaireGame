@@ -48,8 +48,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   
-  // Track recently clicked cards to prevent duplication (alternative to animatingCard check)
-  const recentlyClickedCardsRef = useRef<Set<string>>(new Set());
+  // Track if this column is currently processing a click (prevents duplication bug)
+  // When a card is clicked, we block the entire column for a short time
+  const columnBlockedUntilRef = useRef<number>(0);
   
   // Track shaking cards for invalid moves (store array of card IDs)
   const [shakingCardIds, setShakingCardIds] = useState<string[]>([]);
@@ -105,7 +106,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
 
   // Core card action logic (used by both click and tap handlers)
   const performCardAction = (cardIndex: number) => {
-    console.log('📱 performCardAction called, cardIndex:', cardIndex);
+    console.log('📱 performCardAction called, cardIndex:', cardIndex, 'column:', columnIndex);
     const card = cards[cardIndex];
     if (!card || !card.faceUp) {
       console.log('📱 performCardAction: card not found or face down');
@@ -118,18 +119,16 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       return;
     }
     
-    // Block if this card was recently clicked (prevents duplication)
-    // Uses a time-based approach instead of animatingCard which was getting stuck on mobile
-    if (recentlyClickedCardsRef.current.has(card.id)) {
-      console.log('📱 performCardAction: blocked - card recently clicked:', card.rank, card.suit);
+    // Block if this column is currently processing a click (prevents duplication bug)
+    // The bug: clicking card under a flying card causes duplication
+    const now = Date.now();
+    if (now < columnBlockedUntilRef.current) {
+      console.log('📱 performCardAction: blocked - column cooldown active, remaining:', columnBlockedUntilRef.current - now, 'ms');
       return;
     }
     
-    // Mark card as recently clicked and clear after animation time
-    recentlyClickedCardsRef.current.add(card.id);
-    setTimeout(() => {
-      recentlyClickedCardsRef.current.delete(card.id);
-    }, 300); // 300ms cooldown
+    // Block this column for 350ms (enough for animation to complete and state to update)
+    columnBlockedUntilRef.current = now + 350;
     
     console.log('📱 performCardAction: proceeding with action for card', card.rank, card.suit);
 
