@@ -169,6 +169,11 @@ export function WastePile({ cards }: WastePileProps) {
     if (isAutoCollecting) {
       return;
     }
+    
+    // Block during card animation to prevent duplicates
+    if (animatingCard) {
+      return;
+    }
 
     console.log('🎯 WastePile: Card action', topCard);
 

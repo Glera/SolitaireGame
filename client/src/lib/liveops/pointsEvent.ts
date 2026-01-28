@@ -318,6 +318,12 @@ export function generatePackItems(
   const pack = COLLECTION_PACKS[packRarity];
   const items: PackItem[] = [];
   
+  // Check if first collection is complete
+  const firstCollection = collections[0];
+  const isFirstCollectionComplete = firstCollection 
+    ? firstCollection.items.every(i => i.collected) 
+    : true;
+  
   // Build pool of all items with weights
   interface PoolItem {
     collectionId: string;
@@ -326,10 +332,13 @@ export function generatePackItems(
     name: string;
     rarity: number;
     isCollected: boolean;
+    isFirstCollection: boolean;
   }
   
   const allItems: PoolItem[] = [];
-  for (const collection of collections) {
+  for (let collectionIndex = 0; collectionIndex < collections.length; collectionIndex++) {
+    const collection = collections[collectionIndex];
+    const isFirstColl = collectionIndex === 0;
     for (const item of collection.items) {
       allItems.push({
         collectionId: collection.id,
@@ -338,9 +347,23 @@ export function generatePackItems(
         name: item.name,
         rarity: item.rarity,
         isCollected: item.collected,
+        isFirstCollection: isFirstColl,
       });
     }
   }
+  
+  // Helper to calculate item weight with first collection boost
+  const getItemWeight = (item: PoolItem, baseBoost: number = 1): number => {
+    let weight = RARITY_WEIGHTS[item.rarity] || 1;
+    if (!item.isCollected) weight *= baseBoost; // Boost uncollected
+    
+    // HUGE boost for first collection until it's complete
+    if (item.isFirstCollection && !isFirstCollectionComplete) {
+      weight *= item.isCollected ? 5 : 50;
+    }
+    
+    return weight;
+  };
   
   // First, pick guaranteed item with minimum rarity
   const guaranteedPool = allItems.filter(i => i.rarity >= pack.guaranteedMinRarity);
@@ -348,8 +371,7 @@ export function generatePackItems(
     // Weight by rarity (higher rarity = lower weight) and boost uncollected
     let totalWeight = 0;
     const weightedGuaranteed = guaranteedPool.map(item => {
-      let weight = RARITY_WEIGHTS[item.rarity] || 1;
-      if (!item.isCollected) weight *= 2; // Boost uncollected
+      const weight = getItemWeight(item, 2);
       totalWeight += weight;
       return { item, weight, cumulativeWeight: totalWeight };
     });
@@ -374,8 +396,7 @@ export function generatePackItems(
     const weightedItems = allItems.map(item => {
       // Skip if already selected (allow duplicates for common items)
       const alreadySelected = items.some(i => i.collectionId === item.collectionId && i.itemId === item.itemId);
-      let weight = RARITY_WEIGHTS[item.rarity] || 1;
-      if (!item.isCollected) weight *= 1.5; // Slight boost for uncollected
+      let weight = getItemWeight(item, 1.5);
       if (alreadySelected && !item.isCollected) weight = 0; // Don't duplicate uncollected items
       totalWeight += weight;
       return { item, weight, cumulativeWeight: totalWeight };

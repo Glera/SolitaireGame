@@ -22,6 +22,8 @@ interface DonationProgressProps {
   onDropCollectionItem?: () => void;
   onTestLevelUp?: () => void;
   onNextDay?: () => void;
+  onStartDungeonDig?: () => void;
+  onShowOvertaken?: () => void;
   pulseKey?: number;
   onOtherPlayerStars?: (count: number) => void;
   disableOtherPlayerNotifications?: boolean;
@@ -108,6 +110,8 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
   onDropCollectionItem,
   onTestLevelUp,
   onNextDay,
+  onStartDungeonDig,
+  onShowOvertaken,
   pulseKey = 0,
   onOtherPlayerStars,
   disableOtherPlayerNotifications = false
@@ -462,6 +466,30 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
                   title="Следующий день"
                 >
                   <span className="text-white text-sm">📅</span>
+                </button>
+              )}
+              
+              {/* Start Dungeon Dig event button */}
+              {onStartDungeonDig && (
+                <button
+                  onClick={() => { onStartDungeonDig(); setShowDebugMenu(false); }}
+                  className="w-7 h-7 flex items-center justify-center rounded-full bg-amber-600/50 hover:bg-amber-600/70 transition-colors border border-amber-500/60 shadow-md backdrop-blur-sm"
+                  aria-label="Запустить Подземелье"
+                  title="Запустить Подземелье"
+                >
+                  <span className="text-white text-sm">🪏</span>
+                </button>
+              )}
+              
+              {/* Show overtaken notification button */}
+              {onShowOvertaken && (
+                <button
+                  onClick={() => { onShowOvertaken(); setShowDebugMenu(false); }}
+                  className="w-7 h-7 flex items-center justify-center rounded-full bg-red-500/50 hover:bg-red-500/70 transition-colors border border-red-400/60 shadow-md backdrop-blur-sm"
+                  aria-label="Показать 'Вас обогнали'"
+                  title="Показать 'Вас обогнали'"
+                >
+                  <span className="text-white text-sm">⬇️</span>
                 </button>
               )}
               

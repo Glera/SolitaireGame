@@ -58,7 +58,10 @@ import {
   isEventAvailable,
   getRequiredLevel,
   addKeys,
-  resetTreasureHuntEvent
+  resetTreasureHuntEvent,
+  formatTimeRemaining,
+  isTimeCritical as checkIsTimeCritical,
+  isEventExpired
 } from '../../lib/liveops/treasureHunt';
 import { 
   distributeKeys, 
@@ -73,6 +76,33 @@ import { FlyingKeyDrop } from './FlyingKeyDrop';
 import { TreasureHuntIcon, FlyingKeysContainer, launchFlyingKey, setOnFlyingKeyCompleteCallback } from './TreasureHuntIcon';
 import { TreasureHuntPromo } from './TreasureHuntPromo';
 import { TreasureHuntPopup } from './TreasureHuntPopup';
+import { DungeonDigPromo } from './DungeonDigPromo';
+// Dungeon Dig Event
+import {
+  DungeonDigEvent,
+  TileReward,
+  getDungeonDigEvent,
+  saveDungeonDigEvent,
+  activateDungeonDig,
+  isEventAvailable as isDungeonAvailable,
+  getRequiredLevel as getDungeonRequiredLevel,
+  addShovels,
+  resetDungeonDigEvent,
+  formatTimeRemaining as formatDungeonTime,
+  isTimeCritical as checkDungeonTimeCritical,
+  isEventExpired as isDungeonExpired
+} from '../../lib/liveops/dungeonDig';
+import { digTile as dungeonDigTile } from '../../lib/liveops/dungeonDig/logic';
+import {
+  distributeShovels,
+  cardHasShovel,
+  collectShovelFromCard,
+  clearAllShovels,
+  setCallbacks as setShovelCallbacks
+} from '../../lib/liveops/dungeonDig/shovelManager';
+import { FlyingShovelDrop } from './FlyingShovelDrop';
+import { DungeonDigIcon, FlyingShovelsContainer, launchFlyingShovel, setOnFlyingShovelCompleteCallback } from './DungeonDigIcon';
+import { DungeonDigPopup } from './DungeonDigPopup';
 import { 
   PointsEventState,
   PendingReward,
@@ -529,6 +559,46 @@ export function GameBoard() {
   });
   const [pendingTreasureHuntPromo, setPendingTreasureHuntPromo] = useState(false);
   
+  // DungeonDig promo state - show promo when event starts in rotation
+  const [showDungeonDigPromo, setShowDungeonDigPromo] = useState(false);
+  const [pendingDungeonDigPromo, setPendingDungeonDigPromo] = useState(false);
+  
+  // Treasure Hunt timer state
+  const [treasureHuntTimeRemaining, setTreasureHuntTimeRemaining] = useState<string>('');
+  const [treasureHuntTimeCritical, setTreasureHuntTimeCritical] = useState(false);
+  const [showEventEndedPopup, setShowEventEndedPopup] = useState(false);
+  
+  // Dungeon Dig LiveOps event state
+  const [dungeonDigEvent, setDungeonDigEvent] = useState<DungeonDigEvent>(() => getDungeonDigEvent());
+  const [showDungeonDig, setShowDungeonDig] = useState(false);
+  const [dungeonEventCompleteOverlay, setDungeonEventCompleteOverlay] = useState(false);
+  const [pendingDungeonEventComplete, setPendingDungeonEventComplete] = useState(false); // Set when floor 10 pack is claimed
+  const dungeonDigIconRef = useRef<HTMLDivElement>(null);
+  const [dungeonDigPulse, setDungeonDigPulse] = useState(false);
+  const [dungeonDigTimeRemaining, setDungeonDigTimeRemaining] = useState<string>('');
+  const [dungeonDigTimeCritical, setDungeonDigTimeCritical] = useState(false);
+  const [dungeonDigExpired, setDungeonDigExpired] = useState(() => {
+    const event = getDungeonDigEvent();
+    return event.endTime ? isDungeonExpired(event) : false;
+  });
+  const [showDungeonEndedPopup, setShowDungeonEndedPopup] = useState(false);
+  
+  // Event rotation state - which event should start next after a win
+  // 'treasure' = TreasureHunt next, 'dungeon' = DungeonDig next
+  const [nextEventType, setNextEventType] = useState<'treasure' | 'dungeon'>(() => {
+    const saved = localStorage.getItem('solitaire_next_event_type');
+    return (saved as 'treasure' | 'dungeon') || 'treasure';
+  });
+  
+  // Flying shovel drops for animation
+  const [flyingShovelDrops, setFlyingShovelDrops] = useState<Array<{
+    id: number;
+    cardId: string;
+    targetX: number;
+    targetY: number;
+  }>>([]);
+  const shovelsDistributedRef = useRef(false);
+  
   // Collections unlock state
   const [showCollectionsUnlock, setShowCollectionsUnlock] = useState(false);
   const [collectionsUnlockShown, setCollectionsUnlockShown] = useState(() => {
@@ -538,6 +608,7 @@ export function GameBoard() {
   const [showLockedCollectionsPopup, setShowLockedCollectionsPopup] = useState(false);
   const [showLockedPointsEventPopup, setShowLockedPointsEventPopup] = useState(false);
   const [showLockedLeaderboardPopup, setShowLockedLeaderboardPopup] = useState(false);
+  const [showLockedDungeonPopup, setShowLockedDungeonPopup] = useState(false);
   
   // Leaderboard unlock state
   const [showLeaderboardUnlock, setShowLeaderboardUnlock] = useState(false);
@@ -564,8 +635,9 @@ export function GameBoard() {
   const [nextRewardDropping, setNextRewardDropping] = useState(false); // Track when next reward is dropping in
   const [animatingRewardIndex, setAnimatingRewardIndex] = useState<number | null>(null); // Index of reward being animated away
   // Queue for pack rewards - allows multiple packs to be queued from rapid chest clicks
-  const [packRewardsQueue, setPackRewardsQueue] = useState<Array<{ rarity: PackRarity; items: PackItem[]; sourcePosition?: { x: number; y: number } }>>([]);
+  const [packRewardsQueue, setPackRewardsQueue] = useState<Array<{ rarity: PackRarity; items: PackItem[]; sourcePosition?: { x: number; y: number }; skipBounce?: boolean }>>([]);
   const [showPackPopup, setShowPackPopup] = useState(false);
+  const [packBlocksTiles, setPackBlocksTiles] = useState(false); // Blocks tile digging until cards start flying
   // Current pack being shown (first item from queue)
   const currentPackReward = packRewardsQueue[0] || null;
   const [autoClaimingRewards, setAutoClaimingRewards] = useState(false); // Track if we're auto-claiming after win
@@ -696,19 +768,136 @@ export function GameBoard() {
   const keysDistributedRef = useRef<boolean>(false);
   const prevIsDealingRef = useRef<boolean>(true);
   
-  // Reset keys distributed flag when new game starts (isDealing becomes true)
+  // Reset distribution flags when new game starts
   useEffect(() => {
     if (isDealing && !prevIsDealingRef.current) {
-      // New game started - reset flag
       keysDistributedRef.current = false;
+      shovelsDistributedRef.current = false;
     }
     prevIsDealingRef.current = isDealing;
   }, [isDealing]);
   
+  // Timer for Treasure Hunt event - updates every second
+  // Track if event time expired (but player can still use remaining keys)
+  const [treasureHuntExpired, setTreasureHuntExpired] = useState(() => {
+    const event = getTreasureHuntEvent();
+    return event.endTime ? isEventExpired(event) : false;
+  });
+  
+  useEffect(() => {
+    if (!treasureHuntEvent.active || !treasureHuntEvent.endTime) return;
+    
+    const updateTimer = () => {
+      const expired = isEventExpired(treasureHuntEvent);
+      
+      if (expired) {
+        // Timer ended - but allow using remaining keys
+        setTreasureHuntTimeRemaining('0:00');
+        setTreasureHuntTimeCritical(true);
+        setTreasureHuntExpired(true);
+        
+        // Clear keys from cards (no more key collection)
+        clearAllKeys();
+        
+        // Show popup only once
+        if (!treasureHuntExpired) {
+          setShowEventEndedPopup(true);
+        }
+      } else {
+        const timeStr = formatTimeRemaining(treasureHuntEvent.endTime!);
+        setTreasureHuntTimeRemaining(timeStr);
+        setTreasureHuntTimeCritical(checkIsTimeCritical(treasureHuntEvent.endTime!));
+      }
+    };
+    
+    // Initial update
+    updateTimer();
+    
+    // Update every second
+    const interval = setInterval(updateTimer, 1000);
+    
+    return () => clearInterval(interval);
+  }, [treasureHuntEvent.active, treasureHuntEvent.endTime, treasureHuntExpired]);
+  
+  // Fully deactivate event when expired and all keys are spent
+  useEffect(() => {
+    if (treasureHuntExpired && treasureHuntEvent.keys === 0 && treasureHuntEvent.active) {
+      const updatedEvent = { ...treasureHuntEvent, active: false };
+      saveTreasureHuntEvent(updatedEvent);
+      setTreasureHuntEvent(updatedEvent);
+      // Mark next event as dungeon
+      setNextEventType('dungeon');
+      localStorage.setItem('solitaire_next_event_type', 'dungeon');
+    }
+  }, [treasureHuntExpired, treasureHuntEvent.keys, treasureHuntEvent.active]);
+  
+  // Timer for Dungeon Dig event
+  useEffect(() => {
+    if (!dungeonDigEvent.active || !dungeonDigEvent.endTime) return;
+    
+    const updateTimer = () => {
+      const expired = isDungeonExpired(dungeonDigEvent);
+      
+      if (expired) {
+        setDungeonDigTimeRemaining('0:00');
+        setDungeonDigTimeCritical(true);
+        setDungeonDigExpired(true);
+        
+        // Clear shovels from cards
+        clearAllShovels();
+        
+        if (!dungeonDigExpired) {
+          setShowDungeonEndedPopup(true);
+        }
+      } else {
+        const timeStr = formatDungeonTime(dungeonDigEvent.endTime!);
+        setDungeonDigTimeRemaining(timeStr);
+        setDungeonDigTimeCritical(checkDungeonTimeCritical(dungeonDigEvent.endTime!));
+      }
+    };
+    
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [dungeonDigEvent.active, dungeonDigEvent.endTime, dungeonDigExpired]);
+  
+  // Fully deactivate DungeonDig when expired and all shovels are spent
+  useEffect(() => {
+    if (dungeonDigExpired && dungeonDigEvent.shovels === 0 && dungeonDigEvent.active) {
+      const updatedEvent = { ...dungeonDigEvent, active: false };
+      saveDungeonDigEvent(updatedEvent);
+      setDungeonDigEvent(updatedEvent);
+      // Mark next event as treasure
+      setNextEventType('treasure');
+      localStorage.setItem('solitaire_next_event_type', 'treasure');
+    }
+  }, [dungeonDigExpired, dungeonDigEvent.shovels, dungeonDigEvent.active]);
+  
+  // Check if next event should start when previous one fully ends
+  // Instead of auto-starting, set pending promo to show before game starts
+  useEffect(() => {
+    const eventsUnlocked = isEventAvailable(playerLevel);
+    const noActiveEvent = !treasureHuntEvent.active && !dungeonDigEvent.active;
+    const treasureFullyEnded = treasureHuntExpired && treasureHuntEvent.keys === 0;
+    const dungeonFullyEnded = dungeonDigExpired && dungeonDigEvent.shovels === 0;
+    
+    // When an event fully ends, set pending promo for next event
+    if (eventsUnlocked && noActiveEvent && (treasureFullyEnded || dungeonFullyEnded)) {
+      if (nextEventType === 'treasure') {
+        // TreasureHunt is next - set pending promo
+        setPendingTreasureHuntPromo(true);
+      } else {
+        // DungeonDig is next - set pending promo  
+        setPendingDungeonDigPromo(true);
+      }
+    }
+  }, [playerLevel, treasureHuntEvent.active, dungeonDigEvent.active, treasureHuntExpired, dungeonDigExpired, treasureHuntEvent.keys, dungeonDigEvent.shovels, nextEventType]);
+  
   // Distribute keys ONCE when dealing completes (isDealing becomes false)
   // Keys are only placed on tableau cards, not on stock/waste pile
   useEffect(() => {
-    if (!treasureHuntEvent.active) return;
+    // Don't distribute if event is not active or already expired
+    if (!treasureHuntEvent.active || treasureHuntExpired) return;
     if (isDealing) return; // Wait for dealing to complete
     if (keysDistributedRef.current) return; // Already distributed for this game
     
@@ -727,8 +916,30 @@ export function GameBoard() {
       .filter(c => c.faceUp)
       .map(c => c.id);
     
-    distributeKeys(faceDownCards, faceUpCards, treasureHuntEvent.active);
-  }, [treasureHuntEvent.active, isDealing, tableau]);
+    distributeKeys(faceDownCards, faceUpCards, treasureHuntEvent.active && !treasureHuntExpired);
+  }, [treasureHuntEvent.active, treasureHuntExpired, isDealing, tableau]);
+  
+  // Distribute shovels ONCE when dealing completes (for DungeonDig)
+  useEffect(() => {
+    // Don't distribute if event is not active or already expired
+    if (!dungeonDigEvent.active || dungeonDigExpired) return;
+    if (isDealing) return;
+    if (shovelsDistributedRef.current) return;
+    
+    shovelsDistributedRef.current = true;
+    
+    const faceDownCards = tableau
+      .flat()
+      .filter(c => !c.faceUp)
+      .map(c => c.id);
+    
+    const faceUpCards = tableau
+      .flat()
+      .filter(c => c.faceUp)
+      .map(c => c.id);
+    
+    distributeShovels(faceDownCards, faceUpCards, dungeonDigEvent.active && !dungeonDigExpired);
+  }, [dungeonDigEvent.active, dungeonDigExpired, isDealing, tableau]);
   
   // End initial dealing animation after cards have animated in
   useEffect(() => {
@@ -761,6 +972,46 @@ export function GameBoard() {
     });
     
     return () => setOnKeyCollectedCallback(() => {});
+  }, []);
+  
+  // Setup shovel collection callback for DungeonDig
+  useEffect(() => {
+    setShovelCallbacks({
+      onShovelCollected: (cardId, startX, startY) => {
+        const iconElement = dungeonDigIconRef.current;
+        
+        if (iconElement) {
+          const iconRect = iconElement.getBoundingClientRect();
+          launchFlyingShovel(
+            startX,
+            startY,
+            iconRect.left + iconRect.width / 2,
+            iconRect.top + iconRect.height / 2
+          );
+        }
+      },
+      onShovelsChanged: () => {
+        // Force re-render for shovel count update
+        setDungeonDigEvent(prev => ({ ...prev }));
+      },
+      onShovelDrop: (cardId, targetX, targetY) => {
+        const id = Date.now() + Math.random();
+        setFlyingShovelDrops(prev => [...prev, { id, cardId, targetX, targetY }]);
+      }
+    });
+  }, []);
+  
+  // When flying shovel completes, add to inventory
+  useEffect(() => {
+    setOnFlyingShovelCompleteCallback(() => {
+      setDungeonDigEvent(prev => {
+        const updated = addShovels(1);
+        setDungeonDigPulse(true);
+        setTimeout(() => setDungeonDigPulse(false), 150);
+        return updated;
+      });
+    });
+    return () => setOnFlyingShovelCompleteCallback(() => {});
   }, []);
   
   // Track if daily reward needs to be shown (checked on mount, shown before new game)
@@ -866,15 +1117,33 @@ export function GameBoard() {
       setPendingDailyReward(0);
       setPendingStreak(0);
       
-      // Continue chain - check for treasure hunt promo, then start new game
+      // Continue chain - check for unlock popups first, then event promos
+      if (pendingCollectionsUnlock) {
+        setShowCollectionsUnlock(true);
+        return;
+      }
+      if (pendingLeaderboardUnlock) {
+        setShowLeaderboardUnlock(true);
+        return;
+      }
+      if (pendingPromoUnlock) {
+        setShowPromoUnlock(true);
+        return;
+      }
       if (pendingTreasureHuntPromo) {
         setShowTreasureHuntPromo(true);
-      } else {
-        clearNoMoves();
-        setShowNewGameButton(false);
-        setNoMovesShownOnce(false);
-        newGame('solvable');
+        return;
       }
+      if (pendingDungeonDigPromo) {
+        setShowDungeonDigPromo(true);
+        return;
+      }
+      
+      // No popups pending - start new game
+      clearNoMoves();
+      setShowNewGameButton(false);
+      setNoMovesShownOnce(false);
+      newGame('solvable');
     }
   };
   
@@ -989,8 +1258,8 @@ export function GameBoard() {
   
   // Launch flying stars from chest position to progress bar
   const launchTreasureStars = (totalStars: number, startPos: { x: number; y: number }) => {
-    // Clear any existing flying stars first to prevent duplicates
-    setTreasureFlyingStars([]);
+    // Generate unique base ID for this batch
+    const batchId = Date.now();
     
     // Get target position - find the star icon in progress bar
     let targetX = window.innerWidth / 2;
@@ -1049,7 +1318,7 @@ export function GameBoard() {
       const flyDelay = i * 60;
       
       stars.push({
-        id: Date.now() * 1000 + Math.random() * 1000 + i, // Ensure unique IDs
+        id: batchId * 1000 + Math.random() * 1000 + i, // Ensure unique IDs within batch
         value,
         startX: centerX,
         startY: centerY,
@@ -1065,7 +1334,8 @@ export function GameBoard() {
       });
     }
     
-    setTreasureFlyingStars(stars);
+    // Append new stars to existing ones (don't replace)
+    setTreasureFlyingStars(prev => [...prev, ...stars]);
   };
   
   const handleTreasureStarArrived = (star: TreasureFlyingStar) => {
@@ -1713,6 +1983,69 @@ export function GameBoard() {
     
     setShowLevelUp(false);
     
+    // Check daily reward FIRST (it's the first thing player should see each day)
+    // This ensures daily reward shows even if feature unlocks happen
+    if (tryShowDailyReward()) {
+      // Daily reward will chain to rest of flow when closed
+      // But we still need to process level up state changes
+      if (pendingLevelUp !== null) {
+        setPlayerLevel(pendingLevelUp);
+        localStorage.setItem('solitaire_player_level', pendingLevelUp.toString());
+        
+        // Check for collections unlock at level 2
+        if (pendingLevelUp >= COLLECTIONS_REQUIRED_LEVEL && !collectionsUnlockShown) {
+          setPendingCollectionsUnlock(true);
+          // Reset points event to start fresh at 0%
+          const freshPointsState = resetPointsEvent();
+          setPointsEventState(freshPointsState);
+        }
+        
+        // Check for leaderboard unlock at level 4
+        if (pendingLevelUp >= LEADERBOARD_REQUIRED_LEVEL && !leaderboardUnlockShown) {
+          setPendingLeaderboardUnlock(true);
+          // Reset leaderboard so everyone starts at 0 when tournament unlocks
+          resetLeaderboard();
+          resetSeasonStars();
+          setSeasonStars(0);
+          const freshPlayers = initializeLeaderboard(0);
+          setLeaderboardPlayers(freshPlayers);
+          setLeaderboardNewPosition(20);
+          setLeaderboardOldPosition(20);
+        }
+        
+        // Try to activate next event if player reached required level
+        const noActiveEvent = !treasureHuntEvent.active && !dungeonDigEvent.active;
+        const eventsUnlocked = isEventAvailable(pendingLevelUp);
+        
+        if (eventsUnlocked && noActiveEvent) {
+          if (nextEventType === 'treasure') {
+            const updatedEvent = activateTreasureHunt(pendingLevelUp);
+            if (updatedEvent && updatedEvent.activated) {
+              setTreasureHuntEvent(updatedEvent);
+              keysDistributedRef.current = false;
+              if (!treasureHuntPromoShown) {
+                setPendingTreasureHuntPromo(true);
+              }
+            }
+          } else {
+            const updatedEvent = activateDungeonDig(pendingLevelUp);
+            if (updatedEvent && updatedEvent.activated) {
+              setDungeonDigEvent(updatedEvent);
+              shovelsDistributedRef.current = false;
+              setPendingDungeonDigPromo(true);
+            }
+          }
+        }
+        
+        setPendingLevelUp(null);
+      }
+      return;
+    }
+    
+    // Track what unlocks happen this level up (to show immediately, not via async state)
+    let shouldShowCollectionsUnlock = false;
+    let shouldShowLeaderboardUnlock = false;
+    
     // Update player level and check for feature unlocks
     if (pendingLevelUp !== null) {
       setPlayerLevel(pendingLevelUp);
@@ -1721,6 +2054,7 @@ export function GameBoard() {
       // Check for collections unlock at level 2
       if (pendingLevelUp >= COLLECTIONS_REQUIRED_LEVEL && !collectionsUnlockShown) {
         setPendingCollectionsUnlock(true);
+        shouldShowCollectionsUnlock = true;
         // Reset points event to start fresh at 0%
         const freshPointsState = resetPointsEvent();
         setPointsEventState(freshPointsState);
@@ -1729,6 +2063,7 @@ export function GameBoard() {
       // Check for leaderboard unlock at level 4
       if (pendingLevelUp >= LEADERBOARD_REQUIRED_LEVEL && !leaderboardUnlockShown) {
         setPendingLeaderboardUnlock(true);
+        shouldShowLeaderboardUnlock = true;
         // Reset leaderboard so everyone starts at 0 when tournament unlocks
         resetLeaderboard();
         resetSeasonStars();
@@ -1740,19 +2075,51 @@ export function GameBoard() {
         setLeaderboardOldPosition(20);
       }
       
-      // Try to activate treasure hunt if player reached required level
-      const updatedEvent = activateTreasureHunt(pendingLevelUp);
-      if (updatedEvent) {
-        setTreasureHuntEvent(updatedEvent);
-        // Mark that promo should be shown at the end of popup chain
-        if (!treasureHuntPromoShown) {
-          setPendingTreasureHuntPromo(true);
+      // Try to activate next event if player reached required level
+      // First time: TreasureHunt. After that: rotate between events
+      const noActiveEvent = !treasureHuntEvent.active && !dungeonDigEvent.active;
+      const eventsUnlocked = isEventAvailable(pendingLevelUp);
+      
+      if (eventsUnlocked && noActiveEvent) {
+        if (nextEventType === 'treasure') {
+          const updatedEvent = activateTreasureHunt(pendingLevelUp);
+          if (updatedEvent && updatedEvent.activated) {
+            setTreasureHuntEvent(updatedEvent);
+            // Reset distribution ref for new event
+            keysDistributedRef.current = false;
+            // Mark that promo should be shown (only first time)
+            if (!treasureHuntPromoShown) {
+              setPendingTreasureHuntPromo(true);
+            }
+          }
+        } else {
+          const updatedEvent = activateDungeonDig(pendingLevelUp);
+          if (updatedEvent && updatedEvent.activated) {
+            setDungeonDigEvent(updatedEvent);
+            // Reset distribution ref for new event
+            shovelsDistributedRef.current = false;
+            // Show promo for dungeon dig event starting
+            setPendingDungeonDigPromo(true);
+          }
         }
       }
     }
     setPendingLevelUp(null);
     
-    // Continue to daily quests
+    // Show unlock popups immediately (don't rely on async state check)
+    // Collections unlock takes priority (shows first at level 2)
+    if (shouldShowCollectionsUnlock) {
+      setShowCollectionsUnlock(true);
+      return; // Collections unlock will chain to leaderboard unlock if needed
+    }
+    
+    // Leaderboard unlock (shows at level 4)
+    if (shouldShowLeaderboardUnlock) {
+      setShowLeaderboardUnlock(true);
+      return; // Leaderboard unlock will continue the flow
+    }
+    
+    // No unlocks - continue to daily quests
     proceedToDailyQuests();
   };
   
@@ -1774,9 +2141,13 @@ export function GameBoard() {
       return;
     }
     
-    // Check for treasure hunt promo
+    // Check for event promos
     if (pendingTreasureHuntPromo) {
       setShowTreasureHuntPromo(true);
+      return;
+    }
+    if (pendingDungeonDigPromo) {
+      setShowDungeonDigPromo(true);
       return;
     }
     
@@ -1805,6 +2176,7 @@ export function GameBoard() {
         if (tryShowDailyReward()) return;
         if (pendingPromoUnlock) { setShowPromoUnlock(true); return; }
         if (pendingTreasureHuntPromo) { setShowTreasureHuntPromo(true); return; }
+        if (pendingDungeonDigPromo) { setShowDungeonDigPromo(true); return; }
         clearNoMoves();
         setShowNewGameButton(false);
         setNoMovesShownOnce(false);
@@ -1824,9 +2196,13 @@ export function GameBoard() {
       return;
     }
     
-    // Check for treasure hunt promo
+    // Check for event promos
     if (pendingTreasureHuntPromo) {
       setShowTreasureHuntPromo(true);
+      return;
+    }
+    if (pendingDungeonDigPromo) {
+      setShowDungeonDigPromo(true);
       return;
     }
     
@@ -1844,9 +2220,13 @@ export function GameBoard() {
     localStorage.setItem('solitaire_promo_unlocked', 'true');
     setPendingPromoUnlock(false);
     
-    // Check for treasure hunt promo
+    // Check for event promos
     if (pendingTreasureHuntPromo) {
       setShowTreasureHuntPromo(true);
+      return;
+    }
+    if (pendingDungeonDigPromo) {
+      setShowDungeonDigPromo(true);
       return;
     }
     
@@ -1863,6 +2243,40 @@ export function GameBoard() {
     setTreasureHuntPromoShown(true);
     localStorage.setItem('solitaire_treasure_hunt_promo_shown', 'true');
     setPendingTreasureHuntPromo(false);
+    
+    // Activate the event if not already active (for rotation)
+    if (!treasureHuntEvent.active) {
+      resetTreasureHuntEvent();
+      const activated = activateTreasureHunt(playerLevel);
+      if (activated) {
+        setTreasureHuntEvent(activated);
+        setTreasureHuntExpired(false);
+        setTreasureHuntTimeRemaining('');
+        keysDistributedRef.current = false;
+      }
+    }
+    
+    // Now start new game
+    clearNoMoves();
+    setShowNewGameButton(false);
+    setNoMovesShownOnce(false);
+    newGame('solvable');
+  };
+  
+  // Handle dungeon dig promo close - activate event and start new game
+  const handleDungeonDigPromoClose = () => {
+    setShowDungeonDigPromo(false);
+    setPendingDungeonDigPromo(false);
+    
+    // Activate the event
+    resetDungeonDigEvent();
+    const activated = activateDungeonDig(playerLevel);
+    if (activated) {
+      setDungeonDigEvent(activated);
+      setDungeonDigExpired(false);
+      setDungeonDigTimeRemaining('');
+      shovelsDistributedRef.current = false;
+    }
     
     // Now start new game
     clearNoMoves();
@@ -1913,10 +2327,35 @@ export function GameBoard() {
       return; // Promo unlock popup will continue chain when closed
     }
     
-    // Check for treasure hunt promo before starting new game
+    // Check for event promos before starting new game
     if (pendingTreasureHuntPromo) {
       setShowTreasureHuntPromo(true);
       return; // Promo will start new game when closed
+    }
+    if (pendingDungeonDigPromo) {
+      setShowDungeonDigPromo(true);
+      return; // Promo will start new game when closed
+    }
+    
+    // Check if we should start the next event in rotation
+    // This handles the case where previous event just ended
+    const eventsUnlocked = isEventAvailable(playerLevel);
+    const noActiveEvent = !treasureHuntEvent.active && !dungeonDigEvent.active;
+    const treasureFullyEnded = treasureHuntExpired && treasureHuntEvent.keys === 0;
+    const dungeonFullyEnded = dungeonDigExpired && dungeonDigEvent.shovels === 0;
+    
+    if (eventsUnlocked && noActiveEvent && (treasureFullyEnded || dungeonFullyEnded)) {
+      if (nextEventType === 'dungeon') {
+        // Start Dungeon Dig event
+        setPendingDungeonDigPromo(true);
+        setShowDungeonDigPromo(true);
+        return;
+      } else if (nextEventType === 'treasure') {
+        // Start Treasure Hunt event
+        setPendingTreasureHuntPromo(true);
+        setShowTreasureHuntPromo(true);
+        return;
+      }
     }
     
     // Start new game
@@ -2007,12 +2446,18 @@ export function GameBoard() {
     localStorage.removeItem('solitaire_leaderboard_trophies');
     localStorage.removeItem('solitaire_player_level');
     
-    // Reset Treasure Hunt event
+    // Reset Treasure Hunt event (clears keys)
     resetTreasureHuntEvent();
     localStorage.removeItem('solitaire_treasure_hunt_promo_shown');
     setTreasureHuntEvent(getTreasureHuntEvent());
     setTreasureHuntPromoShown(false);
     setPendingTreasureHuntPromo(false);
+    
+    // Reset Dungeon Dig event (clears shovels)
+    resetDungeonDigEvent();
+    localStorage.removeItem('solitaire_dungeon_dig_promo_shown');
+    setDungeonDigEvent(getDungeonDigEvent());
+    setDungeonDigExpired(false);
     
     // Reset Collections unlock
     localStorage.removeItem('solitaire_collections_unlock_shown');
@@ -2040,6 +2485,10 @@ export function GameBoard() {
     setPointsEventState(newPointsState);
     setPackRewardsQueue([]);
     setShowPackPopup(false);
+    
+    // Reset event rotation to treasure hunt (first event)
+    setNextEventType('treasure');
+    localStorage.removeItem('solitaire_next_event_type');
     
     // Reset leaderboard state - create fresh leaderboard with low-star players
     const newSeasonInfo = getSeasonInfo();
@@ -2113,6 +2562,39 @@ export function GameBoard() {
     yesterday.setDate(yesterday.getDate() - 1);
     setLastLoginDate(yesterday.toDateString());
     setDailyStreak(newStreak - 1); // Will be set to newStreak when claimed
+    
+    // Start new game
+    newGame('solvable');
+  };
+  
+  // Start Dungeon Dig event (debug) - ends Treasure Hunt if active, starts Dungeon Dig
+  const handleStartDungeonDig = () => {
+    // If Treasure Hunt is active, deactivate it
+    if (treasureHuntEvent.active) {
+      const updatedTreasureHunt = { 
+        ...treasureHuntEvent, 
+        active: false,
+        keys: 0  // Clear remaining keys
+      };
+      saveTreasureHuntEvent(updatedTreasureHunt);
+      setTreasureHuntEvent(updatedTreasureHunt);
+      clearAllKeys();
+      setTreasureHuntExpired(false);
+    }
+    
+    // Reset and activate Dungeon Dig
+    resetDungeonDigEvent();
+    const activated = activateDungeonDig(playerLevel);
+    if (activated) {
+      setDungeonDigEvent(activated);
+      setDungeonDigExpired(false);
+      setDungeonDigTimeRemaining('');
+      shovelsDistributedRef.current = false;
+    }
+    
+    // Set next event to treasure (after dungeon ends, treasure starts)
+    setNextEventType('treasure');
+    localStorage.setItem('solitaire_next_event_type', 'treasure');
     
     // Start new game
     newGame('solvable');
@@ -2608,11 +3090,15 @@ export function GameBoard() {
               </div>
           </div>
           
-            {/* Treasure Hunt - compact circle */}
-            {(treasureHuntEvent.active || !isEventAvailable(playerLevel)) && (
-              <div ref={treasureHuntIconRef} style={{ zIndex: 20 }}>
+            {/* LiveOps Event Icon - shows one active event at a time */}
+            {/* Show TreasureHunt when: active, OR expired but has keys, OR locked and nextEvent is treasure */}
+            {(treasureHuntEvent.active || (treasureHuntExpired && treasureHuntEvent.keys > 0) || (!isEventAvailable(playerLevel) && nextEventType === 'treasure')) && (
+              <div ref={treasureHuntIconRef} style={{ zIndex: 20 }} className="relative">
                 <button
-                  onClick={() => setShowTreasureHunt(true)}
+                  onClick={() => {
+                    // If event is locked, only show locked popup (handled inside TreasureHuntPopup)
+                    setShowTreasureHunt(true);
+                  }}
                   className="relative flex items-center justify-center rounded-full transition-all duration-150 cursor-pointer hover:scale-110"
                   style={{
                     width: '62px',
@@ -2640,6 +3126,98 @@ export function GameBoard() {
                     <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {getRequiredLevel()}</span>
                   )}
                 </button>
+                {/* Timer display */}
+                {treasureHuntEvent.active && treasureHuntTimeRemaining && !treasureHuntExpired && (
+                  <span 
+                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-xs px-1.5 py-px rounded-full font-mono font-bold shadow-lg whitespace-nowrap pointer-events-none"
+                    style={{
+                      background: treasureHuntTimeCritical ? 'rgba(239, 68, 68, 0.95)' : 'rgba(0, 0, 0, 0.9)',
+                      color: '#fff',
+                      animation: treasureHuntTimeCritical ? 'pulse 1s ease-in-out infinite' : undefined,
+                    }}
+                  >
+                    {treasureHuntTimeRemaining}
+                  </span>
+                )}
+                {/* Expired but has keys */}
+                {treasureHuntExpired && treasureHuntEvent.keys > 0 && (
+                  <span 
+                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-[9px] px-1.5 py-px rounded-full font-bold shadow-lg whitespace-nowrap pointer-events-none"
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.95)',
+                      color: '#fff',
+                    }}
+                  >
+                    Потрать!
+                  </span>
+                )}
+              </div>
+            )}
+            
+            {/* Show DungeonDig when: active, OR expired but has shovels, OR locked and nextEvent is dungeon */}
+            {(dungeonDigEvent.active || (dungeonDigExpired && dungeonDigEvent.shovels > 0) || (!isDungeonAvailable(playerLevel) && nextEventType === 'dungeon')) && (
+              <div ref={dungeonDigIconRef} style={{ zIndex: 20 }} className="relative">
+                <button
+                  onClick={() => {
+                    // If event is locked, show locked popup instead of dungeon popup
+                    if (!isDungeonAvailable(playerLevel)) {
+                      setShowLockedDungeonPopup(true);
+                    } else {
+                      setShowDungeonDig(true);
+                    }
+                  }}
+                  className="relative flex items-center justify-center rounded-full transition-all duration-150 cursor-pointer hover:scale-110"
+                  style={{
+                    width: '62px',
+                    height: '62px',
+                    background: isDungeonAvailable(playerLevel)
+                      ? 'linear-gradient(135deg, #78350f 0%, #92400e 100%)'
+                      : 'linear-gradient(135deg, #4b5563 0%, #374151 100%)',
+                    boxShadow: dungeonDigPulse 
+                      ? '0 0 14px rgba(180, 83, 9, 0.6), 0 3px 10px rgba(0,0,0,0.3)'
+                      : '0 3px 10px rgba(0,0,0,0.3)',
+                    border: '2px solid rgba(255,255,255,0.25)',
+                    transform: dungeonDigPulse ? 'scale(1.1)' : undefined,
+                    pointerEvents: 'auto',
+                  }}
+                >
+                  <span className="text-3xl" style={{ 
+                    filter: isDungeonAvailable(playerLevel) ? 'none' : 'grayscale(0.5) brightness(0.7)',
+                  }}>⛏️</span>
+                  {isDungeonAvailable(playerLevel) && dungeonDigEvent.shovels > 0 && (
+                    <div className="absolute -top-1 -right-1 bg-amber-600 text-amber-100 rounded-full w-6 h-6 flex items-center justify-center shadow-lg">
+                      <span className="text-xs font-bold">{dungeonDigEvent.shovels}</span>
+                    </div>
+                  )}
+                  {!isDungeonAvailable(playerLevel) && (
+                    <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {getDungeonRequiredLevel()}</span>
+                  )}
+                </button>
+                {/* Timer display */}
+                {dungeonDigEvent.active && dungeonDigTimeRemaining && !dungeonDigExpired && (
+                  <span 
+                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-xs px-1.5 py-px rounded-full font-mono font-bold shadow-lg whitespace-nowrap pointer-events-none"
+                    style={{
+                      background: dungeonDigTimeCritical ? 'rgba(239, 68, 68, 0.95)' : 'rgba(0, 0, 0, 0.9)',
+                      color: '#fff',
+                      animation: dungeonDigTimeCritical ? 'pulse 1s ease-in-out infinite' : undefined,
+                    }}
+                  >
+                    {dungeonDigTimeRemaining}
+                  </span>
+                )}
+                {/* Expired but has shovels */}
+                {dungeonDigExpired && dungeonDigEvent.shovels > 0 && (
+                  <span 
+                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-[9px] px-1.5 py-px rounded-full font-bold shadow-lg whitespace-nowrap pointer-events-none"
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.95)',
+                      color: '#fff',
+                    }}
+                  >
+                    Потрать!
+                  </span>
+                )}
               </div>
             )}
             
@@ -3083,6 +3661,57 @@ export function GameBoard() {
         document.body
       )}
       
+      {/* Locked Dungeon Dig Popup (shown when clicking locked button) */}
+      {showLockedDungeonPopup && ReactDOM.createPortal(
+        <div 
+          className="fixed inset-0 z-[10005] flex items-center justify-center"
+          onClick={() => setShowLockedDungeonPopup(false)}
+        >
+          {/* Backdrop - appears instantly */}
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div 
+            className="relative bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 rounded-2xl p-6 max-w-sm w-full mx-4 border-2 border-gray-600/50 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+            style={{ animation: 'modalSlideIn 0.2s ease-out' }}
+          >
+            {/* Header */}
+            <div className="text-center mb-5">
+              <div className="text-5xl mb-3">🔒</div>
+              <h2 className="text-xl font-bold text-gray-200 mb-1">Функция заблокирована</h2>
+            </div>
+            
+            {/* Info */}
+            <div className="bg-black/30 rounded-xl p-4 mb-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-3xl">⛏️</span>
+                <div>
+                  <h3 className="text-lg font-bold text-amber-400">Подземелье</h3>
+                  <p className="text-white/70 text-sm">Копай и открывай награды</p>
+                </div>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Исследуй подземелье, собирай лопатки в пасьянсе и открывай тайлы с наградами. Найди выход на следующий этаж!
+              </p>
+              <div className="flex items-center gap-2 bg-amber-500/20 rounded-lg px-3 py-2">
+                <span className="text-xl">⭐</span>
+                <span className="text-amber-300 text-sm font-medium">
+                  Разблокируется на {getDungeonRequiredLevel()} уровне
+                </span>
+              </div>
+            </div>
+            
+            {/* Close button */}
+            <button
+              onClick={() => setShowLockedDungeonPopup(false)}
+              className="w-full py-2.5 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-semibold rounded-xl transition-all shadow-lg"
+            >
+              Понятно
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+      
       {/* Collections Unlock Popup (shown when reaching level 2) */}
       {showCollectionsUnlock && ReactDOM.createPortal(
         <div 
@@ -3259,6 +3888,61 @@ export function GameBoard() {
         onClose={handleTreasureHuntPromoClose}
       />
       
+      {/* Dungeon Dig Promo (shown when event starts in rotation) */}
+      <DungeonDigPromo
+        isVisible={showDungeonDigPromo}
+        onClose={handleDungeonDigPromoClose}
+      />
+      
+      {/* Event Ended Popup */}
+      {showEventEndedPopup && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div 
+            className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 mx-4 shadow-2xl border border-gray-700 max-w-sm text-center"
+            style={{
+              animation: 'modalSlideIn 0.3s ease-out'
+            }}
+          >
+            <div className="text-5xl mb-4">⏰</div>
+            <h2 className="text-xl font-bold text-white mb-2">
+              Время вышло!
+            </h2>
+            {treasureHuntEvent.keys > 0 ? (
+              <>
+                <p className="text-gray-300 mb-4">
+                  Время ивента истекло, но ты ещё можешь потратить собранные ключи!
+                </p>
+                <div className="flex items-center justify-center gap-2 text-yellow-400 mb-4">
+                  <span>🔑</span>
+                  <span className="font-bold">Осталось ключей: {treasureHuntEvent.keys}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowEventEndedPopup(false);
+                    setShowTreasureHunt(true);
+                  }}
+                  className="w-full py-3 px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold rounded-xl shadow-lg transition-all"
+                >
+                  🔑 Потратить ключи
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-300 mb-4">
+                  Ивент "Охота за сокровищами" завершён. Не переживай - скоро будут новые события!
+                </p>
+                <button
+                  onClick={() => setShowEventEndedPopup(false)}
+                  className="w-full py-3 px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold rounded-xl shadow-lg transition-all"
+                >
+                  Понятно
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      
       {/* Treasure Hunt Popup */}
       <TreasureHuntPopup
         isVisible={showTreasureHunt}
@@ -3314,6 +3998,153 @@ export function GameBoard() {
         requiredLevel={getRequiredLevel()}
       />
       
+      {/* Dungeon Dig Popup */}
+      <DungeonDigPopup
+        isVisible={showDungeonDig}
+        onClose={() => {
+          setShowDungeonDig(false);
+          setDungeonEventCompleteOverlay(false);
+        }}
+        onEventComplete={() => {
+          // Event is complete (all 10 floors done) - deactivate and hide icon
+          const deactivatedEvent = {
+            ...dungeonDigEvent,
+            active: false,
+            shovels: 0 // Clear shovels - can't be used after completion
+          };
+          saveDungeonDigEvent(deactivatedEvent);
+          setDungeonDigEvent(deactivatedEvent);
+        }}
+        event={dungeonDigEvent}
+        onEventUpdate={setDungeonDigEvent}
+        onRewardClaimed={(reward, tilePosition) => {
+          console.log('⛏️ Dungeon tile reward:', reward);
+          
+          const startX = tilePosition?.x || window.innerWidth / 2;
+          const startY = tilePosition?.y || window.innerHeight / 2;
+          
+          if (reward.type === 'empty') {
+            addFloatingScore(0, startX, startY, 'empty');
+            return;
+          }
+          
+          if (reward.type === 'exit') {
+            addFloatingScore(0, startX, startY, 'exit');
+            return;
+          }
+          
+          if (reward.stars) {
+            addStars(reward.stars);
+            launchTreasureStars(reward.stars, { x: startX, y: startY });
+          }
+          
+          if (reward.type === 'pack' && reward.packRarity) {
+            const packItems = generatePackItems(reward.packRarity, collections);
+            const newPackReward = { 
+              rarity: reward.packRarity, 
+              items: packItems,
+              sourcePosition: { x: startX, y: startY }
+            };
+            setPackRewardsQueue(prev => [...prev, newPackReward]);
+            setPackBlocksTiles(true); // Block tiles until cards start flying
+            setShowPackPopup(true);
+          }
+        }}
+        onDigTile={(floorId, tileId) => {
+          const result = dungeonDigTile(dungeonDigEvent, floorId, tileId);
+          saveDungeonDigEvent(result.event);
+          setDungeonDigEvent(result.event);
+          return { reward: result.reward, floorCompleted: result.floorCompleted, milestoneUnlocked: result.milestoneUnlocked };
+        }}
+        onStarsEarned={(stars, position) => {
+          // Stars earned - add and launch with classic effect
+          addStars(stars);
+          launchTreasureStars(stars, position);
+        }}
+        onMilestoneReward={(floorIdx, reward) => {
+          console.log('🏆 Milestone reward claimed:', floorIdx, reward);
+          
+          // Update milestoneClaimed in event
+          const updatedEvent = {
+            ...dungeonDigEvent,
+            milestoneClaimed: [...(dungeonDigEvent.milestoneClaimed || []), floorIdx]
+          };
+          saveDungeonDigEvent(updatedEvent);
+          setDungeonDigEvent(updatedEvent);
+          
+          // Note: Stars are handled separately via onStarsEarned
+          
+          // Track if floor 10 (index 9) was completed - show event complete after pack claimed
+          if (floorIdx === 9 && reward.packRarity) {
+            setPendingDungeonEventComplete(true);
+          }
+          
+          // Award pack - use source position from reward if provided
+          if (reward.packRarity) {
+            const packItems = generatePackItems(reward.packRarity, collections);
+            const rewardWithPos = reward as typeof reward & { sourcePosition?: { x: number; y: number } };
+            const newPackReward = { 
+              rarity: reward.packRarity, 
+              items: packItems,
+              sourcePosition: rewardWithPos.sourcePosition || { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+              skipBounce: true // No bounce animation for milestone rewards - pack flies directly from reward row
+            };
+            setPackRewardsQueue(prev => [...prev, newPackReward]);
+            // Show pack popup immediately - animation handled by CollectionPackPopup
+            setShowPackPopup(true);
+          }
+        }}
+        showEventCompleteOverlay={dungeonEventCompleteOverlay}
+        isPackPopupOpen={packBlocksTiles}
+      />
+      
+      {/* Dungeon Event Ended Popup */}
+      {showDungeonEndedPopup && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div 
+            className="relative bg-gradient-to-br from-stone-800 to-stone-900 rounded-2xl p-6 mx-4 shadow-2xl border border-stone-700 max-w-sm text-center"
+            style={{ animation: 'modalSlideIn 0.3s ease-out' }}
+          >
+            <div className="text-5xl mb-4">⏰</div>
+            <h2 className="text-xl font-bold text-white mb-2">
+              Время вышло!
+            </h2>
+            {dungeonDigEvent.shovels > 0 ? (
+              <>
+                <p className="text-gray-300 mb-4">
+                  Время ивента истекло, но ты ещё можешь использовать лопатки!
+                </p>
+                <div className="flex items-center justify-center gap-2 text-amber-400 mb-4">
+                  <span>🪏</span>
+                  <span className="font-bold">Осталось: {dungeonDigEvent.shovels}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowDungeonEndedPopup(false);
+                    setShowDungeonDig(true);
+                  }}
+                  className="w-full py-3 px-6 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold rounded-xl shadow-lg transition-all"
+                >
+                  🪏 Копать
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-300 mb-4">
+                  Ивент "Подземелье" завершён. Скоро начнётся новый ивент!
+                </p>
+                <button
+                  onClick={() => setShowDungeonEndedPopup(false)}
+                  className="w-full py-3 px-6 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold rounded-xl shadow-lg transition-all"
+                >
+                  Понятно
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      
       {/* Points Event Popup */}
       <PointsEventPopup
         isVisible={showPointsEventPopup}
@@ -3327,6 +4158,11 @@ export function GameBoard() {
         packRarity={currentPackReward?.rarity || 1}
         items={currentPackReward?.items || []}
         sourcePosition={currentPackReward?.sourcePosition}
+        skipBounce={currentPackReward?.skipBounce}
+        onCardsStartFlying={() => {
+          // Cards are flying - unblock tiles early
+          setPackBlocksTiles(false);
+        }}
         onClose={() => {
           // Remove current pack from queue
           setPackRewardsQueue(prev => {
@@ -3342,6 +4178,15 @@ export function GameBoard() {
             } else {
               // No more packs - close popup
               setShowPackPopup(false);
+              
+              // Check if dungeon event was just completed (floor 10 pack claimed)
+              if (pendingDungeonEventComplete) {
+                setPendingDungeonEventComplete(false);
+                // Small delay before showing event complete overlay
+                setTimeout(() => {
+                  setDungeonEventCompleteOverlay(true);
+                }, 300);
+              }
               
               // If we're in auto-claiming mode, try to claim next reward
               if (autoClaimingRewardsRef.current) {
@@ -3407,6 +4252,20 @@ export function GameBoard() {
           targetX={drop.targetX}
           targetY={drop.targetY}
           onComplete={() => setFlyingKeyDrops(prev => prev.filter(d => d.id !== drop.id))}
+        />
+      ))}
+      
+      {/* Flying Shovels Container */}
+      <FlyingShovelsContainer />
+      
+      {/* Flying Shovel Drops (shovels falling onto cards) */}
+      {flyingShovelDrops.map(drop => (
+        <FlyingShovelDrop
+          key={drop.id}
+          cardId={drop.cardId}
+          targetX={drop.targetX}
+          targetY={drop.targetY}
+          onComplete={() => setFlyingShovelDrops(prev => prev.filter(d => d.id !== drop.id))}
         />
       ))}
       
@@ -3587,6 +4446,11 @@ export function GameBoard() {
             onDropCollectionItem={handleDropCollectionItem}
             onTestLevelUp={handleTestLevelUp}
             onNextDay={handleNextDay}
+            onStartDungeonDig={handleStartDungeonDig}
+            onShowOvertaken={() => {
+              setShowOvertakenNotification(true);
+              setTimeout(() => setShowOvertakenNotification(false), 3000);
+            }}
             onDebugClick={handleDebugClick}
             pulseKey={starPulseKey}
             onOtherPlayerStars={handleOtherPlayerStars}
@@ -3599,7 +4463,7 @@ export function GameBoard() {
       {/* Bottom Buttons - Icons on Cushions Design */}
       {/* Hide when any popup is open (except pack popup - need collections button for flying items) */}
       {!showDailyQuests && !showWinScreen && !showCollections && !showShop && 
-       !showLeaderboard && !showTreasureHunt && !showTreasureHuntPromo && !showCollectionsUnlock && !showLockedCollectionsPopup &&
+       !showLeaderboard && !showTreasureHunt && !showTreasureHuntPromo && !showDungeonDig && !showDungeonDigPromo && !showCollectionsUnlock && !showLockedCollectionsPopup &&
        !showLockedPointsEventPopup && !showLockedLeaderboardPopup && !showLeaderboardUnlock && !showPromoUnlock &&
        !showLevelUp && !showStreakPopup && !showDailyReward && (
         <div className="fixed bottom-[49px] left-1/2 -translate-x-1/2 z-40 flex items-end gap-2 pb-0 pointer-events-none" style={{ paddingTop: '40px' }}>
@@ -3795,10 +4659,10 @@ export function GameBoard() {
             )}
           </button>
           
-          {/* Overtaken notification toast - positioned above the trophy icon */}
+          {/* Overtaken notification toast - positioned just above buttons */}
           {leaderboardUnlocked && showOvertakenNotification && (
             <div 
-              className="absolute -top-[4.5rem] left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-500/90 text-white text-xs px-3 py-1.5 rounded-lg shadow-lg"
+              className="absolute bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-500/90 text-white text-xs px-3 py-1.5 rounded-lg shadow-lg"
               style={{ animation: 'slideUp 0.3s ease-out' }}
             >
               😱 Вас обогнали!
@@ -3807,10 +4671,10 @@ export function GameBoard() {
         </div>
       )}
       
-      {/* Collections Button - visible during Treasure Hunt popup for flying icons */}
+      {/* Collections Button - visible during Treasure Hunt and Dungeon Dig popups for flying icons */}
       {/* Not clickable, just a target for flying collection items */}
-      {showTreasureHunt && (
-        <div className="fixed bottom-[49px] left-1/2 -translate-x-1/2 z-[60] flex items-end gap-2 pb-0 pointer-events-none" style={{ paddingTop: '40px' }}>
+      {(showTreasureHunt || showDungeonDig) && (
+        <div className="fixed bottom-[49px] left-1/2 -translate-x-1/2 z-[10001] flex items-end gap-2 pb-0 pointer-events-none" style={{ paddingTop: '40px' }}>
           {/* Invisible spacers to match cushion button row layout (undo, hint, quests, shop, collections) */}
           <div className="w-14 h-8 opacity-0"></div>
           <div className="w-14 h-8 opacity-0"></div>

@@ -107,6 +107,8 @@ export function DailyQuests({
   const [monthlyBarPulse, setMonthlyBarPulse] = useState(false);
   const [monthlyTextPulse, setMonthlyTextPulse] = useState(false);
   const [monthlyOvershoot, setMonthlyOvershoot] = useState(0); // Extra % to show temporarily
+  // Displayed monthly progress (updated only when chip animation arrives, not immediately)
+  const [displayedMonthlyProgress, setDisplayedMonthlyProgress] = useState(monthlyProgress);
   const rewardIconRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const questCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const questProgressBarRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -176,6 +178,10 @@ export function DailyQuests({
         // Launch chip at the same moment progress bar reaches 100%
         // This creates effect of progress bar "pushing out" the chip
         launchChipToMonthlyBar(quest.id);
+        // Increment monthly progress IMMEDIATELY (save to storage) - don't wait for animation
+        // This ensures progress is saved even if user closes popup before animation completes
+        onMonthlyProgressIncrement?.();
+        onQuestRewardClaimed?.(quest.id);
         // Next quest will be animated after chip arrives (handled in handleChipArrived)
       } else {
         // No completion - animate next quest after progress bar settles
@@ -211,6 +217,9 @@ export function DailyQuests({
     setMonthlyBarPulse(false);
     setMonthlyTextPulse(false);
     setMonthlyOvershoot(0);
+    // Capture the displayed monthly progress at window open time
+    // This will be incremented by handleChipArrived, not immediately when data saves
+    setDisplayedMonthlyProgress(monthlyProgress);
     starsArrivedCount.current = {};
     expectedStarsCount.current = {};
     questQueueRef.current = [];
@@ -416,12 +425,12 @@ export function DailyQuests({
     setFlyingChips(prev => [...prev, chip]);
   };
   
-  const handleChipArrived = (chip: FlyingChip) => {
-    // Mark quest reward as claimed (prevents re-animation after page reload)
-    onQuestRewardClaimed?.(chip.questId);
+  const handleChipArrived = (_chip: FlyingChip) => {
+    // Note: Progress is saved immediately when quest completes (not here)
+    // This handler only triggers visual effects when chip animation arrives
     
-    // Update monthly progress with pulse effect
-    onMonthlyProgressIncrement?.();
+    // Increment the displayed monthly progress (visual update)
+    setDisplayedMonthlyProgress(prev => prev + 1);
     
     // Trigger text pulse animation
     setMonthlyTextPulse(true);
@@ -587,20 +596,20 @@ export function DailyQuests({
               <div 
                 className="absolute inset-y-0 left-0 bg-gradient-to-r from-amber-500 to-orange-400 rounded-full transition-all duration-300"
                 style={{ 
-                  width: `${Math.min((monthlyProgress / monthlyTarget) * 100 + monthlyOvershoot, 100)}%` 
+                  width: `${Math.min((displayedMonthlyProgress / monthlyTarget) * 100 + monthlyOvershoot, 100)}%` 
                 }}
               />
               <div className="absolute inset-0 flex items-center justify-center">
                 <span 
                   className={`font-bold text-white drop-shadow-lg transition-all duration-200 ${isCompact ? 'text-[10px]' : 'text-xs'} ${monthlyTextPulse ? 'scale-125 text-amber-300' : ''}`}
                 >
-                  {monthlyProgress} / {monthlyTarget}
+                  {displayedMonthlyProgress} / {monthlyTarget}
                 </span>
               </div>
             </div>
             
             {/* Claim button or status */}
-            {monthlyProgress >= monthlyTarget && !monthlyRewardClaimed && (
+            {displayedMonthlyProgress >= monthlyTarget && !monthlyRewardClaimed && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -616,7 +625,7 @@ export function DailyQuests({
                 ✓ Награда получена!
               </div>
             )}
-            {monthlyProgress < monthlyTarget && !isCompact && (
+            {displayedMonthlyProgress < monthlyTarget && !isCompact && (
               <div className="mt-1 text-center text-xs text-amber-300/70">
                 Выполняй задания каждый день
               </div>

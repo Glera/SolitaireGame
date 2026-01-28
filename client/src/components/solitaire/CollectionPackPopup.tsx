@@ -32,12 +32,14 @@ interface CollectionPackPopupProps {
   onClose: () => void;
   onItemsCollected: (items: PackItem[]) => void;
   onItemArrived?: (x: number, y: number) => void;
+  onCardsStartFlying?: () => void; // Called when cards start flying - can unblock interactions early
   collectionsButtonRef?: React.RefObject<HTMLButtonElement>;
   sourceRef?: React.RefObject<HTMLDivElement>; // Where the pack flies from (ref)
   sourcePosition?: { x: number; y: number }; // Where the pack flies from (coordinates)
+  skipBounce?: boolean; // Skip bouncing phase, go directly to arriving (for milestone rewards)
 }
 
-type Phase = 'arriving' | 'pack' | 'revealing' | 'items' | 'flying';
+type Phase = 'bouncing' | 'arriving' | 'pack' | 'revealing' | 'items' | 'flying';
 
 export function CollectionPackPopup({
   isVisible,
@@ -46,17 +48,21 @@ export function CollectionPackPopup({
   onClose,
   onItemsCollected,
   onItemArrived,
+  onCardsStartFlying,
   collectionsButtonRef,
   sourceRef,
   sourcePosition,
+  skipBounce,
 }: CollectionPackPopupProps) {
-  const [phase, setPhase] = useState<Phase>('arriving');
+  const [phase, setPhase] = useState<Phase>('bouncing');
   const [revealedItems, setRevealedItems] = useState<number[]>([]);
   const [flyingCards, setFlyingCards] = useState<FlyingCardData[]>([]);
   const [completedFlights, setCompletedFlights] = useState(0);
+  const [bounceProgress, setBounceProgress] = useState(0);
   const [arrivalProgress, setArrivalProgress] = useState(0);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const arrivalRafRef = useRef<number>();
+  const bounceRafRef = useRef<number>();
   
   const pack = COLLECTION_PACKS[packRarity];
   
@@ -72,7 +78,7 @@ export function CollectionPackPopup({
     itemsRef.current = items;
   }, [onItemsCollected, onClose, items]);
   
-  // Reset state when popup becomes visible and start arrival animation
+  // Reset state when popup becomes visible and start bounce + arrival animation
   useEffect(() => {
     if (isVisible) {
       setRevealedItems([]);
@@ -80,33 +86,65 @@ export function CollectionPackPopup({
       setCompletedFlights(0);
       hasCompletedRef.current = false;
       cardRefs.current = [];
+      setBounceProgress(0);
       setArrivalProgress(0);
       
       // Check if we have a source to fly from (ref or coordinates)
       const hasSource = sourceRef?.current || sourcePosition;
       if (hasSource) {
-        setPhase('arriving');
-        
-        // Animate arrival - pack flies from miniature to center
-        const startTime = performance.now();
-        const duration = 450; // ms - faster for more impact
-        
-        const animate = (timestamp: number) => {
-          const elapsed = timestamp - startTime;
-          const progress = Math.min(elapsed / duration, 1);
+        // Arrival animation function (reused)
+        const startArrivalAnimation = () => {
+          setPhase('arriving');
+          const arrivalStartTime = performance.now();
+          const arrivalDuration = 400; // ms
           
-          // Ease out cubic
-          const eased = 1 - Math.pow(1 - progress, 3);
-          setArrivalProgress(eased);
+          const animateArrival = (timestamp: number) => {
+            const elapsed = timestamp - arrivalStartTime;
+            const progress = Math.min(elapsed / arrivalDuration, 1);
+            
+            // Ease out cubic
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setArrivalProgress(eased);
+            
+            if (progress < 1) {
+              arrivalRafRef.current = requestAnimationFrame(animateArrival);
+            } else {
+              setPhase('pack');
+            }
+          };
           
-          if (progress < 1) {
-            arrivalRafRef.current = requestAnimationFrame(animate);
-          } else {
-            setPhase('pack');
-          }
+          arrivalRafRef.current = requestAnimationFrame(animateArrival);
         };
         
-        arrivalRafRef.current = requestAnimationFrame(animate);
+        if (skipBounce) {
+          // Skip bouncing, go directly to arriving
+          startArrivalAnimation();
+        } else {
+          // Start with bouncing phase
+          setPhase('bouncing');
+          
+          // Animate bounce - smooth pulse effect at source position
+          const bounceStartTime = performance.now();
+          const bounceDuration = 600; // ms - longer for smoother feel
+          
+          const animateBounce = (timestamp: number) => {
+            const elapsed = timestamp - bounceStartTime;
+            const progress = Math.min(elapsed / bounceDuration, 1);
+            
+            // Smooth sine wave easing - gentle pulse up and down
+            const eased = Math.sin(progress * Math.PI);
+            setBounceProgress(eased);
+            
+            if (progress < 1) {
+              bounceRafRef.current = requestAnimationFrame(animateBounce);
+            } else {
+              // Bounce complete, start arrival animation
+              startArrivalAnimation();
+            }
+          };
+          
+          bounceRafRef.current = requestAnimationFrame(animateBounce);
+        }
       } else {
         // No source, go directly to pack phase
         setPhase('pack');
@@ -115,11 +153,14 @@ export function CollectionPackPopup({
     }
     
     return () => {
+      if (bounceRafRef.current) {
+        cancelAnimationFrame(bounceRafRef.current);
+      }
       if (arrivalRafRef.current) {
         cancelAnimationFrame(arrivalRafRef.current);
       }
     };
-  }, [isVisible, sourceRef, sourcePosition]);
+  }, [isVisible, sourceRef, sourcePosition, skipBounce]);
   
   // Check when all flights complete
   useEffect(() => {
@@ -178,41 +219,59 @@ export function CollectionPackPopup({
     
     setFlyingCards(newFlyingCards);
     setPhase('flying');
+    
+    // Notify parent that cards are flying - can unblock interactions early
+    if (onCardsStartFlying) {
+      onCardsStartFlying();
+    }
   };
   
   if (!isVisible) return null;
   
-  // Calculate pack position during arrival
+  // Get source position helper
+  const getSourcePosition = () => {
+    if (sourcePosition) {
+      return { x: sourcePosition.x, y: sourcePosition.y };
+    } else if (sourceRef?.current) {
+      const sourceRect = sourceRef.current.getBoundingClientRect();
+      return { x: sourceRect.left + sourceRect.width / 2, y: sourceRect.top + sourceRect.height / 2 };
+    }
+    return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  };
+
+  // Calculate pack position during bouncing and arrival
   const getPackPosition = () => {
+    if (phase === 'bouncing') {
+      const source = getSourcePosition();
+      
+      // Smooth pulse effect - bounceProgress is sine wave (0 → 1 → 0)
+      const bounceHeight = 25; // pixels to bounce up
+      const bounceY = -bounceHeight * bounceProgress; // Smooth up and down
+      
+      // Scale with bounce - gentle pulse
+      const baseScale = 0.15;
+      const bounceScale = baseScale * (1 + bounceProgress * 0.3); // Grow slightly during pulse
+      
+      return {
+        position: 'fixed' as const,
+        left: source.x,
+        top: source.y + bounceY,
+        transform: `translate(-50%, -50%) scale(${bounceScale})`,
+      };
+    }
+    
     if (phase === 'arriving') {
-      let startX: number;
-      let startY: number;
-      
-      // Get source position from ref or coordinates
-      if (sourcePosition) {
-        startX = sourcePosition.x;
-        startY = sourcePosition.y;
-      } else if (sourceRef?.current) {
-        const sourceRect = sourceRef.current.getBoundingClientRect();
-        startX = sourceRect.left + sourceRect.width / 2;
-        startY = sourceRect.top + sourceRect.height / 2;
-      } else {
-        // No source, center position
-        startX = window.innerWidth / 2;
-        startY = window.innerHeight / 2;
-      }
-      
+      const source = getSourcePosition();
       const centerX = window.innerWidth / 2;
       const centerY = window.innerHeight / 2;
       
       // Interpolate from source to center
-      const currentX = startX + (centerX - startX) * arrivalProgress;
-      const currentY = startY + (centerY - startY) * arrivalProgress;
+      const currentX = source.x + (centerX - source.x) * arrivalProgress;
+      const currentY = source.y + (centerY - source.y) * arrivalProgress;
       
-      // Scale from miniature-like size (0.1 = ~18px for 180px pack) to full size
-      // Using ease-out for scale to make it "burst" to full size at the end
+      // Scale from small (0.15) to full size (1.0)
       const scaleEased = Math.pow(arrivalProgress, 0.5); // Faster scale growth
-      const scale = 0.1 + 0.9 * scaleEased;
+      const scale = 0.15 + 0.85 * scaleEased;
       
       return {
         position: 'fixed' as const,
@@ -228,13 +287,16 @@ export function CollectionPackPopup({
     <div 
       className="fixed inset-0 z-[9999] flex items-center justify-center"
       style={{ 
-        background: phase === 'flying' ? 'transparent' : `rgba(0, 0, 0, ${phase === 'arriving' ? 0.85 * arrivalProgress : 0.85})`,
-        pointerEvents: phase === 'flying' || phase === 'arriving' ? 'none' : 'auto',
+        background: phase === 'flying' ? 'transparent' : 
+          phase === 'bouncing' ? `rgba(0, 0, 0, ${0.85 * bounceProgress})` :
+          phase === 'arriving' ? `rgba(0, 0, 0, 0.85)` : 
+          'rgba(0, 0, 0, 0.85)',
+        pointerEvents: phase === 'flying' || phase === 'arriving' || phase === 'bouncing' ? 'none' : 'auto',
       }}
       onClick={phase === 'pack' ? handlePackTap : phase === 'items' ? handleItemsTap : undefined}
     >
-      {/* Pack display - shown during arriving and pack phases */}
-      {(phase === 'arriving' || phase === 'pack') && (
+      {/* Pack display - shown during bouncing, arriving and pack phases */}
+      {(phase === 'bouncing' || phase === 'arriving' || phase === 'pack') && (
         <div 
           className="relative cursor-pointer"
           style={{

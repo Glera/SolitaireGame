@@ -9,6 +9,7 @@ import { clearAllDropTargetHighlights, applyDropTargetHighlight } from '../../li
 import { perfMonitor } from '../../lib/solitaire/performanceMonitor';
 import { getFaceUpOffset, isMobileDevice } from '../../lib/solitaire/cardConstants';
 import { cardHasKey } from '../../lib/liveops/keyManager';
+import { cardHasShovel } from '../../lib/liveops/dungeonDig/shovelManager';
 import type { Suit } from '../../lib/types/solitaire';
 
 interface DragPreviewProps {
@@ -240,6 +241,7 @@ const { sourceType, sourceIndex, sourceFoundation, draggedCards, collisionHighli
               isClickable={false}
               isDragging={false}
               hasKey={cardHasKey(card.id)}
+              hasShovel={cardHasShovel(card.id)}
               style={{
                 cursor: 'grabbing',
                 boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2)'

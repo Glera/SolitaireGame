@@ -335,10 +335,10 @@ export function tryCollectionDrop(
         itemWeight *= 1.5;
       }
       
-      // BIG boost for first collection until it's complete (to collect it in 1-2 sessions)
+      // HUGE boost for first collection until it's complete (to collect it quickly)
       if (isFirstCollection && !isFirstCollectionComplete) {
-        // If item not collected: 10x boost, if already collected: 3x boost (for duplicates less)
-        itemWeight *= item.collected ? 3 : 10;
+        // If item not collected: 50x boost, if already collected: 5x boost (for duplicates less)
+        itemWeight *= item.collected ? 5 : 50;
       }
       
       allItems.push({

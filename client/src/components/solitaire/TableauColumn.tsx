@@ -9,6 +9,7 @@ import { useTouchDrag } from '../../hooks/useTouchDrag';
 import { calculateStackOffsets } from '../../lib/solitaire/stackCompression';
 import { useGameScaleContext } from '../../contexts/GameScaleContext';
 import { cardHasKey } from '../../lib/liveops/keyManager';
+import { cardHasShovel } from '../../lib/liveops/dungeonDig/shovelManager';
 
 interface TableauColumnProps {
   cards: CardType[];
@@ -106,6 +107,11 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     
     // Block during auto-collect
     if (isAutoCollecting) {
+      return;
+    }
+    
+    // Block during card animation to prevent duplicates
+    if (animatingCard) {
       return;
     }
 
@@ -449,6 +455,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
               isDragging={isCardBeingDragged(index)}
               isAnimating={isCardAnimating(index)}
               hasKey={cardHasKey(card.id)}
+              hasShovel={cardHasShovel(card.id)}
             />
           </div>
           );

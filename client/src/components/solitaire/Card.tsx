@@ -19,6 +19,7 @@ interface CardProps {
   isAnimating?: boolean;
   isClickable?: boolean;
   hasKey?: boolean;
+  hasShovel?: boolean;
 }
 
 export function Card({ 
@@ -36,14 +37,16 @@ export function Card({
   isPlayable = false,
   isAnimating = false,
   isClickable = true,
-  hasKey = false
+  hasKey = false,
+  hasShovel = false
 }: CardProps) {
   const [isFlipping, setIsFlipping] = useState(false);
   const [showFace, setShowFace] = useState(card.faceUp);
   const prevFaceUpRef = useRef(card.faceUp);
-  // Key visibility - no animation, just show/hide
-  // Animation is handled by FlyingKeyDrop component
+  // Resource visibility - show key or shovel emoji
   const keyVisible = hasKey;
+  const shovelVisible = hasShovel;
+  const hasResource = hasKey || hasShovel;
   
   // Flip animation (150ms) - only when card changes from faceDown to faceUp
   useEffect(() => {
@@ -91,7 +94,7 @@ export function Card({
         borderRadius: '0.5rem',
         backfaceVisibility: 'hidden',
         transform: 'rotateY(180deg)',
-        borderColor: hasKey ? '#a3b550' : '#14532d' // muted yellow-green for keys, green-900 default
+        borderColor: hasKey ? '#a3b550' : hasShovel ? '#b45309' : '#14532d' // muted yellow-green for keys, amber for shovels, green-900 default
       }}
     >
       <div 
@@ -113,7 +116,7 @@ export function Card({
       style={{ 
         borderRadius: '0.5rem',
         backfaceVisibility: 'hidden',
-        borderColor: hasKey ? '#fbbf24' : '#1c1917' // amber-400 for keys, stone-900 default
+        borderColor: hasKey ? '#fbbf24' : hasShovel ? '#f59e0b' : '#1c1917' // amber-400 for keys, amber-500 for shovels, stone-900 default
       }}
     >
       {/* Desktop version */}
@@ -171,6 +174,7 @@ export function Card({
       data-card-id={card.id}
       data-face-up={showFace ? 'true' : 'false'}
       data-has-key={hasKey ? 'true' : 'false'}
+      data-has-shovel={hasShovel ? 'true' : 'false'}
       className={cn(
         "w-20 h-[104px] cursor-pointer select-none relative",
         isDragging && "opacity-0",
@@ -213,6 +217,20 @@ export function Card({
           }}
         >
           <span style={{ fontSize: '0.8rem' }}>🔑</span>
+        </div>
+      )}
+      
+      {/* Shovel indicator for Dungeon Dig event - only show on face-up cards */}
+      {shovelVisible && showFace && (
+        <div 
+          className="absolute flex items-center justify-center z-10 pointer-events-none"
+          style={{
+            left: '2px',
+            bottom: '2px',
+            filter: 'drop-shadow(0 1px 0 rgba(0,0,0,0.7)) drop-shadow(0 0 1px rgba(0,0,0,0.5))',
+          }}
+        >
+          <span style={{ fontSize: '0.8rem' }}>🪏</span>
         </div>
       )}
       

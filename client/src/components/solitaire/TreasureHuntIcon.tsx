@@ -7,6 +7,8 @@ interface TreasureHuntIconProps {
   requiredLevel: number;
   isActive: boolean;
   isPulsing?: boolean;
+  timeRemaining?: string;  // Formatted time string like "4:32"
+  isTimeCritical?: boolean; // True when < 1 minute left
   onClick: () => void;
 }
 
@@ -16,6 +18,8 @@ export const TreasureHuntIcon: React.FC<TreasureHuntIconProps> = ({
   requiredLevel,
   isActive,
   isPulsing = false,
+  timeRemaining,
+  isTimeCritical = false,
   onClick
 }) => {
   // Locked state
@@ -121,6 +125,20 @@ export const TreasureHuntIcon: React.FC<TreasureHuntIconProps> = ({
             }}
           />
         </div>
+      )}
+      
+      {/* Timer display - same style as PromoWidget */}
+      {isActive && timeRemaining && (
+        <span 
+          className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-xs px-1.5 py-px rounded-full font-mono font-bold shadow-lg whitespace-nowrap pointer-events-none"
+          style={{
+            background: isTimeCritical ? 'rgba(239, 68, 68, 0.95)' : 'rgba(0, 0, 0, 0.9)',
+            color: '#fff',
+            animation: isTimeCritical ? 'pulse 1s ease-in-out infinite' : undefined,
+          }}
+        >
+          {timeRemaining}
+        </span>
       )}
     </div>
   );

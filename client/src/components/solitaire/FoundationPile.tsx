@@ -180,6 +180,11 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   const handleCardClick = () => {
     if (!topCard) return;
     
+    // Block during card animation to prevent duplicates
+    if (animatingCard) {
+      return;
+    }
+    
     // Check if there's a valid tableau placement for this card
     const targetColumn = findTableauPlacementForCard(topCard);
     if (targetColumn !== null) {
