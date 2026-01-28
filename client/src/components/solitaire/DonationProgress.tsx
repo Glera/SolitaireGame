@@ -2,6 +2,7 @@ import React, { useState, useEffect, forwardRef, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { getTotalXP, calculateLevel, setOnXPChangeCallback } from '../../lib/solitaire/experienceManager';
 import { OtherPlayerNotification } from './OtherPlayerNotification';
+import { getLogs, clearLogs, formatLogsForCopy, setOnLogsChangedCallback } from '../../lib/debugLogger';
 
 interface Particle {
   id: string;
@@ -145,8 +146,18 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
   }, []);
   const [showInfo, setShowInfo] = useState(false);
   const [showDebugMenu, setShowDebugMenu] = useState(false);
+  const [showLogsPopup, setShowLogsPopup] = useState(false);
+  const [logsUpdateKey, setLogsUpdateKey] = useState(0);
   const debugMenuRef = useRef<HTMLDivElement>(null);
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  
+  // Subscribe to log changes to update the popup
+  useEffect(() => {
+    if (showLogsPopup) {
+      setOnLogsChangedCallback(() => setLogsUpdateKey(k => k + 1));
+      return () => setOnLogsChangedCallback(null);
+    }
+  }, [showLogsPopup]);
   
   // Close debug menu when clicking outside
   useEffect(() => {
@@ -516,6 +527,16 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
                   <span className="text-white text-sm">🔧</span>
                 </button>
               )}
+              
+              {/* Debug logs button */}
+              <button
+                onClick={() => { setShowLogsPopup(true); setShowDebugMenu(false); }}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-600/50 hover:bg-slate-600/70 transition-colors border border-slate-400/60 shadow-md backdrop-blur-sm"
+                aria-label="Показать логи"
+                title="Показать логи"
+              >
+                <span className="text-white text-sm">📋</span>
+              </button>
             </div>
           )}
         </div>,
@@ -618,6 +639,98 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
             >
               Закрыть
             </button>
+          </div>
+        </div>,
+        document.body
+      )}
+      
+      {/* Debug Logs Popup */}
+      {showLogsPopup && ReactDOM.createPortal(
+        <div 
+          className="fixed inset-0 z-[10010] flex items-center justify-center p-2"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)' }}
+          onClick={() => setShowLogsPopup(false)}
+        >
+          <div 
+            className="bg-gray-900 text-white rounded-xl shadow-2xl w-full max-w-lg border border-gray-700 flex flex-col"
+            style={{ maxHeight: 'calc(100vh - 32px)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-3 border-b border-gray-700 flex-shrink-0">
+              <h3 className="text-base font-bold flex items-center gap-2">
+                <span>📋</span> Логи ({getLogs().length})
+              </h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const text = formatLogsForCopy();
+                    navigator.clipboard.writeText(text).then(() => {
+                      alert('Логи скопированы!');
+                    }).catch(() => {
+                      // Fallback for browsers that don't support clipboard API
+                      const textarea = document.createElement('textarea');
+                      textarea.value = text;
+                      document.body.appendChild(textarea);
+                      textarea.select();
+                      document.execCommand('copy');
+                      document.body.removeChild(textarea);
+                      alert('Логи скопированы!');
+                    });
+                  }}
+                  className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium"
+                >
+                  📋 Копировать
+                </button>
+                <button
+                  onClick={() => { clearLogs(); setLogsUpdateKey(k => k + 1); }}
+                  className="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-sm font-medium"
+                >
+                  🗑️ Очистить
+                </button>
+              </div>
+            </div>
+            
+            {/* Logs content */}
+            <div 
+              className="flex-1 overflow-y-auto p-2 font-mono text-xs"
+              style={{ 
+                maxHeight: '60vh',
+                WebkitOverflowScrolling: 'touch'
+              }}
+            >
+              {getLogs().length === 0 ? (
+                <div className="text-gray-500 text-center py-8">Логи пусты</div>
+              ) : (
+                <div className="space-y-0.5" key={logsUpdateKey}>
+                  {getLogs().map((log, i) => (
+                    <div 
+                      key={i}
+                      className={`py-0.5 px-1 rounded ${
+                        log.type === 'error' ? 'bg-red-900/50 text-red-300' :
+                        log.type === 'warn' ? 'bg-yellow-900/50 text-yellow-300' :
+                        'text-gray-300'
+                      }`}
+                    >
+                      <span className="text-gray-500">
+                        [{log.timestamp.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
+                      </span>{' '}
+                      {log.message}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Footer */}
+            <div className="p-3 border-t border-gray-700 flex-shrink-0">
+              <button
+                onClick={() => setShowLogsPopup(false)}
+                className="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-colors"
+              >
+                Закрыть
+              </button>
+            </div>
           </div>
         </div>,
         document.body

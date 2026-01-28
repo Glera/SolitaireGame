@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import ReactDOM from 'react-dom';
+// Import debugLogger early to capture all logs
+import '../../lib/debugLogger';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { useAudio } from '../../lib/stores/useAudio';
 import { useProgressGift } from '../../hooks/useProgressGift';

@@ -170,8 +170,8 @@ export function WastePile({ cards }: WastePileProps) {
       return;
     }
     
-    // Block during card animation to prevent duplicates
-    if (animatingCard) {
+    // Block if THIS card is currently animating (to prevent duplicates)
+    if (animatingCard && animatingCard.card.id === topCard.id) {
       return;
     }
 

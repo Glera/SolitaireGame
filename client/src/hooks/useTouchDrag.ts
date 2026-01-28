@@ -37,8 +37,12 @@ export function useTouchDrag(
     sourceIndex?: number,
     sourceFoundation?: Suit
   ) => {
+    console.log('📱 handleTouchStart called, cards:', cards.length, 'source:', sourceType);
     const touch = e.touches[0];
-    if (!touch) return;
+    if (!touch) {
+      console.log('📱 handleTouchStart: no touch found');
+      return;
+    }
 
     const rect = e.currentTarget.getBoundingClientRect();
     
@@ -49,6 +53,7 @@ export function useTouchDrag(
       moved: false,
       dragElement: e.currentTarget as HTMLElement
     };
+    console.log('📱 handleTouchStart: isDragging set to true, startX:', touch.clientX, 'startY:', touch.clientY);
 
     // Start drag
     onDragStart(cards, sourceType, sourceIndex, sourceFoundation);
@@ -112,7 +117,9 @@ export function useTouchDrag(
     const deltaX = Math.abs(touch.clientX - touchState.current.startX);
     const deltaY = Math.abs(touch.clientY - touchState.current.startY);
 
-    if (deltaX > 5 || deltaY > 5) {
+    // Increased threshold for mobile devices - 5px was too sensitive
+    // causing taps to be detected as drags on high-DPI screens
+    if (deltaX > 15 || deltaY > 15) {
       touchState.current.moved = true;
     }
 
@@ -121,7 +128,11 @@ export function useTouchDrag(
   }, []);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (!touchState.current.isDragging) return;
+    console.log('📱 handleTouchEnd called, isDragging:', touchState.current.isDragging, 'moved:', touchState.current.moved);
+    if (!touchState.current.isDragging) {
+      console.log('📱 handleTouchEnd: not dragging, returning early');
+      return;
+    }
 
     // Clear collision check interval
     if (collisionCheckInterval.current) {
@@ -151,6 +162,7 @@ export function useTouchDrag(
     
     // If it was just a tap (no movement), call onTap callback and prevent synthetic click
     if (!wasMoved) {
+      console.log('📱 Touch tap detected (no movement)');
       // Prevent the synthetic click event from firing
       (window as any).__preventNextClick = true;
       setTimeout(() => {
@@ -159,11 +171,14 @@ export function useTouchDrag(
       
       // Call tap handler after drag state is cleaned up
       if (onTap) {
+        console.log('📱 Calling onTap callback');
         // Small delay to ensure drag state is fully cleared
         setTimeout(() => {
           onTap();
         }, 10);
       }
+    } else {
+      console.log('📱 Touch drag detected (moved)');
     }
   }, [onDragEnd, onDrop, setShowDragPreview, onTap]);
 

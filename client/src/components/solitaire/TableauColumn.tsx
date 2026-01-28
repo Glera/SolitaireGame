@@ -102,18 +102,26 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
 
   // Core card action logic (used by both click and tap handlers)
   const performCardAction = (cardIndex: number) => {
+    console.log('📱 performCardAction called, cardIndex:', cardIndex);
     const card = cards[cardIndex];
-    if (!card || !card.faceUp) return;
+    if (!card || !card.faceUp) {
+      console.log('📱 performCardAction: card not found or face down');
+      return;
+    }
     
     // Block during auto-collect
     if (isAutoCollecting) {
+      console.log('📱 performCardAction: blocked by isAutoCollecting');
       return;
     }
     
-    // Block during card animation to prevent duplicates
-    if (animatingCard) {
+    // Block if THIS card is currently animating (to prevent duplicates)
+    // But allow other cards to be clicked
+    if (animatingCard && animatingCard.card.id === card.id) {
+      console.log('📱 performCardAction: blocked by animatingCard');
       return;
     }
+    console.log('📱 performCardAction: proceeding with action for card', card.rank, card.suit);
 
     // Get all cards from this index to the end (the stack we want to move)
     const cardsToMove = cards.slice(cardIndex);
@@ -165,6 +173,7 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   
   // Update tap ref to use the stored card index
   handleTapRef.current = () => {
+    console.log('📱 TableauColumn tap handler called, cardIndex:', touchedCardIndexRef.current);
     if (touchedCardIndexRef.current >= 0) {
       performCardAction(touchedCardIndexRef.current);
     }

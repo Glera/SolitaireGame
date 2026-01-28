@@ -180,8 +180,8 @@ export function FoundationPile({ cards, suit, id }: FoundationPileProps) {
   const handleCardClick = () => {
     if (!topCard) return;
     
-    // Block during card animation to prevent duplicates
-    if (animatingCard) {
+    // Block if THIS card is currently animating (to prevent duplicates)
+    if (animatingCard && animatingCard.card.id === topCard.id) {
       return;
     }
     
