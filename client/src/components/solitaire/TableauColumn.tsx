@@ -48,6 +48,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   
+  // Track recently clicked cards to prevent duplication (alternative to animatingCard check)
+  const recentlyClickedCardsRef = useRef<Set<string>>(new Set());
+  
   // Track shaking cards for invalid moves (store array of card IDs)
   const [shakingCardIds, setShakingCardIds] = useState<string[]>([]);
   
@@ -115,13 +118,18 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       return;
     }
     
-    // Log animating card state for debugging
-    if (animatingCard) {
-      console.log('📱 animatingCard exists:', animatingCard.card.rank, animatingCard.card.suit, 'id:', animatingCard.card.id, 'clicked card id:', card.id);
+    // Block if this card was recently clicked (prevents duplication)
+    // Uses a time-based approach instead of animatingCard which was getting stuck on mobile
+    if (recentlyClickedCardsRef.current.has(card.id)) {
+      console.log('📱 performCardAction: blocked - card recently clicked:', card.rank, card.suit);
+      return;
     }
     
-    // Don't block on animatingCard - it was causing issues on mobile
-    // The animation system should handle preventing duplicates differently
+    // Mark card as recently clicked and clear after animation time
+    recentlyClickedCardsRef.current.add(card.id);
+    setTimeout(() => {
+      recentlyClickedCardsRef.current.delete(card.id);
+    }, 300); // 300ms cooldown
     
     console.log('📱 performCardAction: proceeding with action for card', card.rank, card.suit);
 

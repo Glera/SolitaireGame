@@ -67,6 +67,9 @@ export function WastePile({ cards }: WastePileProps) {
   // Track if we're in actual drag mode (not just click)
   const [isActuallyDragging, setIsActuallyDragging] = useState(false);
   
+  // Track recently clicked cards to prevent duplication
+  const recentlyClickedRef = useRef<string | null>(null);
+  
   // Ref for tap handler (to avoid dependency issues with useTouchDrag)
   const handleTapRef = useRef<() => void>(() => {});
   
@@ -170,7 +173,16 @@ export function WastePile({ cards }: WastePileProps) {
       return;
     }
     
-    // Don't block on animatingCard - it was causing issues on mobile
+    // Block if this card was recently clicked (prevents duplication)
+    if (recentlyClickedRef.current === topCard.id) {
+      return;
+    }
+    
+    // Mark card as recently clicked and clear after animation time
+    recentlyClickedRef.current = topCard.id;
+    setTimeout(() => {
+      recentlyClickedRef.current = null;
+    }, 300);
 
     console.log('🎯 WastePile: Card action', topCard);
 
