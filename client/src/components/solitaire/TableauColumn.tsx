@@ -106,7 +106,16 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
 
   // Core card action logic (used by both click and tap handlers)
   const performCardAction = (cardIndex: number) => {
-    console.log('📱 performCardAction called, cardIndex:', cardIndex, 'column:', columnIndex);
+    const now = Date.now();
+    console.log('📱 performCardAction called, cardIndex:', cardIndex, 'column:', columnIndex, 'blockedUntil:', columnBlockedUntilRef.current, 'now:', now);
+    
+    // Block if this column is currently processing a click (prevents duplication bug)
+    // Check this FIRST before anything else
+    if (now < columnBlockedUntilRef.current) {
+      console.log('📱 performCardAction: BLOCKED - column cooldown active, remaining:', columnBlockedUntilRef.current - now, 'ms');
+      return;
+    }
+    
     const card = cards[cardIndex];
     if (!card || !card.faceUp) {
       console.log('📱 performCardAction: card not found or face down');
@@ -119,16 +128,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       return;
     }
     
-    // Block if this column is currently processing a click (prevents duplication bug)
-    // The bug: clicking card under a flying card causes duplication
-    const now = Date.now();
-    if (now < columnBlockedUntilRef.current) {
-      console.log('📱 performCardAction: blocked - column cooldown active, remaining:', columnBlockedUntilRef.current - now, 'ms');
-      return;
-    }
-    
-    // Block this column for 350ms (enough for animation to complete and state to update)
-    columnBlockedUntilRef.current = now + 350;
+    // Block this column for 400ms (enough for animation to complete and state to update)
+    columnBlockedUntilRef.current = now + 400;
+    console.log('📱 performCardAction: SET blockedUntil to', columnBlockedUntilRef.current);
     
     console.log('📱 performCardAction: proceeding with action for card', card.rank, card.suit);
 

@@ -177,8 +177,8 @@ export function Card({
       data-has-shovel={hasShovel ? 'true' : 'false'}
       className={cn(
         "w-20 h-[104px] cursor-pointer select-none relative",
-        isDragging && "opacity-0",
-        isAnimating && "opacity-0",
+        isDragging && "opacity-0 pointer-events-none",
+        isAnimating && "opacity-0 pointer-events-none",
         className
       )}
       style={{ 
