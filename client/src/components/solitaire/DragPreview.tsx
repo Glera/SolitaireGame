@@ -36,6 +36,20 @@ const { sourceType, sourceIndex, sourceFoundation, draggedCards, collisionHighli
   const isMobile = isMobileDevice();
   const cardOffset = getFaceUpOffset(isMobile);
   
+  // Expose update function for useTouchDrag to call directly
+  // (touchmove events may not bubble if preventDefault is called on the element)
+  useEffect(() => {
+    (window as any).__touchDragUpdatePosition = (x: number, y: number) => {
+      setPosition({ x, y });
+      setCursorPos({ x: x + offset.x, y: y + offset.y });
+      lastCursorPosRef.current = { x: x + offset.x, y: y + offset.y };
+    };
+    
+    return () => {
+      delete (window as any).__touchDragUpdatePosition;
+    };
+  }, [offset]);
+  
   useEffect(() => {
     let collisionCheckTimer: number;
     
@@ -110,7 +124,6 @@ const { sourceType, sourceIndex, sourceFoundation, draggedCards, collisionHighli
       
       const target = getCurrentBestTarget();
       if (target && !e.defaultPrevented) {
-        console.log('🌍 Global drop caught, best target:', target.type, target.index || target.suit);
         e.preventDefault();
         
         // Trigger drop on the best target
@@ -181,8 +194,6 @@ const { sourceType, sourceIndex, sourceFoundation, draggedCards, collisionHighli
     window.addEventListener('drop', handleGlobalDrop as any, true);
     
     return () => {
-      console.log('DragPreview: Cleaning up');
-      
       // Cancel any pending RAF
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);

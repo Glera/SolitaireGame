@@ -243,28 +243,31 @@ export function WastePile({ cards }: WastePileProps) {
       clickTimeoutRef.current = null;
     }
     
-    // Mark that we're actually dragging (not just clicking)
-    setIsActuallyDragging(true);
-    
     // Calculate offset from the click position to the card position
     const rect = e.currentTarget.getBoundingClientRect();
     const offsetX = e.clientX - rect.left;
     const offsetY = e.clientY - rect.top;
     
-    // Use custom drag preview for waste pile cards
-    setShowDragPreview(true, 
-      { x: rect.left, y: rect.top },
-      { x: offsetX, y: offsetY }
-    );
+    // CRITICAL: Set data for drag - browser cancels drag without this!
+    e.dataTransfer.setData('text/plain', topCard.id);
+    e.dataTransfer.effectAllowed = 'move';
     
-    // Hide the default drag image
+    // Hide the default drag image BEFORE any state changes
     const img = new Image();
     img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
     e.dataTransfer.setDragImage(img, 0, 0);
     
-    // For waste pile, use standard browser drag behavior
-    startDrag([topCard], 'waste');
-    e.dataTransfer.effectAllowed = 'move';
+    // IMPORTANT: Delay state changes to AFTER dragstart event completes
+    // React re-render during dragstart can cancel the drag operation
+    const cardToMove = topCard;
+    setTimeout(() => {
+      setIsActuallyDragging(true);
+      setShowDragPreview(true, 
+        { x: rect.left, y: rect.top },
+        { x: offsetX, y: offsetY }
+      );
+      startDrag([cardToMove], 'waste');
+    }, 0);
   };
 
   const handleDragEnd = (e: React.DragEvent) => {

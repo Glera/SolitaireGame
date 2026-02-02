@@ -34,8 +34,8 @@ export function useGameScale(): GameDimensions {
       const AD_SPACE = 70;          // Bottom ad space for banner
       const PROGRESS_BAR = 85;      // Progress bar container + margins
       const EVENTS_ROW = 55;        // Top events row (icons + margins)
-      const BOTTOM_BUTTONS = 80;    // Bottom control buttons with margins
-      const PADDING = 30;           // Padding and spacing between elements
+      const BOTTOM_BUTTONS = 100;   // Bottom control buttons with margins (increased)
+      const PADDING = 50;           // Padding and spacing between elements (increased)
       
       const reservedHeight = AD_SPACE + PROGRESS_BAR + EVENTS_ROW + BOTTOM_BUTTONS + PADDING;
       const availableHeight = containerHeight - reservedHeight;
@@ -70,19 +70,9 @@ export function useGameScale(): GameDimensions {
       const scaleX = containerWidth / BASE_WIDTH;
       const scaleY = availableHeight / BASE_HEIGHT;
       
-      // Detect narrow windows (like Telegram Desktop or mobile portrait)
-      const aspectRatio = containerWidth / containerHeight;
-      const isNarrowWindow = aspectRatio < 0.7;
-      
-      // For narrow windows, maximize width usage
-      // For normal cases, use the smaller scale to ensure everything fits
-      let scale: number;
-      if (isNarrowWindow) {
-        // Use almost full width (98%), allow vertical scroll if needed
-        scale = Math.max(0.5, (containerWidth - 4) / BASE_WIDTH);
-      } else {
-        scale = Math.max(0.5, Math.min(scaleX, scaleY));
-      }
+      // Always use the smaller scale to ensure everything fits
+      // This prevents cards from overlapping with bottom buttons
+      const scale = Math.max(0.5, Math.min(scaleX, scaleY));
 
       setDimensions({
         scale,

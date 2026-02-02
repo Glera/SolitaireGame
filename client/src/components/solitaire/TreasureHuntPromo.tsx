@@ -1,24 +1,34 @@
 import React from 'react';
 
 interface TreasureHuntPromoProps {
-  isVisible: boolean;
   onClose: () => void;
 }
 
-export const TreasureHuntPromo: React.FC<TreasureHuntPromoProps> = ({
-  isVisible,
-  onClose
-}) => {
-  if (!isVisible) return null;
+/**
+ * Treasure Hunt event promo popup.
+ * 
+ * SIMPLIFIED: No isVisible prop - parent controls rendering.
+ * No complex touch handling - single onClick callback.
+ */
+export const TreasureHuntPromo: React.FC<TreasureHuntPromoProps> = ({ onClose }) => {
+  // Simple click handler - no refs, no guards
+  const handleClick = () => {
+    onClose();
+  };
+  
+  // Stop propagation on content to prevent backdrop click
+  const handleContentClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
 
   return (
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={handleClick}
     >
       <div 
         className="bg-gradient-to-br from-amber-900 via-orange-900 to-yellow-900 rounded-2xl max-w-sm mx-4 border-2 border-amber-400/50 shadow-2xl overflow-hidden animate-[bounceIn_0.5s_ease-out]"
-        onClick={(e) => e.stopPropagation()}
+        onClick={handleContentClick}
       >
         {/* Header with sparkles */}
         <div className="relative bg-gradient-to-r from-amber-600/50 to-orange-600/50 px-6 py-4 text-center">
@@ -71,7 +81,7 @@ export const TreasureHuntPromo: React.FC<TreasureHuntPromoProps> = ({
         {/* Button */}
         <div className="px-6 pb-6">
           <button
-            onClick={onClose}
+            onClick={handleClick}
             className="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-amber-900 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-xl hover:scale-[1.02]"
           >
             Начать охоту! 🔑

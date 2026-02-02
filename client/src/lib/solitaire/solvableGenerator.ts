@@ -1,5 +1,7 @@
 import { Card, GameState, Suit, Rank, Color } from './types';
 import { getRoomFromURL, getPremiumCardsCount } from '../roomUtils';
+import { cardHasKey, clearAllKeys, addKeyToCard } from '../liveops/treasureHunt/keyManager';
+import { cardHasShovel, clearAllShovels, addShovelToCard } from '../liveops/dungeonDig/shovelManager';
 
 const SUITS: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
 const RANKS: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -1354,11 +1356,22 @@ export function ensureSolvability(gameState: GameState): GameState {
   const hiddenCards: Card[] = [];
   const faceDownPositions: { col: number; row: number }[] = [];
   
+  // Track which POSITIONS have keys/shovels (not card IDs!)
+  const positionsWithKeys: { col: number; row: number }[] = [];
+  const positionsWithShovels: { col: number; row: number }[] = [];
+  
   // Collect face-down cards from tableau
   for (let col = 0; col < gameState.tableau.length; col++) {
     for (let row = 0; row < gameState.tableau[col].length; row++) {
       const card = gameState.tableau[col][row];
       if (!card.faceUp) {
+        // Remember positions with keys/shovels BEFORE rearranging
+        if (cardHasKey(card.id)) {
+          positionsWithKeys.push({ col, row });
+        }
+        if (cardHasShovel(card.id)) {
+          positionsWithShovels.push({ col, row });
+        }
         hiddenCards.push({ ...card });
         faceDownPositions.push({ col, row });
       }
@@ -1414,6 +1427,63 @@ export function ensureSolvability(gameState: GameState): GameState {
   // Use best arrangement found, or return original if nothing better
   if (bestArrangement && bestArrangement.solved > solved) {
     console.log(`✅ Improved solvability from ${solved}/52 to ${bestArrangement.solved}/52`);
+    
+    // Preserve keys/shovels on face-up cards (they weren't rearranged)
+    const faceUpKeysCardIds: string[] = [];
+    const faceUpShovelsCardIds: string[] = [];
+    
+    for (let col = 0; col < gameState.tableau.length; col++) {
+      for (let row = 0; row < gameState.tableau[col].length; row++) {
+        const card = gameState.tableau[col][row];
+        if (card.faceUp) {
+          if (cardHasKey(card.id)) {
+            faceUpKeysCardIds.push(card.id);
+          }
+          if (cardHasShovel(card.id)) {
+            faceUpShovelsCardIds.push(card.id);
+          }
+        }
+      }
+    }
+    
+    // If there were keys on hidden cards, restore them to same POSITIONS
+    if (positionsWithKeys.length > 0 || faceUpKeysCardIds.length > 0) {
+      clearAllKeys();
+      
+      // Restore keys to face-up cards first
+      for (const cardId of faceUpKeysCardIds) {
+        addKeyToCard(cardId);
+      }
+      
+      // Restore keys to cards at the same visual positions (for face-down)
+      for (const pos of positionsWithKeys) {
+        const newCard = bestArrangement.tableau[pos.col]?.[pos.row];
+        if (newCard && !newCard.faceUp) {
+          addKeyToCard(newCard.id);
+          console.log(`🔑 Key preserved at position [${pos.col}][${pos.row}] -> card ${newCard.id}`);
+        }
+      }
+    }
+    
+    // Same for shovels
+    if (positionsWithShovels.length > 0 || faceUpShovelsCardIds.length > 0) {
+      clearAllShovels();
+      
+      // Restore shovels to face-up cards first
+      for (const cardId of faceUpShovelsCardIds) {
+        addShovelToCard(cardId);
+      }
+      
+      // Restore shovels to cards at same positions
+      for (const pos of positionsWithShovels) {
+        const newCard = bestArrangement.tableau[pos.col]?.[pos.row];
+        if (newCard && !newCard.faceUp) {
+          addShovelToCard(newCard.id);
+          console.log(`🪓 Shovel preserved at position [${pos.col}][${pos.row}] -> card ${newCard.id}`);
+        }
+      }
+    }
+    
     return {
       ...gameState,
       tableau: bestArrangement.tableau,

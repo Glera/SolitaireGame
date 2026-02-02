@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { Card, Suit } from '../lib/solitaire/types';
 import { findBestDropTarget, getCurrentBestTarget, updateDropTargetBounds } from '../lib/solitaire/dropTargets';
 
@@ -20,15 +20,101 @@ export function useTouchDrag(
     startY: number;
     moved: boolean;
     dragElement: HTMLElement | null;
+    initialOffset: { x: number; y: number };
   }>({
     isDragging: false,
     startX: 0,
     startY: 0,
     moved: false,
-    dragElement: null
+    dragElement: null,
+    initialOffset: { x: 0, y: 0 }
   });
 
   const collisionCheckInterval = useRef<number | null>(null);
+  
+  // Global touchmove handler - needed because touch events stop firing on element when finger moves off
+  useEffect(() => {
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      if (!touchState.current.isDragging) return;
+      
+      const touch = e.touches[0];
+      if (!touch) return;
+      
+      const deltaX = Math.abs(touch.clientX - touchState.current.startX);
+      const deltaY = Math.abs(touch.clientY - touchState.current.startY);
+      
+      // Threshold for distinguishing tap from drag
+      if (deltaX > 15 || deltaY > 15) {
+        touchState.current.moved = true;
+      }
+      
+      // Update drag preview position via global callback
+      const updatePosition = (window as any).__touchDragUpdatePosition;
+      if (updatePosition && touchState.current.moved) {
+        const { x: offsetX, y: offsetY } = touchState.current.initialOffset;
+        updatePosition(touch.clientX - offsetX, touch.clientY - offsetY);
+      }
+      
+      // Prevent scrolling during drag
+      if (touchState.current.moved) {
+        e.preventDefault();
+      }
+    };
+    
+    const handleGlobalTouchEnd = (e: TouchEvent) => {
+      if (!touchState.current.isDragging) return;
+      
+      // Clear collision check interval
+      if (collisionCheckInterval.current) {
+        clearInterval(collisionCheckInterval.current);
+        collisionCheckInterval.current = null;
+      }
+      
+      const wasMoved = touchState.current.moved;
+      touchState.current.isDragging = false;
+      
+      // Get the drop target
+      const target = (window as any).__currentTouchDropTarget;
+      
+      if (target && wasMoved) {
+        onDrop(target.type, target.index, target.suit);
+      }
+      
+      // Clean up
+      delete (window as any).__currentTouchDropTarget;
+      
+      // End drag
+      onDragEnd();
+      
+      // Hide drag preview
+      setShowDragPreview(false);
+      
+      // If it was just a tap (no movement), call onTap callback
+      if (!wasMoved) {
+        (window as any).__preventNextClick = true;
+        setTimeout(() => {
+          delete (window as any).__preventNextClick;
+        }, 400);
+        
+        if (onTap) {
+          setTimeout(() => {
+            onTap();
+          }, 10);
+        }
+      }
+    };
+    
+    // Use passive: false to allow preventDefault
+    window.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+    window.addEventListener('touchend', handleGlobalTouchEnd);
+    window.addEventListener('touchcancel', handleGlobalTouchEnd);
+    
+    return () => {
+      window.removeEventListener('touchmove', handleGlobalTouchMove);
+      window.removeEventListener('touchend', handleGlobalTouchEnd);
+      window.removeEventListener('touchcancel', handleGlobalTouchEnd);
+    };
+  }, [onDragEnd, onDrop, setShowDragPreview, onTap]);
 
   const handleTouchStart = useCallback((
     e: React.TouchEvent,
@@ -37,23 +123,21 @@ export function useTouchDrag(
     sourceIndex?: number,
     sourceFoundation?: Suit
   ) => {
-    console.log('📱 handleTouchStart called, cards:', cards.length, 'source:', sourceType);
     const touch = e.touches[0];
-    if (!touch) {
-      console.log('📱 handleTouchStart: no touch found');
-      return;
-    }
+    if (!touch) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
+    const offsetX = touch.clientX - rect.left;
+    const offsetY = touch.clientY - rect.top;
     
     touchState.current = {
       isDragging: true,
       startX: touch.clientX,
       startY: touch.clientY,
       moved: false,
-      dragElement: e.currentTarget as HTMLElement
+      dragElement: e.currentTarget as HTMLElement,
+      initialOffset: { x: offsetX, y: offsetY }
     };
-    console.log('📱 handleTouchStart: isDragging set to true, startX:', touch.clientX, 'startY:', touch.clientY);
 
     // Start drag
     onDragStart(cards, sourceType, sourceIndex, sourceFoundation);
@@ -62,7 +146,7 @@ export function useTouchDrag(
     setShowDragPreview(
       true,
       { x: rect.left, y: rect.top },
-      { x: touch.clientX - rect.left, y: touch.clientY - rect.top }
+      { x: offsetX, y: offsetY }
     );
 
     // Update drop target bounds
@@ -108,79 +192,18 @@ export function useTouchDrag(
     (window as any).__currentTouchDropTarget = target;
   }, [getGameState, getDraggedCards, getSourceType, getSourceIndex, getSourceFoundation]);
 
+  // These are kept for backward compatibility but the real work is done by global handlers
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchState.current.isDragging) return;
-
-    const touch = e.touches[0];
-    if (!touch) return;
-
-    const deltaX = Math.abs(touch.clientX - touchState.current.startX);
-    const deltaY = Math.abs(touch.clientY - touchState.current.startY);
-
-    // Increased threshold for mobile devices - 5px was too sensitive
-    // causing taps to be detected as drags on high-DPI screens
-    if (deltaX > 15 || deltaY > 15) {
-      touchState.current.moved = true;
+    // Global handler does the work - just prevent default here
+    if (touchState.current.isDragging && touchState.current.moved) {
+      e.preventDefault();
     }
-
-    // Prevent scrolling during drag
-    e.preventDefault();
   }, []);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    console.log('📱 handleTouchEnd called, isDragging:', touchState.current.isDragging, 'moved:', touchState.current.moved);
-    if (!touchState.current.isDragging) {
-      console.log('📱 handleTouchEnd: not dragging, returning early');
-      return;
-    }
-
-    // Clear collision check interval
-    if (collisionCheckInterval.current) {
-      clearInterval(collisionCheckInterval.current);
-      collisionCheckInterval.current = null;
-    }
-
-    const wasMoved = touchState.current.moved;
-    touchState.current.isDragging = false;
-    
-    // Get the drop target
-    const target = (window as any).__currentTouchDropTarget;
-    
-    if (target && wasMoved) {
-      // Only drop if it was actually a drag (moved)
-      onDrop(target.type, target.index, target.suit);
-    }
-
-    // Clean up
-    delete (window as any).__currentTouchDropTarget;
-    
-    // End drag
-    onDragEnd();
-
-    // Hide drag preview
-    setShowDragPreview(false);
-    
-    // If it was just a tap (no movement), call onTap callback and prevent synthetic click
-    if (!wasMoved) {
-      console.log('📱 Touch tap detected (no movement)');
-      // Prevent the synthetic click event from firing
-      (window as any).__preventNextClick = true;
-      setTimeout(() => {
-        delete (window as any).__preventNextClick;
-      }, 400);
-      
-      // Call tap handler after drag state is cleaned up
-      if (onTap) {
-        console.log('📱 Calling onTap callback');
-        // Small delay to ensure drag state is fully cleared
-        setTimeout(() => {
-          onTap();
-        }, 10);
-      }
-    } else {
-      console.log('📱 Touch drag detected (moved)');
-    }
-  }, [onDragEnd, onDrop, setShowDragPreview, onTap]);
+    // Global handler does the work - this is just for backward compatibility
+    // The global touchend handler will handle cleanup
+  }, []);
 
   return {
     handleTouchStart,

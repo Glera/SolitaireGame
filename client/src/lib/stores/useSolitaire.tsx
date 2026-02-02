@@ -1942,6 +1942,67 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       }
     }
     
+    // Priority 3.5: Foundation to tableau - take card back if it enables new moves
+    // This is useful when a card from foundation can receive cards from waste/tableau
+    const rankOrder = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
+    
+    for (const suit of suits) {
+      const foundation = state.foundations[suit];
+      if (foundation.length === 0) continue;
+      
+      const topFoundationCard = foundation[foundation.length - 1];
+      // Aces can't receive any cards, so skip
+      if (topFoundationCard.rank === 'A') continue;
+      
+      // Check if this card can be placed on any tableau column
+      for (let col = 0; col < state.tableau.length; col++) {
+        const column = state.tableau[col];
+        let canPlaceOnColumn = false;
+        
+        if (column.length === 0) {
+          // Only Kings can go to empty columns
+          canPlaceOnColumn = topFoundationCard.rank === 'K';
+        } else {
+          const colTop = column[column.length - 1];
+          if (colTop.faceUp) {
+            canPlaceOnColumn = canPlaceOnTableau(colTop, topFoundationCard);
+          }
+        }
+        
+        if (!canPlaceOnColumn) continue;
+        
+        // Now check if taking this card back would enable a useful move
+        // (i.e., there's a card that could be placed on it)
+        const cardNeededRank = rankOrder[rankOrder.indexOf(topFoundationCard.rank) - 1];
+        const cardNeededColors = topFoundationCard.suit === 'hearts' || topFoundationCard.suit === 'diamonds'
+          ? ['clubs', 'spades'] // Red card needs black
+          : ['hearts', 'diamonds']; // Black card needs red
+        
+        // Check waste for matching card
+        if (state.waste.length > 0) {
+          const wasteTop = state.waste[state.waste.length - 1];
+          if (wasteTop.rank === cardNeededRank && cardNeededColors.includes(wasteTop.suit)) {
+            // Found! Moving foundation card back enables waste placement
+            set({ hint: { type: 'foundation', cardId: topFoundationCard.id, to: col } });
+            return;
+          }
+        }
+        
+        // Check tableau for matching card (top of any column)
+        for (let srcCol = 0; srcCol < state.tableau.length; srcCol++) {
+          const srcColumn = state.tableau[srcCol];
+          if (srcColumn.length === 0) continue;
+          const srcTop = srcColumn[srcColumn.length - 1];
+          if (srcTop.faceUp && srcTop.rank === cardNeededRank && cardNeededColors.includes(srcTop.suit)) {
+            // Found! Moving foundation card back enables tableau move
+            set({ hint: { type: 'foundation', cardId: topFoundationCard.id, to: col } });
+            return;
+          }
+        }
+      }
+    }
+    
     // Priority 4: Check if drawing from stock would help
     // Only suggest if there are cards in stock/waste that could actually be used
     const allStockWasteCards = [...state.stock, ...state.waste];

@@ -165,7 +165,6 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   
   // Update tap ref to use the stored card index
   handleTapRef.current = () => {
-    console.log('📱 TableauColumn tap handler called, cardIndex:', touchedCardIndexRef.current);
     if (touchedCardIndexRef.current >= 0) {
       performCardAction(touchedCardIndexRef.current);
     }
@@ -188,9 +187,6 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       return;
     }
     
-    // Mark as actually dragging
-    setIsActuallyDragging(true);
-    
     const movableCards = getMovableCardsFromTableau(columnIndex);
     const cardPosition = cards.length - movableCards.length;
     
@@ -202,31 +198,31 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       const offsetX = e.clientX - rect.left;
       const offsetY = e.clientY - rect.top;
       
-      // Always use custom drag preview for tableau cards
-      setShowDragPreview(true, 
-        { x: rect.left, y: rect.top },
-        { x: offsetX, y: offsetY }
-      );
+      // CRITICAL: Set data for drag - browser cancels drag without this!
+      e.dataTransfer.setData('text/plain', cardsToMove.map(c => c.id).join(','));
+      e.dataTransfer.effectAllowed = 'move';
       
-      // Hide the default drag image
+      // Hide the default drag image BEFORE any state changes
       const img = new Image();
       img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
       e.dataTransfer.setDragImage(img, 0, 0);
       
-      // Start drag with standard browser behavior
-      startDrag(cardsToMove, 'tableau', columnIndex);
-      e.dataTransfer.effectAllowed = 'move';
+      // IMPORTANT: Delay state changes to AFTER dragstart event completes
+      // React re-render during dragstart can cancel the drag operation
+      setTimeout(() => {
+        setIsActuallyDragging(true);
+        setShowDragPreview(true, 
+          { x: rect.left, y: rect.top },
+          { x: offsetX, y: offsetY }
+        );
+        startDrag(cardsToMove, 'tableau', columnIndex);
+      }, 0);
     } else {
       e.preventDefault();
     }
   };
 
   const handleDragEnd = (e: React.DragEvent) => {
-    console.log('🔚 handleDragEnd on TableauColumn', columnIndex, {
-      dropEffect: e.dataTransfer.dropEffect,
-      timestamp: Date.now()
-    });
-    
     // Reset actual dragging state
     setIsActuallyDragging(false);
     
@@ -242,27 +238,11 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     // Use collision-based target if available
     const bestTarget = getCurrentBestTarget();
     
-    console.log('🎯 DROP EVENT on TableauColumn', columnIndex, {
-      bestTarget: bestTarget ? {
-        type: bestTarget.type,
-        index: bestTarget.index,
-        suit: bestTarget.suit
-      } : null,
-      draggedCards: draggedCards.map(c => `${c.suit}-${c.rank}`),
-      sourceType,
-      sourceIndex,
-      sourceFoundation,
-      isDragging,
-      timestamp: Date.now()
-    });
-    
     if (bestTarget && bestTarget.type === 'tableau' && bestTarget.index === columnIndex) {
       // This is the best target based on collision detection
-      console.log('✅ Dropping on THIS column via collision', columnIndex);
       dropCards('tableau', columnIndex);
     } else if (bestTarget) {
       // There's a better target, drop there instead
-      console.log('➡️ Redirecting to better target:', bestTarget.type, bestTarget.index || bestTarget.suit);
       if (bestTarget.type === 'tableau') {
         dropCards('tableau', bestTarget.index);
       } else if (bestTarget.type === 'foundation' && bestTarget.suit) {
@@ -270,11 +250,9 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       }
     } else {
       // No collision detected, use traditional drop
-      console.log('📍 No collision target, using cursor position drop on column', columnIndex);
       dropCards('tableau', columnIndex);
     }
     
-    console.log('🧹 Clearing highlights after drop');
     // Clear the current target and all visual feedback
     setCurrentBestTarget(null);
     clearAllDropTargetHighlights();
@@ -343,7 +321,6 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
         e.dataTransfer.dropEffect = 'move';
       }}
       onDrop={(e) => {
-        console.log('💧 Drop on main container', columnIndex);
         e.preventDefault();
         e.stopPropagation();
         handleDrop(e);
@@ -352,7 +329,6 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       {/* Removed expanded drop zone - using only actual card bounds for precise drag & drop */}
       <Pile
         onDrop={(e) => {
-          console.log('💧 Drop on Pile', columnIndex);
           e.preventDefault();
           e.stopPropagation();
           handleDrop(e);
@@ -425,7 +401,6 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
                 e.dataTransfer.dropEffect = 'move';
               }}
               onDrop={(e) => { 
-                console.log('💧 Drop on card', card.id, 'in column', columnIndex);
                 e.preventDefault();
                 handleDrop(e); 
               }}

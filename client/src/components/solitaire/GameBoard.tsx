@@ -25,7 +25,7 @@ import { FloatingScore } from '../FloatingScore';
 import { clearAllDropTargetHighlights } from '../../lib/solitaire/styleManager';
 import { setAddPointsFunction } from '../../lib/solitaire/progressManager';
 import { setAddFloatingScoreFunction } from '../../lib/solitaire/floatingScoreManager';
-import { resetAllXP, setOnLevelUpCallback, forceNextLevel } from '../../lib/solitaire/experienceManager';
+import { resetAllXP, setOnLevelUpCallback } from '../../lib/solitaire/experienceManager';
 import { LevelUpScreen } from './LevelUpScreen';
 import { PromoWidget } from './PromoWidget';
 import { Shop, type ShopItem } from './Shop';
@@ -37,30 +37,17 @@ import { Suit } from '../../lib/solitaire/types';
 import { 
   LeaderboardPlayer, 
   SeasonInfo,
-  initializeLeaderboard, 
-  updateCurrentUserStars, 
-  simulateOtherPlayers,
-  saveCurrentPosition,
-  getPreviousPosition,
-  getSeasonInfo,
-  getSeasonStars,
-  addSeasonStars,
-  checkSeasonEnd,
-  getLeaderboardTrophies,
   LeaderboardTrophy,
-  resetLeaderboard,
-  resetSeasonStars
+  getPreviousPosition,
 } from '../../lib/leaderboard';
 import {
   TreasureHuntEvent,
   ChestReward,
-  getTreasureHuntEvent,
   saveTreasureHuntEvent,
   activateTreasureHunt,
   isEventAvailable,
   getRequiredLevel,
   addKeys,
-  resetTreasureHuntEvent,
   formatTimeRemaining,
   isTimeCritical as checkIsTimeCritical,
   isEventExpired
@@ -78,18 +65,28 @@ import { FlyingKeyDrop } from './FlyingKeyDrop';
 import { TreasureHuntIcon, FlyingKeysContainer, launchFlyingKey, setOnFlyingKeyCompleteCallback } from './TreasureHuntIcon';
 import { TreasureHuntPromo } from './TreasureHuntPromo';
 import { TreasureHuntPopup } from './TreasureHuntPopup';
+import { EventEndedPopup, DungeonEndedPopup } from './EventEndedPopups';
+import { LockedFeaturePopups } from './LockedFeaturePopups';
+import { UnlockPopups } from './UnlockPopups';
+import { useCollections } from '../../hooks/useCollections';
+import { useShop } from '../../hooks/useShop';
+import { useLeaderboard } from '../../hooks/useLeaderboard';
+import { useDailyRewards } from '../../hooks/useDailyRewards';
+import { usePointsEvent } from '../../hooks/usePointsEvent';
+import { useTreasureFlyingStars, TreasureFlyingStar } from '../../hooks/useTreasureFlyingStars';
+import { useCollisionParticles } from '../../hooks/useCollisionParticles';
+import { CollisionParticles } from './CollisionParticle';
+import { useDebugActions } from '../../hooks/useDebugActions';
 import { DungeonDigPromo } from './DungeonDigPromo';
 // Dungeon Dig Event
 import {
   DungeonDigEvent,
   TileReward,
-  getDungeonDigEvent,
   saveDungeonDigEvent,
   activateDungeonDig,
   isEventAvailable as isDungeonAvailable,
   getRequiredLevel as getDungeonRequiredLevel,
   addShovels,
-  resetDungeonDigEvent,
   formatTimeRemaining as formatDungeonTime,
   isTimeCritical as checkDungeonTimeCritical,
   isEventExpired as isDungeonExpired
@@ -126,154 +123,18 @@ import { PointsEventIcon } from './PointsEventIcon';
 import { PointsEventPopup } from './PointsEventPopup';
 import { CollectionPackPopup } from './CollectionPackPopup';
 import { StarsReward } from './StarsReward';
-import { MiniCardPack } from './MiniCardPack';
+import { TopEventBar } from './TopEventBar';
+import { BottomButtonRow } from './BottomButtonRow';
+// MiniCardPack now imported by FlyingRewardToMiniature
+import { useDailyQuests, Quest, MONTHLY_TARGET, MONTHLY_REWARD } from '../../hooks/useDailyQuests';
+import { useLiveOpsEvents } from '../../hooks/useLiveOpsEvents';
+import { FlyingRewardToMiniature } from './FlyingRewardToMiniature';
+import { useWinFlow } from '../../hooks/useWinFlow';
+import { useGameProgress, COLLECTIONS_REQUIRED_LEVEL, LEADERBOARD_REQUIRED_LEVEL, STARS_PER_WIN, STARS_PER_LEVELUP } from '../../hooks/useGameProgress';
+import { usePopupQueue, WinFlowPopup } from '../../lib/stores/usePopupQueue';
 
-// Stars reward for level up (same as most expensive collection)
-const STARS_PER_LEVELUP = 50;
-
-// Level required to unlock collections and points event
-const COLLECTIONS_REQUIRED_LEVEL = 2;
-
-// Level required to unlock leaderboard
-const LEADERBOARD_REQUIRED_LEVEL = 4;
-
-// Daily quest interface
-interface Quest {
-  id: string;
-  title: string;
-  description: string;
-  current: number;
-  target: number;
-  reward: number;
-  completed: boolean;
-  rewardClaimed?: boolean; // True if reward animation has already played
-}
-
-// Stars earned per win
-const STARS_PER_WIN = 3;
-
-
-// Flying reward animation component (from button to miniature row)
-function FlyingRewardToMiniature({ 
-  reward, 
-  targetRef,
-  pendingIndex,
-  onComplete 
-}: { 
-  reward: { id: number; type: 'stars' | 'pack'; stars?: number; packRarity?: PackRarity; startX: number; startY: number };
-  targetRef: React.RefObject<HTMLDivElement>;
-  pendingIndex: number; // Index where this miniature will appear
-  onComplete: () => void;
-}) {
-  const [position, setPosition] = useState({ x: reward.startX, y: reward.startY });
-  const [scale, setScale] = useState(1);
-  const [opacity, setOpacity] = useState(1);
-  const animationRef = useRef<number | null>(null);
-  const hasCompletedRef = useRef(false);
-  const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
-  
-  useEffect(() => {
-    // Only run animation once per component mount
-    if (hasCompletedRef.current) return;
-    
-    const targetRect = targetRef.current?.getBoundingClientRect();
-    // Calculate target position based on container and miniature index
-    // Each miniature is 36x48 + 4px gap (same size as on event button)
-    const miniatureWidth = 36;
-    const miniatureHeight = 48;
-    const gap = 4;
-    
-    // Miniatures are displayed in a single row (max 4 visible)
-    const col = Math.min(pendingIndex, 3); // Max index 3 (4 items)
-    
-    let targetX: number;
-    let targetY: number;
-    
-    if (targetRect) {
-      // Calculate position within the container for this miniature
-      targetX = targetRect.left + (col * (miniatureWidth + gap)) + miniatureWidth / 2;
-      targetY = targetRect.top + miniatureHeight / 2;
-    } else {
-      // Fallback - below the start position
-      targetX = reward.startX;
-      targetY = reward.startY + 80;
-    }
-    
-    const startX = reward.startX;
-    const startY = reward.startY;
-    
-    // Animate over 400ms
-    const duration = 400;
-    const startTime = performance.now();
-    
-    const animate = (currentTime: number) => {
-      if (hasCompletedRef.current) return;
-      
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      
-      // Ease out cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
-      
-      // Interpolate position
-      const x = startX + (targetX - startX) * eased;
-      const y = startY + (targetY - startY) * eased;
-      
-      // Scale down to miniature size (0.4 = 40% of original)
-      const newScale = 1 - eased * 0.6;
-      
-      setPosition({ x, y });
-      setScale(newScale);
-      
-      if (progress < 1) {
-        animationRef.current = requestAnimationFrame(animate);
-      } else {
-        // Fade out quickly
-        hasCompletedRef.current = true;
-        setOpacity(0);
-        setTimeout(() => onCompleteRef.current(), 100);
-      }
-    };
-    
-    animationRef.current = requestAnimationFrame(animate);
-    
-    // Cleanup on unmount
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [reward.id]); // Only depend on reward.id - run once per unique reward
-  
-  const packColor = reward.type === 'pack' && reward.packRarity 
-    ? COLLECTION_PACKS[reward.packRarity].color 
-    : '#fbbf24';
-  
-  return (
-    <div
-      className="fixed pointer-events-none z-[10000]"
-      style={{
-        left: position.x,
-        top: position.y,
-        transform: `translate(-50%, -50%) scale(${scale})`,
-        opacity,
-        transition: 'opacity 0.1s',
-      }}
-    >
-      {reward.type === 'pack' && reward.packRarity ? (
-        <MiniCardPack color={packColor} stars={reward.packRarity} size={48} />
-      ) : (
-        <span 
-          className="text-3xl"
-          style={{ filter: 'drop-shadow(0 2px 6px rgba(251, 191, 36, 0.8))' }}
-        >
-          ⭐
-        </span>
-      )}
-    </div>
-  );
-}
+// Constants imported from useGameProgress hook:
+// STARS_PER_LEVELUP, COLLECTIONS_REQUIRED_LEVEL, LEADERBOARD_REQUIRED_LEVEL, STARS_PER_WIN
 
 export function GameBoard() {
   const { 
@@ -314,283 +175,202 @@ export function GameBoard() {
   const [showWinScreen, setShowWinScreen] = useState(false);
   
   // Level up state
-  const [showLevelUp, setShowLevelUp] = useState(false);
+  // NOTE: showLevelUp removed - now rendered via popupQueue
   const [pendingLevelUp, setPendingLevelUp] = useState<number | null>(null);
   
-  // Real stars count - saved to localStorage immediately when earned
-  const [totalStars, setTotalStars] = useState(() => {
-    // Load from localStorage on init
-    const saved = localStorage.getItem('solitaire_total_stars');
-    const parsed = saved ? parseInt(saved, 10) : 0;
-    return isNaN(parsed) ? 0 : parsed;
-  });
-  // Displayed stars count - updated visually when stars arrive or window closes
-  const [displayedStars, setDisplayedStars] = useState(() => {
-    const saved = localStorage.getItem('solitaire_total_stars');
-    const parsed = saved ? parseInt(saved, 10) : 0;
-    return isNaN(parsed) ? 0 : parsed;
-  });
+  // Stars management - using hook (handles localStorage persistence)
+  const {
+    totalStars,
+    displayedStars,
+    setDisplayedStars,
+    starPulseKey,
+    triggerStarPulse,
+    addStars: addStarsBase,
+    resetProgress: resetStarsProgress,
+  } = useGameProgress();
+  
   const [winHandled, setWinHandled] = useState(false);
-  const [starPulseKey, setStarPulseKey] = useState(0);
+  const dailyQuestsShownThisWinRef = useRef(false); // Track if daily quests shown in current win flow
   const progressBarRef = useRef<HTMLDivElement>(null);
   
-  // Save totalStars to localStorage when it changes
-  useEffect(() => {
-    // Guard against saving NaN
-    if (typeof totalStars === 'number' && !isNaN(totalStars)) {
-    localStorage.setItem('solitaire_total_stars', totalStars.toString());
-    }
-  }, [totalStars]);
-  
-  // Default daily quests - designed for 1, 3, 5 games completion
-  const defaultDailyQuests: Quest[] = [
-    {
-      id: 'daily-games',
-      title: 'Первая победа',
-      description: 'Успешно разложи 1 пасьянс',
-      current: 0,
-      target: 1,
-      reward: 15,
-      completed: false
-    },
-    {
-      id: 'daily-aces',
-      title: 'Собери тузы',
-      description: 'Собери 12 тузов в основание',
-      current: 0,
-      target: 12,
-      reward: 30,
-      completed: false
-    },
-    {
-      id: 'daily-wins',
-      title: 'Мастер пасьянса',
-      description: 'Успешно разложи 5 пасьянсов',
-      current: 0,
-      target: 5,
-      reward: 45,
-      completed: false
-    }
-  ];
-  
-  // Daily quests state - load from localStorage
-  const [showDailyQuests, setShowDailyQuests] = useState(false);
-  // Track if daily quests were opened automatically after winning (vs manually via button)
-  const [dailyQuestsAfterWin, setDailyQuestsAfterWin] = useState(false);
-  // Track if collections were opened automatically after winning (vs manually via button)
-  const [collectionsAfterWin, setCollectionsAfterWin] = useState(false);
-  
-  // Shop state
-  const [showShop, setShowShop] = useState(false);
-  const [isSubscribed, setIsSubscribed] = useState(() => {
-    return localStorage.getItem('solitaire_premium_subscription') === 'true';
+  // Flying stars from treasure hunt chests - managed via hook
+  const {
+    treasureFlyingStars,
+    launchTreasureStars,
+    handleTreasureStarArrived,
+  } = useTreasureFlyingStars({
+    progressBarRef,
+    onStarArrived: (value) => setDisplayedStars(prev => prev + value),
+    onPulse: triggerStarPulse,
   });
+  
+  // Daily quests - using hook (handles localStorage persistence)
+  const {
+    quests: dailyQuests,
+    setQuests: setDailyQuests,
+    acesCollected,
+    setAcesCollected,
+    monthlyProgress,
+    setMonthlyProgress,
+    monthlyRewardClaimed,
+    setMonthlyRewardClaimed,
+    showDailyQuests,
+    openDailyQuests,
+    closeDailyQuests,
+    dailyQuestsAfterWin,
+    setDailyQuestsAfterWin,
+    resetQuests: resetDailyQuests,
+  } = useDailyQuests();
+  
+  // Collections hook - manages all collections state
+  const collectionsHook = useCollections();
+  const {
+    collections, setCollections,
+    completedCollectionsCount,
+    rewardedCollections, setRewardedCollections,
+    allCollectionsRewarded, setAllCollectionsRewarded,
+    pendingCollectionRewards, setPendingCollectionRewards,
+    showCollections, openCollections, closeCollections,
+    collectionsAfterWin, setCollectionsAfterWin,
+    flyingIcons, setFlyingIcons,
+    hasNewCollectionItem, setHasNewCollectionItem,
+    newItemsInCollections, setNewItemsInCollections,
+    collectionsResetKey, setCollectionsResetKey,
+    collectionButtonPulse, setCollectionButtonPulse,
+    collectionsButtonRef,
+    collectionsUnlockShown, setCollectionsUnlockShown,
+    pendingCollectionsUnlock, setPendingCollectionsUnlock,
+  } = collectionsHook;
+  
+  // Popup queue for win flow - replaces complex proceedToX chains
+  const popupQueue = usePopupQueue();
+  
+  // Universal helper to show any popup via queue (prevents double-click issues)
+  const showPopupViaQueue = (popup: WinFlowPopup) => {
+    // Get FRESH state from store (not stale closure value)
+    const currentState = usePopupQueue.getState();
+    
+    // Only add if not already in queue or showing
+    if (currentState.current?.type !== popup.type && !currentState.queue.some(p => p.type === popup.type)) {
+      currentState.enqueue(popup);
+      
+      // Check fresh state AFTER enqueue
+      const stateAfterEnqueue = usePopupQueue.getState();
+      if (!stateAfterEnqueue.isProcessing) {
+        stateAfterEnqueue.startProcessing();
+      }
+    }
+  };
+  
+  // Shorthand for event promos (backward compatibility)
+  const showEventPromoViaQueue = (type: 'treasureHuntPromo' | 'dungeonDigPromo') => {
+    showPopupViaQueue({ type });
+  };
+  
+  // Computed: popup visibility from queue
+  const isLevelUpShowing = popupQueue.current?.type === 'levelUp';
+  const isStreakShowing = popupQueue.current?.type === 'streak';
+  const isDailyRewardShowing = popupQueue.current?.type === 'dailyReward';
+  
+  // Shop hook - manages shop popup and subscription state
+  const {
+    showShop, openShop, closeShop,
+    isSubscribed, setIsSubscribed,
+    promoUnlocked, setPromoUnlocked,
+    pendingPromoUnlock, setPendingPromoUnlock,
+    handleSubscribe,
+  } = useShop();
   
   // No moves state - show popup first, then button if closed
   const [showNewGameButton, setShowNewGameButton] = useState(false);
   const [noMovesShownOnce, setNoMovesShownOnce] = useState(false);
   
-  const [dailyQuests, setDailyQuests] = useState<Quest[]>(() => {
-    const saved = localStorage.getItem('solitaire_daily_quests');
-    const savedDate = localStorage.getItem('solitaire_daily_quests_date');
-    const today = new Date().toDateString();
-    
-    // Check if it's a new day - reset quests
-    if (savedDate !== today) {
-      localStorage.setItem('solitaire_daily_quests_date', today);
-      localStorage.removeItem('solitaire_aces_collected'); // Reset aces too
-      return defaultDailyQuests;
-    }
-    
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return defaultDailyQuests;
-      }
-    }
-    return defaultDailyQuests;
-  });
+  // Daily rewards hook - manages daily streak, login rewards, mount/visibility checks
+  const {
+    dailyStreak, setDailyStreak,
+    lastLoginDate, setLastLoginDate,
+    pendingDailyReward, setPendingDailyReward,
+    pendingStreak, setPendingStreak,
+    pendingDailyRewardCheck, setPendingDailyRewardCheck,
+    tryGetDailyRewardPopup,
+    claimDailyReward: claimDailyRewardFromHook,
+  } = useDailyRewards({ onNewDay: resetDailyQuests });
   
-  // Track aces collected (reset on new day) - load from localStorage
-  const [acesCollected, setAcesCollected] = useState(() => {
-    const saved = localStorage.getItem('solitaire_aces_collected');
-    return saved ? parseInt(saved, 10) : 0;
-  });
-  
-  // Save daily quests to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem('solitaire_daily_quests', JSON.stringify(dailyQuests));
-    localStorage.setItem('solitaire_daily_quests_date', new Date().toDateString());
-  }, [dailyQuests]);
-  
-  // Save aces collected to localStorage when it changes
-  useEffect(() => {
-    localStorage.setItem('solitaire_aces_collected', acesCollected.toString());
-  }, [acesCollected]);
-  
-  // Monthly progress state - track completed daily quests across the month
-  const [monthlyProgress, setMonthlyProgress] = useState(() => {
-    const saved = localStorage.getItem('solitaire_monthly_progress');
-    return saved ? parseInt(saved, 10) : 0;
-  });
-  const [monthlyRewardClaimed, setMonthlyRewardClaimed] = useState(() => {
-    return localStorage.getItem('solitaire_monthly_reward_claimed') === 'true';
-  });
-  const MONTHLY_TARGET = 50;
-  const MONTHLY_REWARD = 500;
-  
-  // Save monthly progress to localStorage
-  useEffect(() => {
-    localStorage.setItem('solitaire_monthly_progress', monthlyProgress.toString());
-  }, [monthlyProgress]);
-  
-  useEffect(() => {
-    localStorage.setItem('solitaire_monthly_reward_claimed', monthlyRewardClaimed.toString());
-  }, [monthlyRewardClaimed]);
-  
-  // Daily login streak state
-  const [dailyStreak, setDailyStreak] = useState(() => {
-    const saved = localStorage.getItem('solitaire_daily_streak');
-    return saved ? parseInt(saved, 10) : 0;
-  });
-  const [lastLoginDate, setLastLoginDate] = useState(() => {
-    return localStorage.getItem('solitaire_last_login_date') || '';
-  });
-  const [showDailyReward, setShowDailyReward] = useState(false);
-  const [showStreakPopup, setShowStreakPopup] = useState(false);
-  const [pendingDailyReward, setPendingDailyReward] = useState(0); // Stars to award (max 10)
-  const [pendingStreak, setPendingStreak] = useState(0); // Actual streak day (no limit)
-  
-  // Save daily streak to localStorage
-  useEffect(() => {
-    localStorage.setItem('solitaire_daily_streak', dailyStreak.toString());
-  }, [dailyStreak]);
-  
-  useEffect(() => {
-    localStorage.setItem('solitaire_last_login_date', lastLoginDate);
-  }, [lastLoginDate]);
-  
-  // Leaderboard state
-  const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [leaderboardPlayers, setLeaderboardPlayers] = useState<LeaderboardPlayer[]>([]);
-  const [leaderboardOldPosition, setLeaderboardOldPosition] = useState(20);
-  const [leaderboardNewPosition, setLeaderboardNewPosition] = useState(20);
-  const [pendingLeaderboardShow, setPendingLeaderboardShow] = useState(false);
-  const [seasonInfo, setSeasonInfo] = useState<SeasonInfo>(() => getSeasonInfo());
-  const [seasonStars, setSeasonStars] = useState(() => getSeasonStars());
-  const [leaderboardTrophies, setLeaderboardTrophies] = useState<LeaderboardTrophy[]>(() => getLeaderboardTrophies());
-  const lastCheckedSeasonStarsRef = useRef(seasonStars);
-  const showLeaderboardRef = useRef(showLeaderboard);
-  const leaderboardPositionRef = useRef(leaderboardNewPosition);
-  const pendingDowngradeRef = useRef<{ players: LeaderboardPlayer[]; position: number; overtaken: boolean; } | null>(null);
-  
-  // Check for season end on mount and periodically
-  useEffect(() => {
-    const checkSeason = () => {
-      const result = checkSeasonEnd();
-      if (result.seasonEnded) {
-        // Season ended - refresh state
-        setSeasonInfo(getSeasonInfo());
-        setSeasonStars(getSeasonStars());
-        setLeaderboardTrophies(getLeaderboardTrophies());
-        const players = initializeLeaderboard(0);
-        setLeaderboardPlayers(players);
-        
-        // If trophy was awarded, show it
-        if (result.trophy) {
-          // Trophy will be shown in Collections trophies tab
-          console.log('🏆 Trophy awarded:', result.trophy);
-        }
-      }
-    };
-    
-    checkSeason();
-    const interval = setInterval(checkSeason, 60000); // Check every minute
-    return () => clearInterval(interval);
-  }, []);
-  
-  // Initialize leaderboard on mount
-  useEffect(() => {
-    const players = initializeLeaderboard(seasonStars);
-    setLeaderboardPlayers(players);
-    const position = players.findIndex(p => p.isCurrentUser) + 1;
-    setLeaderboardOldPosition(position);
-    setLeaderboardNewPosition(position);
-    saveCurrentPosition(position);
-    lastCheckedSeasonStarsRef.current = seasonStars;
-  }, []);
-  
-  // Keep refs in sync for interval logic
-  useEffect(() => {
-    showLeaderboardRef.current = showLeaderboard;
-    // If leaderboard закрыт и есть отложенное ухудшение — применяем
-    if (!showLeaderboard && pendingDowngradeRef.current) {
-      const pending = pendingDowngradeRef.current;
-      setLeaderboardPlayers(pending.players);
-      setLeaderboardNewPosition(pending.position);
-      if (pending.overtaken) {
-        setShowOvertakenNotification(true);
-        setTimeout(() => setShowOvertakenNotification(false), 3000);
-      }
-      pendingDowngradeRef.current = null;
-    }
-  }, [showLeaderboard]);
-  
-  useEffect(() => {
-    leaderboardPositionRef.current = leaderboardNewPosition;
-  }, [leaderboardNewPosition]);
-  
-  // State for "overtaken" notification
-  const [showOvertakenNotification, setShowOvertakenNotification] = useState(false);
-  
-  // Treasure Hunt LiveOps event state
-  const [treasureHuntEvent, setTreasureHuntEvent] = useState<TreasureHuntEvent>(() => getTreasureHuntEvent());
-  const [showTreasureHunt, setShowTreasureHunt] = useState(false);
+  // Player level state
   const [playerLevel, setPlayerLevel] = useState(() => {
     const saved = localStorage.getItem('solitaire_player_level');
     return saved ? parseInt(saved, 10) : 1;
   });
+  
+  // Popup states for event ended - managed via onDemand popup queue
+  const showEventEndedPopup = popupQueue.onDemandPopup?.type === 'eventEnded';
+  const showDungeonEndedPopup = popupQueue.onDemandPopup?.type === 'dungeonEnded';
+  const openEventEndedPopup = () => popupQueue.showOnDemand({ type: 'eventEnded' });
+  const openDungeonEndedPopup = () => popupQueue.showOnDemand({ type: 'dungeonEnded' });
+  
+  // LiveOps Events Hook - manages TreasureHunt and DungeonDig state, timers, and rotation
+  const {
+    treasureHuntEvent,
+    setTreasureHuntEvent,
+    treasureHuntExpired,
+    setTreasureHuntExpired,
+    treasureHuntTimeRemaining,
+    treasureHuntTimeCritical,
+    treasureHuntPulse,
+    setTreasureHuntPulse,
+    triggerTreasureHuntPulse,
+    dungeonDigEvent,
+    setDungeonDigEvent,
+    dungeonDigExpired,
+    setDungeonDigExpired,
+    dungeonDigTimeRemaining,
+    dungeonDigTimeCritical,
+    dungeonDigPulse,
+    setDungeonDigPulse,
+    triggerDungeonDigPulse,
+    nextEventType,
+    setNextEventType,
+    keysDistributedRef,
+    shovelsDistributedRef,
+    resetTreasureHunt,
+    resetDungeonDig,
+    activateTreasureHuntEvent,
+    activateDungeonDigEvent,
+    resetAllEvents,
+  } = useLiveOpsEvents(playerLevel, {
+    onTreasureHuntExpired: () => {
+      clearAllKeys();
+      openEventEndedPopup();
+    },
+    onDungeonDigExpired: () => {
+      clearAllShovels();
+      openDungeonEndedPopup();
+    },
+  });
+  
+  // Treasure Hunt UI state - managed via onDemand popup queue
+  const showTreasureHunt = popupQueue.onDemandPopup?.type === 'treasureHunt';
+  const openTreasureHunt = () => popupQueue.showOnDemand({ type: 'treasureHunt' });
+  const closeTreasureHunt = () => popupQueue.closeOnDemand();
   const treasureHuntIconRef = useRef<HTMLDivElement>(null);
-  const pointsEventIconRef = useRef<HTMLDivElement>(null);
+  // NOTE: pointsEventIconRef moved to usePointsEvent hook
   const lastTapTimeRef = useRef<number>(0);
-  const [treasureHuntPulse, setTreasureHuntPulse] = useState(false);
-  const [showTreasureHuntPromo, setShowTreasureHuntPromo] = useState(false);
+  // NOTE: showTreasureHuntPromo removed - now rendered via popupQueue
   const [treasureHuntPromoShown, setTreasureHuntPromoShown] = useState(() => {
     return localStorage.getItem('solitaire_treasure_hunt_promo_shown') === 'true';
   });
   const [pendingTreasureHuntPromo, setPendingTreasureHuntPromo] = useState(false);
   
-  // DungeonDig promo state - show promo when event starts in rotation
-  const [showDungeonDigPromo, setShowDungeonDigPromo] = useState(false);
+  // DungeonDig UI state (popup visibility, promos)
+  // NOTE: showDungeonDigPromo removed - now rendered via popupQueue
   const [pendingDungeonDigPromo, setPendingDungeonDigPromo] = useState(false);
-  
-  // Treasure Hunt timer state
-  const [treasureHuntTimeRemaining, setTreasureHuntTimeRemaining] = useState<string>('');
-  const [treasureHuntTimeCritical, setTreasureHuntTimeCritical] = useState(false);
-  const [showEventEndedPopup, setShowEventEndedPopup] = useState(false);
-  
-  // Dungeon Dig LiveOps event state
-  const [dungeonDigEvent, setDungeonDigEvent] = useState<DungeonDigEvent>(() => getDungeonDigEvent());
-  const [showDungeonDig, setShowDungeonDig] = useState(false);
+  // Dungeon Dig UI state - managed via onDemand popup queue
+  const showDungeonDig = popupQueue.onDemandPopup?.type === 'dungeonDig';
+  const openDungeonDig = () => popupQueue.showOnDemand({ type: 'dungeonDig' });
+  const closeDungeonDig = () => popupQueue.closeOnDemand();
   const [dungeonEventCompleteOverlay, setDungeonEventCompleteOverlay] = useState(false);
-  const [pendingDungeonEventComplete, setPendingDungeonEventComplete] = useState(false); // Set when floor 10 pack is claimed
+  const [pendingDungeonEventComplete, setPendingDungeonEventComplete] = useState(false);
   const dungeonDigIconRef = useRef<HTMLDivElement>(null);
-  const [dungeonDigPulse, setDungeonDigPulse] = useState(false);
-  const [dungeonDigTimeRemaining, setDungeonDigTimeRemaining] = useState<string>('');
-  const [dungeonDigTimeCritical, setDungeonDigTimeCritical] = useState(false);
-  const [dungeonDigExpired, setDungeonDigExpired] = useState(() => {
-    const event = getDungeonDigEvent();
-    return event.endTime ? isDungeonExpired(event) : false;
-  });
-  const [showDungeonEndedPopup, setShowDungeonEndedPopup] = useState(false);
-  
-  // Event rotation state - which event should start next after a win
-  // 'treasure' = TreasureHunt next, 'dungeon' = DungeonDig next
-  const [nextEventType, setNextEventType] = useState<'treasure' | 'dungeon'>(() => {
-    const saved = localStorage.getItem('solitaire_next_event_type');
-    return (saved as 'treasure' | 'dungeon') || 'treasure';
-  });
   
   // Flying shovel drops for animation
   const [flyingShovelDrops, setFlyingShovelDrops] = useState<Array<{
@@ -599,43 +379,47 @@ export function GameBoard() {
     targetX: number;
     targetY: number;
   }>>([]);
-  const shovelsDistributedRef = useRef(false);
   
-  // Collections unlock state
-  const [showCollectionsUnlock, setShowCollectionsUnlock] = useState(false);
-  const [collectionsUnlockShown, setCollectionsUnlockShown] = useState(() => {
-    return localStorage.getItem('solitaire_collections_unlock_shown') === 'true';
-  });
-  const [pendingCollectionsUnlock, setPendingCollectionsUnlock] = useState(false);
-  const [showLockedCollectionsPopup, setShowLockedCollectionsPopup] = useState(false);
-  const [showLockedPointsEventPopup, setShowLockedPointsEventPopup] = useState(false);
-  const [showLockedLeaderboardPopup, setShowLockedLeaderboardPopup] = useState(false);
-  const [showLockedDungeonPopup, setShowLockedDungeonPopup] = useState(false);
-  
-  // Leaderboard unlock state
-  const [showLeaderboardUnlock, setShowLeaderboardUnlock] = useState(false);
-  const [leaderboardUnlockShown, setLeaderboardUnlockShown] = useState(() => {
-    return localStorage.getItem('solitaire_leaderboard_unlock_shown') === 'true';
-  });
-  const [pendingLeaderboardUnlock, setPendingLeaderboardUnlock] = useState(false);
-  
-  // Promo/Shop offers unlock state (unlocks on first win after collections are unlocked)
-  const [showPromoUnlock, setShowPromoUnlock] = useState(false);
-  const [promoUnlocked, setPromoUnlocked] = useState(() => {
-    return localStorage.getItem('solitaire_promo_unlocked') === 'true';
-  });
-  const [pendingPromoUnlock, setPendingPromoUnlock] = useState(false);
+  // NOTE: Collections unlock state moved to useCollections hook
+  // NOTE: Promo/Shop unlock state moved to useShop hook
   
   // Check if collections are unlocked
   const collectionsUnlocked = playerLevel >= COLLECTIONS_REQUIRED_LEVEL;
   const leaderboardUnlocked = playerLevel >= LEADERBOARD_REQUIRED_LEVEL;
   
-  // Points Event LiveOps state
-  const [pointsEventState, setPointsEventState] = useState<PointsEventState>(() => getPointsEventState());
-  const [pointsEventPulse, setPointsEventPulse] = useState(false);
-  const [rewardIconAnimating, setRewardIconAnimating] = useState(false); // Track when reward icon is flying away
-  const [nextRewardDropping, setNextRewardDropping] = useState(false); // Track when next reward is dropping in
-  const [animatingRewardIndex, setAnimatingRewardIndex] = useState<number | null>(null); // Index of reward being animated away
+  // Leaderboard hook - manages leaderboard state, season stars, simulation, etc.
+  const {
+    showLeaderboard, openLeaderboard, closeLeaderboard,
+    leaderboardPlayers, setLeaderboardPlayers,
+    leaderboardOldPosition, setLeaderboardOldPosition,
+    leaderboardNewPosition, setLeaderboardNewPosition,
+    seasonInfo, setSeasonInfo,
+    seasonStars, setSeasonStars,
+    pendingLeaderboardShow, setPendingLeaderboardShow,
+    leaderboardTrophies, setLeaderboardTrophies,
+    leaderboardUnlockShown, setLeaderboardUnlockShown,
+    pendingLeaderboardUnlock, setPendingLeaderboardUnlock,
+    showOvertakenNotification, setShowOvertakenNotification,
+    addSeasonStarsAndUpdate,
+    handleLeaderboardClose: handleLeaderboardCloseFromHook,
+    tryShowLeaderboard,
+    pendingAfterLeaderboardRef,
+    initializeLeaderboardData,
+    resetLeaderboardData,
+  } = useLeaderboard({ leaderboardUnlocked });
+  
+  // Points Event hook - manages points event state and UI
+  const {
+    pointsEventState, setPointsEventState,
+    pointsEventPulse, setPointsEventPulse,
+    rewardIconAnimating, setRewardIconAnimating,
+    nextRewardDropping, setNextRewardDropping,
+    animatingRewardIndex, setAnimatingRewardIndex,
+    pointsEventIconRef,
+    showPointsEventPopup, openPointsEventPopup, closePointsEventPopup,
+    triggerPointsEventPulse,
+  } = usePointsEvent();
+  
   // Queue for pack rewards - allows multiple packs to be queued from rapid chest clicks
   const [packRewardsQueue, setPackRewardsQueue] = useState<Array<{ rarity: PackRarity; items: PackItem[]; sourcePosition?: { x: number; y: number }; skipBounce?: boolean }>>([]);
   const [showPackPopup, setShowPackPopup] = useState(false);
@@ -645,7 +429,7 @@ export function GameBoard() {
   const [autoClaimingRewards, setAutoClaimingRewards] = useState(false); // Track if we're auto-claiming after win
   const autoClaimingRewardsRef = useRef(false); // Ref to avoid stale closure
   const isClaimingRewardRef = useRef(false); // Prevent double claiming
-  const [showPointsEventPopup, setShowPointsEventPopup] = useState(false);
+  // NOTE: Points Event UI state moved to usePointsEvent hook
   
   // Flying reward animation (from button to miniature row)
   const [flyingRewardToMiniature, setFlyingRewardToMiniature] = useState<{
@@ -674,73 +458,13 @@ export function GameBoard() {
     return () => setOnFlyingKeyCompleteCallback(() => {});
   }, []);
   
-  // Simulate other players gaining stars periodically (only when leaderboard is unlocked)
-  useEffect(() => {
-    // Don't simulate if leaderboard is not unlocked yet
-    if (!leaderboardUnlocked) return;
-    
-    const interval = setInterval(() => {
-      const result = simulateOtherPlayers();
-      if (result.players.length > 0) {
-        const currentUserIndex = result.players.findIndex(p => p.isCurrentUser);
-        if (currentUserIndex !== -1) {
-          const newPos = currentUserIndex + 1;
-          const currentPos = leaderboardPositionRef.current;
-          const isDowngrade = newPos > currentPos;
-          
-          // Если окно рейтинга открыто и позиция ухудшается — откладываем обновление
-          if (showLeaderboardRef.current && isDowngrade) {
-            pendingDowngradeRef.current = { players: result.players, position: newPos, overtaken: result.overtaken };
-            return;
-          }
-          
-          // Применяем сразу, если окно закрыто или позиция не ухудшилась
-          setLeaderboardPlayers(result.players);
-          setLeaderboardNewPosition(newPos);
-        }
-        
-        // Show notification if someone overtook us (только если не скрыли из‑за открытого окна)
-        if (result.overtaken && !(showLeaderboardRef.current && pendingDowngradeRef.current)) {
-          setShowOvertakenNotification(true);
-          setTimeout(() => setShowOvertakenNotification(false), 3000);
-        }
-      }
-    }, 20000); // Every 20 seconds (more frequent for more action)
-    
-    return () => clearInterval(interval);
-  }, [leaderboardUnlocked]);
-  
-  // Check for position improvement when season stars change (only when leaderboard is unlocked)
-  useEffect(() => {
-    // Don't update leaderboard if it's not unlocked yet
-    if (!leaderboardUnlocked) return;
-    
-    if (seasonStars === lastCheckedSeasonStarsRef.current) return;
-    if (seasonStars <= lastCheckedSeasonStarsRef.current) {
-      lastCheckedSeasonStarsRef.current = seasonStars;
-      return;
-    }
-    
-    lastCheckedSeasonStarsRef.current = seasonStars;
-    
-    const result = updateCurrentUserStars(seasonStars);
-    setLeaderboardPlayers(result.players);
-    
-    if (result.positionImproved) {
-      setLeaderboardOldPosition(result.oldPosition);
-      setLeaderboardNewPosition(result.newPosition);
-      setPendingLeaderboardShow(true);
-    }
-  }, [seasonStars, leaderboardUnlocked]);
+  // NOTE: Leaderboard simulation and position improvement moved to useLeaderboard hook
   
   // Helper to add stars (updates both total and season)
   const addStars = (amount: number) => {
-    setTotalStars(prev => prev + amount);
-    // Only add to season stars if leaderboard is unlocked
-    if (leaderboardUnlocked) {
-      const newSeasonStars = addSeasonStars(amount);
-      setSeasonStars(newSeasonStars);
-    }
+    addStarsBase(amount);
+    // Season stars and leaderboard update handled by hook
+    addSeasonStarsAndUpdate(amount);
   };
   
   // Force re-render counter for key distribution updates
@@ -766,114 +490,15 @@ export function GameBoard() {
     return () => setOnKeyDropCallback(() => {});
   }, []);
   
-  // Track if keys have been distributed for current game
-  const keysDistributedRef = useRef<boolean>(false);
-  const prevIsDealingRef = useRef<boolean>(true);
-  
   // Reset distribution flags when new game starts
+  const prevIsDealingRef = useRef<boolean>(true);
   useEffect(() => {
     if (isDealing && !prevIsDealingRef.current) {
       keysDistributedRef.current = false;
       shovelsDistributedRef.current = false;
     }
     prevIsDealingRef.current = isDealing;
-  }, [isDealing]);
-  
-  // Timer for Treasure Hunt event - updates every second
-  // Track if event time expired (but player can still use remaining keys)
-  const [treasureHuntExpired, setTreasureHuntExpired] = useState(() => {
-    const event = getTreasureHuntEvent();
-    return event.endTime ? isEventExpired(event) : false;
-  });
-  
-  useEffect(() => {
-    if (!treasureHuntEvent.active || !treasureHuntEvent.endTime) return;
-    
-    const updateTimer = () => {
-      const expired = isEventExpired(treasureHuntEvent);
-      
-      if (expired) {
-        // Timer ended - but allow using remaining keys
-        setTreasureHuntTimeRemaining('0:00');
-        setTreasureHuntTimeCritical(true);
-        setTreasureHuntExpired(true);
-        
-        // Clear keys from cards (no more key collection)
-        clearAllKeys();
-        
-        // Show popup only once
-        if (!treasureHuntExpired) {
-          setShowEventEndedPopup(true);
-        }
-      } else {
-        const timeStr = formatTimeRemaining(treasureHuntEvent.endTime!);
-        setTreasureHuntTimeRemaining(timeStr);
-        setTreasureHuntTimeCritical(checkIsTimeCritical(treasureHuntEvent.endTime!));
-      }
-    };
-    
-    // Initial update
-    updateTimer();
-    
-    // Update every second
-    const interval = setInterval(updateTimer, 1000);
-    
-    return () => clearInterval(interval);
-  }, [treasureHuntEvent.active, treasureHuntEvent.endTime, treasureHuntExpired]);
-  
-  // Fully deactivate event when expired and all keys are spent
-  useEffect(() => {
-    if (treasureHuntExpired && treasureHuntEvent.keys === 0 && treasureHuntEvent.active) {
-      const updatedEvent = { ...treasureHuntEvent, active: false };
-      saveTreasureHuntEvent(updatedEvent);
-      setTreasureHuntEvent(updatedEvent);
-      // Mark next event as dungeon
-      setNextEventType('dungeon');
-      localStorage.setItem('solitaire_next_event_type', 'dungeon');
-    }
-  }, [treasureHuntExpired, treasureHuntEvent.keys, treasureHuntEvent.active]);
-  
-  // Timer for Dungeon Dig event
-  useEffect(() => {
-    if (!dungeonDigEvent.active || !dungeonDigEvent.endTime) return;
-    
-    const updateTimer = () => {
-      const expired = isDungeonExpired(dungeonDigEvent);
-      
-      if (expired) {
-        setDungeonDigTimeRemaining('0:00');
-        setDungeonDigTimeCritical(true);
-        setDungeonDigExpired(true);
-        
-        // Clear shovels from cards
-        clearAllShovels();
-        
-        if (!dungeonDigExpired) {
-          setShowDungeonEndedPopup(true);
-        }
-      } else {
-        const timeStr = formatDungeonTime(dungeonDigEvent.endTime!);
-        setDungeonDigTimeRemaining(timeStr);
-        setDungeonDigTimeCritical(checkDungeonTimeCritical(dungeonDigEvent.endTime!));
-      }
-    };
-    
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [dungeonDigEvent.active, dungeonDigEvent.endTime, dungeonDigExpired]);
-  
-  // Fully deactivate DungeonDig when expired and all shovels are spent
-  useEffect(() => {
-    if (dungeonDigExpired && dungeonDigEvent.shovels === 0 && dungeonDigEvent.active) {
-      const updatedEvent = { ...dungeonDigEvent, active: false };
-      saveDungeonDigEvent(updatedEvent);
-      setDungeonDigEvent(updatedEvent);
-      // Mark next event as treasure
-      setNextEventType('treasure');
-      localStorage.setItem('solitaire_next_event_type', 'treasure');
-    }
-  }, [dungeonDigExpired, dungeonDigEvent.shovels, dungeonDigEvent.active]);
+  }, [isDealing, keysDistributedRef, shovelsDistributedRef]);
   
   // Check if next event should start when previous one fully ends
   // Instead of auto-starting, set pending promo to show before game starts
@@ -897,6 +522,7 @@ export function GameBoard() {
   
   // Distribute keys ONCE when dealing completes (isDealing becomes false)
   // Keys are only placed on tableau cards, not on stock/waste pile
+  // NOTE: tableau is intentionally NOT in deps - we read it once when isDealing becomes false
   useEffect(() => {
     // Don't distribute if event is not active or already expired
     if (!treasureHuntEvent.active || treasureHuntExpired) return;
@@ -919,9 +545,11 @@ export function GameBoard() {
       .map(c => c.id);
     
     distributeKeys(faceDownCards, faceUpCards, treasureHuntEvent.active && !treasureHuntExpired);
-  }, [treasureHuntEvent.active, treasureHuntExpired, isDealing, tableau]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [treasureHuntEvent.active, treasureHuntExpired, isDealing]);
   
   // Distribute shovels ONCE when dealing completes (for DungeonDig)
+  // NOTE: tableau is intentionally NOT in deps - we read it once when isDealing becomes false
   useEffect(() => {
     // Don't distribute if event is not active or already expired
     if (!dungeonDigEvent.active || dungeonDigExpired) return;
@@ -941,7 +569,8 @@ export function GameBoard() {
       .map(c => c.id);
     
     distributeShovels(faceDownCards, faceUpCards, dungeonDigEvent.active && !dungeonDigExpired);
-  }, [dungeonDigEvent.active, dungeonDigExpired, isDealing, tableau]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dungeonDigEvent.active, dungeonDigExpired, isDealing]);
   
   // End initial dealing animation after cards have animated in
   useEffect(() => {
@@ -1016,377 +645,69 @@ export function GameBoard() {
     return () => setOnFlyingShovelCompleteCallback(() => {});
   }, []);
   
-  // Track if daily reward needs to be shown (checked on mount, shown before new game)
-  const [pendingDailyRewardCheck, setPendingDailyRewardCheck] = useState(false);
+  // NOTE: Daily reward mount check and visibilitychange moved to useDailyRewards hook
   
-  // Check for daily reward on mount - but don't show yet, just mark as pending
-  useEffect(() => {
-    const today = new Date().toDateString();
-    if (lastLoginDate === today) {
-      // Already claimed today
-      return;
-    }
-    
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toDateString();
-    
-    let newStreak: number;
-    if (lastLoginDate === yesterdayStr) {
-      // Consecutive day - increase streak (no limit)
-      newStreak = dailyStreak + 1;
-    } else {
-      // Missed a day or first login - reset to 1
-      newStreak = 1;
-    }
-    
-    // Set pending streak (actual day number) and reward based on day
-    setPendingStreak(newStreak);
-    setPendingDailyReward(getRewardStars(newStreak));
-    // Mark that we need to show daily reward before next new game
-    setPendingDailyRewardCheck(true);
-  }, []); // Only on mount
-  
-  // Handle tab visibility change - check for new day when user returns
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== 'visible') return;
-      
-      const today = new Date().toDateString();
-      const savedDate = localStorage.getItem('solitaire_daily_quests_date');
-      const currentLastLogin = localStorage.getItem('solitaire_last_login_date') || '';
-      
-      // Check if it's a new day since quests were last saved
-      if (savedDate !== today) {
-        // Reset daily quests
-        setDailyQuests(defaultDailyQuests);
-        setAcesCollected(0);
-        localStorage.setItem('solitaire_daily_quests_date', today);
-        localStorage.removeItem('solitaire_aces_collected');
-      }
-      
-      // Check if daily reward should be given (new day since last login)
-      if (currentLastLogin !== today && pendingDailyReward <= 0) {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toDateString();
-        
-        const currentStreak = parseInt(localStorage.getItem('solitaire_daily_streak') || '0', 10);
-        
-        let newStreak: number;
-        if (currentLastLogin === yesterdayStr) {
-          // Consecutive day - increase streak
-          newStreak = currentStreak + 1;
-        } else {
-          // Missed a day or first login - reset to 1
-          newStreak = 1;
-        }
-        
-        // Set pending daily reward
-        setPendingStreak(newStreak);
-        setPendingDailyReward(getRewardStars(newStreak));
-        setPendingDailyRewardCheck(true);
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [pendingDailyReward]);
-  
-  // Function to show daily reward if pending
+  // Function to show daily reward if pending (wrapper around hook's tryGetDailyRewardPopup)
   const tryShowDailyReward = (): boolean => {
-    if (!pendingDailyRewardCheck || pendingDailyReward <= 0) {
-      return false;
-    }
+    const popupData = tryGetDailyRewardPopup();
+    if (!popupData) return false;
     
-    // Show streak popup first if streak >= 2, otherwise show reward directly
-    if (pendingStreak >= 2) {
-      setShowStreakPopup(true);
+    if (popupData.type === 'streak') {
+      showPopupViaQueue({ type: 'streak', count: popupData.streak, stars: 0 });
     } else {
-      setShowDailyReward(true);
+      showPopupViaQueue({ type: 'dailyReward', day: popupData.streak, stars: popupData.stars });
     }
-    setPendingDailyRewardCheck(false);
     return true;
   };
   
   // Claim daily reward and continue to next step in chain
   const claimDailyReward = () => {
-    if (pendingDailyReward > 0) {
-      addStars(pendingDailyReward);
-      setDailyStreak(pendingStreak); // Save actual streak (not limited to 10)
-      setLastLoginDate(new Date().toDateString());
-      setShowDailyReward(false);
-      setPendingDailyReward(0);
-      setPendingStreak(0);
-      
-      // Continue chain - check for unlock popups first, then event promos
-      if (pendingCollectionsUnlock) {
-        setShowCollectionsUnlock(true);
-        return;
-      }
-      if (pendingLeaderboardUnlock) {
-        setShowLeaderboardUnlock(true);
-        return;
-      }
-      if (pendingPromoUnlock) {
-        setShowPromoUnlock(true);
-        return;
-      }
-      if (pendingTreasureHuntPromo) {
-        setShowTreasureHuntPromo(true);
-        return;
-      }
-      if (pendingDungeonDigPromo) {
-        setShowDungeonDigPromo(true);
-        return;
-      }
-      
-      // No popups pending - start new game
-      clearNoMoves();
-      setShowNewGameButton(false);
-      setNoMovesShownOnce(false);
-      newGame('solvable');
+    // Use hook to claim reward - it updates streak and returns stars
+    const starsToAdd = claimDailyRewardFromHook();
+    if (starsToAdd > 0) {
+      addStars(starsToAdd);
+    }
+    
+    popupQueue.dismiss(); // Close daily reward popup
+    
+    // Continue chain - check for unlock popups first, then event promos
+    if (pendingCollectionsUnlock) {
+      showPopupViaQueue({ type: 'unlockCollections' });
+      return;
+    }
+    if (pendingLeaderboardUnlock) {
+      showPopupViaQueue({ type: 'unlockTournament' });
+      return;
+    }
+    if (pendingPromoUnlock) {
+      showPopupViaQueue({ type: 'unlockPromo' });
+      return;
+    }
+    if (pendingTreasureHuntPromo) {
+      setPendingTreasureHuntPromo(false);
+      showEventPromoViaQueue('treasureHuntPromo');
+      return;
+    }
+    if (pendingDungeonDigPromo) {
+      setPendingDungeonDigPromo(false);
+      showEventPromoViaQueue('dungeonDigPromo');
+      return;
+    }
+    
+    // If daily quests already shown in this win session, go to collections/new game
+    // Otherwise proceed to daily quests first
+    if (dailyQuestsShownThisWinRef.current) {
+      proceedToCollectionsOrNewGame();
+    } else {
+      proceedToDailyQuests();
     }
   };
   
-  // Collections state - load progress from localStorage, but use default structure/rewards
-  const [showCollections, setShowCollections] = useState(false);
-  const [collections, setCollections] = useState<Collection[]>(() => {
-    const saved = localStorage.getItem('solitaire_collections');
-    if (saved) {
-      try {
-        const savedCollections = JSON.parse(saved) as Collection[];
-        // Merge saved progress with default structure (to get updated rewards/names)
-        return defaultCollections.map(defaultColl => {
-          const savedColl = savedCollections.find(sc => sc.id === defaultColl.id);
-          if (savedColl) {
-            // Keep the default structure but restore collected status from saved data
-            return {
-              ...defaultColl,
-              items: defaultColl.items.map(defaultItem => {
-                const savedItem = savedColl.items.find(si => si.id === defaultItem.id);
-                return {
-                  ...defaultItem,
-                  collected: savedItem?.collected || false
-                };
-              })
-            };
-          }
-          return defaultColl;
-        });
-      } catch {
-        return defaultCollections;
-      }
-    }
-    return defaultCollections;
-  });
+  // NOTE: Collections state moved to useCollections hook
+  // NOTE: TreasureFlyingStars state moved to useTreasureFlyingStars hook
   
-  // Save collections to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem('solitaire_collections', JSON.stringify(collections));
-  }, [collections]);
-  
-  // Calculate collections progress for button display
-  const completedCollectionsCount = collections.filter(c => c.items.every(i => i.collected)).length;
-  
-  // Track which collections have been rewarded (to avoid double rewards)
-  const [rewardedCollections, setRewardedCollections] = useState<Set<string>>(() => {
-    const saved = localStorage.getItem('solitaire_rewarded_collections');
-    if (saved) {
-      try {
-        return new Set(JSON.parse(saved));
-      } catch {
-        return new Set();
-      }
-    }
-    return new Set();
-  });
-  
-  // Save rewarded collections to localStorage
-  useEffect(() => {
-    localStorage.setItem('solitaire_rewarded_collections', JSON.stringify(Array.from(rewardedCollections)));
-  }, [rewardedCollections]);
-  
-  // Track if grand prize (all collections) has been rewarded
-  const [allCollectionsRewarded, setAllCollectionsRewarded] = useState(() => {
-    const saved = localStorage.getItem('solitaire_all_collections_rewarded');
-    return saved === 'true';
-  });
-  
-  // Save all collections rewarded status to localStorage
-  useEffect(() => {
-    localStorage.setItem('solitaire_all_collections_rewarded', allCollectionsRewarded.toString());
-  }, [allCollectionsRewarded]);
-  
-  
-  // Queue of pending collection rewards (for when player completes multiple collections in one game)
-  const [pendingCollectionRewards, setPendingCollectionRewards] = useState<string[]>([]);
-  
-  // Flying collection icons state
-  interface FlyingIcon {
-    id: string;
-    icon: string;
-    itemId: string;
-    collectionId: string;
-    startX: number;
-    startY: number;
-    isDuplicate?: boolean; // True if item was already collected
-    rarity?: number; // 1-5 for glow color
-  }
-  const [flyingIcons, setFlyingIcons] = useState<FlyingIcon[]>([]);
-  const [hasNewCollectionItem, setHasNewCollectionItem] = useState(false);
-  const [newItemsInCollections, setNewItemsInCollections] = useState<Set<string>>(new Set());
-  const [collectionsResetKey, setCollectionsResetKey] = useState(0);
-  const [collectionButtonPulse, setCollectionButtonPulse] = useState(false);
-  const collectionsButtonRef = useRef<HTMLButtonElement>(null);
-  
-  // Flying stars from treasure hunt chests
-  interface TreasureFlyingStar {
-    id: number;
-    value: number;
-    startX: number;
-    startY: number;
-    scatterX: number;
-    scatterY: number;
-    targetX: number;
-    targetY: number;
-    controlX: number;
-    controlY: number;
-    scatterDuration: number;
-    flyDelay: number;
-    flyDuration: number;
-  }
-  const [treasureFlyingStars, setTreasureFlyingStars] = useState<TreasureFlyingStar[]>([]);
-  
-  // Launch flying stars from chest position to progress bar
-  const launchTreasureStars = (totalStars: number, startPos: { x: number; y: number }) => {
-    // Generate unique base ID for this batch
-    const batchId = Date.now();
-    
-    // Get target position - find the star icon in progress bar
-    let targetX = window.innerWidth / 2;
-    let targetY = 50;
-    
-    if (progressBarRef?.current) {
-      const starIcon = progressBarRef.current.querySelector('[data-star-icon]');
-      if (starIcon) {
-        const rect = starIcon.getBoundingClientRect();
-        targetX = rect.left + rect.width / 2;
-        targetY = rect.top + rect.height / 2;
-      } else {
-        const rect = progressBarRef.current.getBoundingClientRect();
-        targetX = rect.left + 20;
-        targetY = rect.top + 16;
-      }
-    }
-    
-    const centerX = startPos.x;
-    const centerY = startPos.y;
-    
-    const stars: TreasureFlyingStar[] = [];
-    const MAX_FLYING_ICONS = 8;
-    const iconCount = Math.min(totalStars, MAX_FLYING_ICONS);
-    const starsPerIcon = Math.ceil(totalStars / iconCount);
-    let remainingStars = totalStars;
-    
-    const minRadius = 15;
-    const maxRadius = 40;
-    const scatterDuration = 400;
-    
-    for (let i = 0; i < iconCount; i++) {
-      const value = i === iconCount - 1 ? remainingStars : starsPerIcon;
-      remainingStars -= value;
-      
-      const angle = (i / iconCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
-      const radius = minRadius + Math.random() * (maxRadius - minRadius);
-      
-      const scatterX = centerX + Math.cos(angle) * radius;
-      const scatterY = centerY + Math.sin(angle) * radius;
-      
-      const midX = (scatterX + targetX) / 2;
-      const midY = (scatterY + targetY) / 2;
-      
-      const dx = targetX - scatterX;
-      const dy = targetY - scatterY;
-      const perpX = -dy;
-      const perpY = dx;
-      const len = Math.sqrt(perpX * perpX + perpY * perpY);
-      
-      const curvature = (Math.random() - 0.5) * 150;
-      const controlX = midX + (perpX / len) * curvature;
-      const controlY = midY + (perpY / len) * curvature;
-      
-      const flyDuration = 350 + Math.random() * 150;
-      const flyDelay = i * 60;
-      
-      stars.push({
-        id: batchId * 1000 + Math.random() * 1000 + i, // Ensure unique IDs within batch
-        value,
-        startX: centerX,
-        startY: centerY,
-        scatterX,
-        scatterY,
-        targetX,
-        targetY,
-        controlX,
-        controlY,
-        scatterDuration,
-        flyDelay,
-        flyDuration
-      });
-    }
-    
-    // Append new stars to existing ones (don't replace)
-    setTreasureFlyingStars(prev => [...prev, ...stars]);
-  };
-  
-  const handleTreasureStarArrived = (star: TreasureFlyingStar) => {
-    setTreasureFlyingStars(prev => prev.filter(s => s.id !== star.id));
-    // Update displayed stars by the value of this flying star
-    setDisplayedStars(prev => prev + star.value);
-    // Pulse the progress bar
-    setStarPulseKey(k => k + 1);
-  };
-  
-  // Collision particles state
-  interface CollisionParticle {
-    id: number;
-    x: number;
-    y: number;
-    vx: number;
-    vy: number;
-    size: number;
-    color: string;
-  }
-  const [collisionParticles, setCollisionParticles] = useState<CollisionParticle[]>([]);
-  const PARTICLE_COLORS = ['#f59e0b', '#fb923c', '#fbbf24', '#fcd34d', '#ffffff'];
-  
-  // Create burst particles at collision point
-  const createCollisionParticles = (x: number, y: number) => {
-    const newParticles: CollisionParticle[] = [];
-    const particleCount = 5 + Math.floor(Math.random() * 3); // 5-7 particles
-    
-    for (let i = 0; i < particleCount; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 2 + Math.random() * 3;
-      newParticles.push({
-        id: Date.now() + i,
-        x,
-        y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 1, // slight upward bias
-        size: 3 + Math.random() * 4,
-        color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)]
-      });
-    }
-    
-    setCollisionParticles(prev => [...prev, ...newParticles]);
-    
-    // Clean up particles after animation
-    setTimeout(() => {
-      setCollisionParticles(prev => prev.filter(p => !newParticles.find(np => np.id === p.id)));
-    }, 600);
-  };
+  // Collision particles hook - manages burst particles on icon arrival
+  const { particles: collisionParticles, createBurst: createCollisionParticles } = useCollisionParticles();
   
   // Update collections button position for flying icons
   useEffect(() => {
@@ -1554,8 +875,7 @@ export function GameBoard() {
         }
         
         // Pulse the points event icon
-        setPointsEventPulse(true);
-        setTimeout(() => setPointsEventPulse(false), 150);
+        triggerPointsEventPulse();
       }
       
       // Note: We no longer drop collection items directly
@@ -1611,20 +931,20 @@ export function GameBoard() {
   
   // Add stars when level up screen is shown (only once per level up)
   useEffect(() => {
-    if (showLevelUp && pendingLevelUp !== null && levelUpStarsAwardedRef.current !== pendingLevelUp) {
+    if (isLevelUpShowing && pendingLevelUp !== null && levelUpStarsAwardedRef.current !== pendingLevelUp) {
       // Add stars for level up immediately (persisted via localStorage effect)
       levelUpStarsAwardedRef.current = pendingLevelUp;
       addStars(STARS_PER_LEVELUP);
       console.log(`⭐ Awarded ${STARS_PER_LEVELUP} stars for level ${pendingLevelUp}`);
     }
-  }, [showLevelUp, pendingLevelUp]);
+  }, [isLevelUpShowing, pendingLevelUp]);
   
   // Reset level up stars tracker when level up is complete
   useEffect(() => {
-    if (!showLevelUp && pendingLevelUp === null) {
+    if (!isLevelUpShowing && pendingLevelUp === null) {
       levelUpStarsAwardedRef.current = null;
     }
-  }, [showLevelUp, pendingLevelUp]);
+  }, [isLevelUpShowing, pendingLevelUp]);
 
   // Calculate cards in foundations
   const foundationCards = Object.values(foundations).reduce((sum, f) => sum + f.length, 0);
@@ -1694,6 +1014,7 @@ export function GameBoard() {
   useEffect(() => {
     if (!isWon) {
       setWinHandled(false);
+      dailyQuestsShownThisWinRef.current = false; // Reset daily quests tracker
     }
   }, [isWon]);
   
@@ -1722,650 +1043,97 @@ export function GameBoard() {
     return () => clearTimeout(timer);
   }, [tableau, waste, stock, foundations, isWon, animatingCard, hasNoMoves, checkForAvailableMoves, isDealing, isAutoCollecting]);
   
+  // Win Flow Hook - handles all popup chains after winning
+  const {
+    handleWinComplete,
+    handleLevelUpComplete,
+    handleDailyQuestsClose,
+    handleCollectionsUnlockClose,
+    handleLeaderboardUnlockClose,
+    handlePromoUnlockClose,
+    handleTreasureHuntPromoClose,
+    handleDungeonDigPromoClose,
+    tryClaimPointsEventReward,
+    proceedAfterPointsEventRewards,
+    proceedToDailyQuests,
+    proceedToCollectionsOrNewGame,
+  } = useWinFlow({
+    addStars,
+    setDisplayedStars,
+    launchTreasureStars,
+    setShowWinScreen,
+    dailyQuests,
+    setDailyQuests,
+    acesCollected,
+    setAcesCollected,
+    openDailyQuests,
+    closeDailyQuests,
+    dailyQuestsAfterWin,
+    setDailyQuestsAfterWin,
+    setPointsEventState,
+    setPackRewardsQueue,
+    setShowPackPopup,
+    miniatureContainerRef,
+    setAutoClaimingRewards,
+    pendingLevelUp,
+    setPendingLevelUp,
+    setPlayerLevel,
+    playerLevel,
+    collections,
+    rewardedCollections,
+    collectionsUnlocked,
+    collectionsUnlockShown,
+    setCollectionsUnlockShown,
+    pendingCollectionsUnlock,
+    setPendingCollectionsUnlock,
+    setPendingCollectionRewards,
+    setCollectionsAfterWin,
+    openCollections,
+    leaderboardUnlockShown,
+    setLeaderboardUnlockShown,
+    pendingLeaderboardUnlock,
+    setPendingLeaderboardUnlock,
+    pendingLeaderboardShow,
+    setPendingLeaderboardShow,
+    openLeaderboard,
+    pendingAfterLeaderboardRef,
+    initializeLeaderboardData,
+    tryShowLeaderboard,
+    promoUnlocked,
+    setPromoUnlocked,
+    pendingPromoUnlock,
+    setPendingPromoUnlock,
+    treasureHuntEvent,
+    setTreasureHuntEvent,
+    dungeonDigEvent,
+    setDungeonDigEvent,
+    treasureHuntExpired,
+    dungeonDigExpired,
+    treasureHuntPromoShown,
+    setTreasureHuntPromoShown,
+    pendingTreasureHuntPromo,
+    setPendingTreasureHuntPromo,
+    pendingDungeonDigPromo,
+    setPendingDungeonDigPromo,
+    nextEventType,
+    keysDistributedRef,
+    shovelsDistributedRef,
+    resetTreasureHunt,
+    resetDungeonDig,
+    activateTreasureHuntEvent,
+    activateDungeonDigEvent,
+    tryShowDailyReward,
+    newGame,
+    clearNoMoves,
+    setShowNewGameButton,
+    setNoMovesShownOnce,
+    dailyQuestsShownThisWinRef,
+    autoClaimingRewardsRef,
+    isClaimingRewardRef,
+  });
   
-  // Try to claim and animate a points event reward from pending rewards
-  // Returns true if a reward was claimed and animation started
-  const tryClaimPointsEventReward = (): boolean => {
-    // Prevent double claiming
-    if (isClaimingRewardRef.current) {
-      console.log('Already claiming a reward, skipping');
-      return false;
-    }
-    
-    // Check for pending rewards
-    const currentState = getPointsEventState();
-    if (!hasPendingRewards(currentState)) {
-      return false;
-    }
-    
-    // Mark as claiming
-    isClaimingRewardRef.current = true;
-    
-    // Get count before claiming to calculate position of last miniature
-    const pendingCount = currentState.pendingRewards.length;
-    
-    // Claim the last pending reward (LIFO order)
-    const claimResult = claimPendingReward();
-    if (!claimResult) {
-      isClaimingRewardRef.current = false;
-      return false;
-    }
-    
-    // Update state immediately to refresh the miniatures
-    setPointsEventState({ ...claimResult.state });
-    const reward = claimResult.reward;
-    
-    // Get position from the last miniature (which was just claimed)
-    // Each miniature is 36x48 + 4px gap (same size as on event button)
-    const containerRect = miniatureContainerRef.current?.getBoundingClientRect();
-    const miniatureWidth = 36;
-    const miniatureHeight = 48;
-    const gap = 4;
-    const lastIndex = Math.min(pendingCount - 1, 3); // Max 4 visible
-    
-    // Miniatures are in a single row
-    const col = lastIndex;
-    
-    const startX = containerRect 
-      ? containerRect.left + (col * (miniatureWidth + gap)) + miniatureWidth / 2
-      : window.innerWidth - 100;
-    const startY = containerRect 
-      ? containerRect.top + miniatureHeight / 2 
-      : 150;
-    
-    if (reward.type === 'stars' && reward.stars) {
-      // Add stars 
-      addStars(reward.stars);
-      
-      // Launch flying animation from miniature position
-      launchTreasureStars(reward.stars, { x: startX, y: startY });
-      
-      // For stars, continue checking for more rewards after a delay
-      setTimeout(() => {
-        // Reset claiming flag
-        isClaimingRewardRef.current = false;
-        // Use ref to avoid stale closure
-        if (autoClaimingRewardsRef.current) {
-          const hasMore = tryClaimPointsEventReward();
-          if (!hasMore) {
-            autoClaimingRewardsRef.current = false;
-            setAutoClaimingRewards(false);
-            proceedAfterPointsEventRewards();
-          }
-        }
-      }, 1650); // Wait for star animation to fully complete
-    } else if (reward.type === 'pack' && reward.packRarity) {
-      // Generate pack items and add to queue
-      const items = generatePackItems(reward.packRarity, collections);
-      // Pass source position so pack icon flies from miniature to center
-      setPackRewardsQueue(prev => [...prev, { rarity: reward.packRarity!, items, sourcePosition: { x: startX, y: startY } }]);
-      setTimeout(() => {
-        isClaimingRewardRef.current = false; // Reset flag before showing popup
-        setShowPackPopup(true);
-      }, 100);
-      // Pack popup will call proceedAfterPointsEventRewards when closed
-    }
-    
-    return true;
-  };
-  
-  // Continue the flow after points event rewards are done
-  const proceedAfterPointsEventRewards = () => {
-    // Check for pending level up first
-    if (pendingLevelUp !== null) {
-      setShowLevelUp(true);
-      return;
-    }
-    
-    // No level up - proceed to daily quests
-    proceedToDailyQuests();
-  };
-  
-  // Handle win screen complete - first try to claim points event rewards
-  const handleWinComplete = () => {
-    setShowWinScreen(false);
-    // Sync displayed stars with actual total from localStorage (to avoid stale closure)
-    const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
-    setDisplayedStars(actualTotal);
-    
-    // Check if promo should be unlocked (first win after collections are already unlocked)
-    if (collectionsUnlocked && !promoUnlocked) {
-      setPendingPromoUnlock(true);
-    }
-    
-    // Start auto-claiming points event rewards
-    autoClaimingRewardsRef.current = true;
-    setAutoClaimingRewards(true);
-    const hasReward = tryClaimPointsEventReward();
-    
-    if (!hasReward) {
-      // No rewards to claim, proceed normally
-      autoClaimingRewardsRef.current = false;
-      setAutoClaimingRewards(false);
-      proceedAfterPointsEventRewards();
-    }
-  };
-  
-  // Proceed to daily quests after level up (or directly if no level up)
-  const proceedToDailyQuests = () => {
-    // Check if all quests were already completed BEFORE this win
-    const allAlreadyCompleted = dailyQuests.every(quest => quest.completed);
-    
-    // If all quests were already done, skip the daily quests screen
-    if (allAlreadyCompleted) {
-      // Check if leaderboard should be shown first, then proceed to collections
-      if (tryShowLeaderboard(proceedToCollectionsOrNewGame)) {
-        return; // Leaderboard will call proceedToCollectionsOrNewGame when closed
-      }
-      // Check for unrewarded collections before starting new game
-      proceedToCollectionsOrNewGame();
-      return;
-    }
-    
-    // Count aces in foundations (4 aces per completed game)
-    const acesInGame = 4;
-    const newAcesTotal = acesCollected + acesInGame;
-    setAcesCollected(newAcesTotal);
-    
-    // Calculate updated quests and track newly completed quests for immediate reward
-    let starsToAdd = 0;
-    let questsJustCompleted = 0;
-    const updatedQuests = dailyQuests.map(quest => {
-      // Both 'daily-games' (1 win) and 'daily-wins' (5 wins) track completed games
-      if ((quest.id === 'daily-games' || quest.id === 'daily-wins') && !quest.completed) {
-        const newCurrent = quest.current + 1;
-        const completed = newCurrent >= quest.target;
-        // If quest just completed, add reward immediately
-        if (completed) {
-          starsToAdd += quest.reward;
-          questsJustCompleted++;
-        }
-        return { ...quest, current: newCurrent, completed };
-      }
-      if (quest.id === 'daily-aces' && !quest.completed) {
-        const newCurrent = Math.min(newAcesTotal, quest.target);
-        const completed = newCurrent >= quest.target;
-        // If quest just completed, add reward immediately
-        if (completed) {
-          starsToAdd += quest.reward;
-          questsJustCompleted++;
-        }
-        return { ...quest, current: newCurrent, completed };
-      }
-      return quest;
-    });
-    
-    // Update daily quest progress
-    setDailyQuests(updatedQuests);
-    
-    // NOTE: Monthly progress is updated via animation callback in DailyQuests component
-    // when particles fly to the monthly progress bar
-    
-    // Add stars immediately for completed quests (persisted via localStorage effect)
-    if (starsToAdd > 0) {
-      addStars(starsToAdd);
-    }
-    
-    // Sync displayed stars before showing daily quests
-    const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
-    setDisplayedStars(actualTotal);
-    
-    // Always show daily quests screen if there was any progress to show
-    setDailyQuestsAfterWin(true); // Mark that this was opened after winning
-    setShowDailyQuests(true);
-  };
-  
-  // Try to show leaderboard if position improved, returns true if shown
-  // IMPORTANT: Only show leaderboard if unlock popup was already shown (user knows about the feature)
-  const tryShowLeaderboard = (onAfterLeaderboard?: () => void): boolean => {
-    if (pendingLeaderboardShow) {
-      // Don't show leaderboard popup before the unlock/promo popup was shown
-      // User should first learn about the feature, then see tournament results
-      if (!leaderboardUnlockShown) {
-        console.log('📊 Leaderboard popup pending, but unlock popup not yet shown - waiting');
-        // Keep pendingLeaderboardShow true, it will be shown after unlock popup
-        return false;
-      }
-      
-      setPendingLeaderboardShow(false);
-      setShowLeaderboard(true);
-      // Store callback for after leaderboard closes
-      pendingAfterLeaderboardRef.current = onAfterLeaderboard || null;
-      return true;
-    }
-    return false;
-  };
-  
-  // Ref to store callback after leaderboard closes
-  const pendingAfterLeaderboardRef = useRef<(() => void) | null>(null);
-  
-  // Handle leaderboard close
-  const handleLeaderboardClose = () => {
-    // Save current position as "last viewed" for next animation
-    saveCurrentPosition(leaderboardNewPosition);
-    setShowLeaderboard(false);
-    // Execute pending callback if any
-    if (pendingAfterLeaderboardRef.current) {
-      const callback = pendingAfterLeaderboardRef.current;
-      pendingAfterLeaderboardRef.current = null;
-      callback();
-    }
-  };
-  
-  // Handle daily quests close - check for collections, then start new game
-  const handleDailyQuestsClose = () => {
-    // Sync displayed stars with actual total from localStorage (to avoid stale closure)
-    const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
-    setDisplayedStars(actualTotal);
-    setShowDailyQuests(false);
-    
-    // Only proceed if daily quests were opened automatically after winning
-    if (dailyQuestsAfterWin) {
-      setDailyQuestsAfterWin(false);
-      
-      // Check if leaderboard should be shown first
-      if (tryShowLeaderboard(proceedToCollectionsOrNewGame)) {
-        return; // Leaderboard will call proceedToCollectionsOrNewGame when closed
-      }
-      
-      // Proceed to check collections
-      proceedToCollectionsOrNewGame();
-    } else {
-      // Manual close - still check for leaderboard
-      tryShowLeaderboard();
-    }
-  };
-  
-  // Handle level up screen complete - proceed to daily quests
-  const handleLevelUpComplete = () => {
-    // Stars were already added when level up was detected
-    // Just sync displayedStars with actual total from localStorage
-    const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
-    setDisplayedStars(actualTotal);
-    
-    setShowLevelUp(false);
-    
-    // Check daily reward FIRST (it's the first thing player should see each day)
-    // This ensures daily reward shows even if feature unlocks happen
-    if (tryShowDailyReward()) {
-      // Daily reward will chain to rest of flow when closed
-      // But we still need to process level up state changes
-      if (pendingLevelUp !== null) {
-        setPlayerLevel(pendingLevelUp);
-        localStorage.setItem('solitaire_player_level', pendingLevelUp.toString());
-        
-        // Check for collections unlock at level 2
-        if (pendingLevelUp >= COLLECTIONS_REQUIRED_LEVEL && !collectionsUnlockShown) {
-          setPendingCollectionsUnlock(true);
-          // Reset points event to start fresh at 0%
-          const freshPointsState = resetPointsEvent();
-          setPointsEventState(freshPointsState);
-        }
-        
-        // Check for leaderboard unlock at level 4
-        if (pendingLevelUp >= LEADERBOARD_REQUIRED_LEVEL && !leaderboardUnlockShown) {
-          setPendingLeaderboardUnlock(true);
-          // Reset leaderboard so everyone starts at 0 when tournament unlocks
-          resetLeaderboard();
-          resetSeasonStars();
-          setSeasonStars(0);
-          const freshPlayers = initializeLeaderboard(0);
-          setLeaderboardPlayers(freshPlayers);
-          setLeaderboardNewPosition(20);
-          setLeaderboardOldPosition(20);
-        }
-        
-        // Try to activate next event if player reached required level
-        const noActiveEvent = !treasureHuntEvent.active && !dungeonDigEvent.active;
-        const eventsUnlocked = isEventAvailable(pendingLevelUp);
-        
-        if (eventsUnlocked && noActiveEvent) {
-          if (nextEventType === 'treasure') {
-            const updatedEvent = activateTreasureHunt(pendingLevelUp);
-            if (updatedEvent && updatedEvent.activated) {
-              setTreasureHuntEvent(updatedEvent);
-              keysDistributedRef.current = false;
-              if (!treasureHuntPromoShown) {
-                setPendingTreasureHuntPromo(true);
-              }
-            }
-          } else {
-            const updatedEvent = activateDungeonDig(pendingLevelUp);
-            if (updatedEvent && updatedEvent.activated) {
-              setDungeonDigEvent(updatedEvent);
-              shovelsDistributedRef.current = false;
-              setPendingDungeonDigPromo(true);
-            }
-          }
-        }
-        
-        setPendingLevelUp(null);
-      }
-      return;
-    }
-    
-    // Track what unlocks happen this level up (to show immediately, not via async state)
-    let shouldShowCollectionsUnlock = false;
-    let shouldShowLeaderboardUnlock = false;
-    
-    // Update player level and check for feature unlocks
-    if (pendingLevelUp !== null) {
-      setPlayerLevel(pendingLevelUp);
-      localStorage.setItem('solitaire_player_level', pendingLevelUp.toString());
-      
-      // Check for collections unlock at level 2
-      if (pendingLevelUp >= COLLECTIONS_REQUIRED_LEVEL && !collectionsUnlockShown) {
-        setPendingCollectionsUnlock(true);
-        shouldShowCollectionsUnlock = true;
-        // Reset points event to start fresh at 0%
-        const freshPointsState = resetPointsEvent();
-        setPointsEventState(freshPointsState);
-      }
-      
-      // Check for leaderboard unlock at level 4
-      if (pendingLevelUp >= LEADERBOARD_REQUIRED_LEVEL && !leaderboardUnlockShown) {
-        setPendingLeaderboardUnlock(true);
-        shouldShowLeaderboardUnlock = true;
-        // Reset leaderboard so everyone starts at 0 when tournament unlocks
-        resetLeaderboard();
-        resetSeasonStars();
-        setSeasonStars(0);
-        // Initialize fresh leaderboard with 0 stars
-        const freshPlayers = initializeLeaderboard(0);
-        setLeaderboardPlayers(freshPlayers);
-        setLeaderboardNewPosition(20); // Start at bottom
-        setLeaderboardOldPosition(20);
-      }
-      
-      // Try to activate next event if player reached required level
-      // First time: TreasureHunt. After that: rotate between events
-      const noActiveEvent = !treasureHuntEvent.active && !dungeonDigEvent.active;
-      const eventsUnlocked = isEventAvailable(pendingLevelUp);
-      
-      if (eventsUnlocked && noActiveEvent) {
-        if (nextEventType === 'treasure') {
-          const updatedEvent = activateTreasureHunt(pendingLevelUp);
-          if (updatedEvent && updatedEvent.activated) {
-            setTreasureHuntEvent(updatedEvent);
-            // Reset distribution ref for new event
-            keysDistributedRef.current = false;
-            // Mark that promo should be shown (only first time)
-            if (!treasureHuntPromoShown) {
-              setPendingTreasureHuntPromo(true);
-            }
-          }
-        } else {
-          const updatedEvent = activateDungeonDig(pendingLevelUp);
-          if (updatedEvent && updatedEvent.activated) {
-            setDungeonDigEvent(updatedEvent);
-            // Reset distribution ref for new event
-            shovelsDistributedRef.current = false;
-            // Show promo for dungeon dig event starting
-            setPendingDungeonDigPromo(true);
-          }
-        }
-      }
-    }
-    setPendingLevelUp(null);
-    
-    // Show unlock popups immediately (don't rely on async state check)
-    // Collections unlock takes priority (shows first at level 2)
-    if (shouldShowCollectionsUnlock) {
-      setShowCollectionsUnlock(true);
-      return; // Collections unlock will chain to leaderboard unlock if needed
-    }
-    
-    // Leaderboard unlock (shows at level 4)
-    if (shouldShowLeaderboardUnlock) {
-      setShowLeaderboardUnlock(true);
-      return; // Leaderboard unlock will continue the flow
-    }
-    
-    // No unlocks - continue to daily quests
-    proceedToDailyQuests();
-  };
-  
-  // Handle collections unlock popup close - continue flow
-  const handleCollectionsUnlockClose = () => {
-    setShowCollectionsUnlock(false);
-    setCollectionsUnlockShown(true);
-    localStorage.setItem('solitaire_collections_unlock_shown', 'true');
-    setPendingCollectionsUnlock(false);
-    
-    // Check for leaderboard unlock
-    if (pendingLeaderboardUnlock) {
-      setShowLeaderboardUnlock(true);
-      return;
-    }
-    
-    // Continue the flow - check daily reward
-    if (tryShowDailyReward()) {
-      return;
-    }
-    
-    // Check for event promos
-    if (pendingTreasureHuntPromo) {
-      setShowTreasureHuntPromo(true);
-      return;
-    }
-    if (pendingDungeonDigPromo) {
-      setShowDungeonDigPromo(true);
-      return;
-    }
-    
-    // Start new game
-    clearNoMoves();
-    setShowNewGameButton(false);
-    setNoMovesShownOnce(false);
-    newGame('solvable');
-  };
-  
-  // Handle leaderboard unlock popup close - continue flow
-  const handleLeaderboardUnlockClose = () => {
-    setShowLeaderboardUnlock(false);
-    setLeaderboardUnlockShown(true);
-    localStorage.setItem('solitaire_leaderboard_unlock_shown', 'true');
-    setPendingLeaderboardUnlock(false);
-    
-    // Now that unlock popup is shown, check if leaderboard popup is pending
-    // (user improved position and should see the tournament results)
-    if (pendingLeaderboardShow) {
-      setPendingLeaderboardShow(false);
-      setShowLeaderboard(true);
-      // After leaderboard closes, continue the flow
-      pendingAfterLeaderboardRef.current = () => {
-        // Continue with the rest of the flow
-        if (tryShowDailyReward()) return;
-        if (pendingPromoUnlock) { setShowPromoUnlock(true); return; }
-        if (pendingTreasureHuntPromo) { setShowTreasureHuntPromo(true); return; }
-        if (pendingDungeonDigPromo) { setShowDungeonDigPromo(true); return; }
-        clearNoMoves();
-        setShowNewGameButton(false);
-        setNoMovesShownOnce(false);
-        newGame('solvable');
-      };
-      return;
-    }
-    
-    // Continue the flow - check daily reward
-    if (tryShowDailyReward()) {
-      return;
-    }
-    
-    // Check for promo/shop unlock
-    if (pendingPromoUnlock) {
-      setShowPromoUnlock(true);
-      return;
-    }
-    
-    // Check for event promos
-    if (pendingTreasureHuntPromo) {
-      setShowTreasureHuntPromo(true);
-      return;
-    }
-    if (pendingDungeonDigPromo) {
-      setShowDungeonDigPromo(true);
-      return;
-    }
-    
-    // Start new game
-    clearNoMoves();
-    setShowNewGameButton(false);
-    setNoMovesShownOnce(false);
-    newGame('solvable');
-  };
-  
-  // Handle promo/shop unlock popup close - continue flow
-  const handlePromoUnlockClose = () => {
-    setShowPromoUnlock(false);
-    setPromoUnlocked(true);
-    localStorage.setItem('solitaire_promo_unlocked', 'true');
-    setPendingPromoUnlock(false);
-    
-    // Check for event promos
-    if (pendingTreasureHuntPromo) {
-      setShowTreasureHuntPromo(true);
-      return;
-    }
-    if (pendingDungeonDigPromo) {
-      setShowDungeonDigPromo(true);
-      return;
-    }
-    
-    // Start new game
-    clearNoMoves();
-    setShowNewGameButton(false);
-    setNoMovesShownOnce(false);
-    newGame('solvable');
-  };
-  
-  // Handle treasure hunt promo close - start new game
-  const handleTreasureHuntPromoClose = () => {
-    setShowTreasureHuntPromo(false);
-    setTreasureHuntPromoShown(true);
-    localStorage.setItem('solitaire_treasure_hunt_promo_shown', 'true');
-    setPendingTreasureHuntPromo(false);
-    
-    // Activate the event if not already active (for rotation)
-    if (!treasureHuntEvent.active) {
-      resetTreasureHuntEvent();
-      const activated = activateTreasureHunt(playerLevel);
-      if (activated) {
-        setTreasureHuntEvent(activated);
-        setTreasureHuntExpired(false);
-        setTreasureHuntTimeRemaining('');
-        keysDistributedRef.current = false;
-      }
-    }
-    
-    // Now start new game
-    clearNoMoves();
-    setShowNewGameButton(false);
-    setNoMovesShownOnce(false);
-    newGame('solvable');
-  };
-  
-  // Handle dungeon dig promo close - activate event and start new game
-  const handleDungeonDigPromoClose = () => {
-    setShowDungeonDigPromo(false);
-    setPendingDungeonDigPromo(false);
-    
-    // Activate the event
-    resetDungeonDigEvent();
-    const activated = activateDungeonDig(playerLevel);
-    if (activated) {
-      setDungeonDigEvent(activated);
-      setDungeonDigExpired(false);
-      setDungeonDigTimeRemaining('');
-      shovelsDistributedRef.current = false;
-    }
-    
-    // Now start new game
-    clearNoMoves();
-    setShowNewGameButton(false);
-    setNoMovesShownOnce(false);
-    newGame('solvable');
-  };
-  
-  // Proceed to collection rewards or start new game
-  const proceedToCollectionsOrNewGame = () => {
-    // Find ALL completed but unrewarded collections
-    const unrewardedCollections = collections
-      .filter(c => c.items.every(i => i.collected) && !rewardedCollections.has(c.id))
-      .map(c => c.id);
-    
-    if (unrewardedCollections.length > 0) {
-      // Sync displayed stars before showing collections
-      const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
-      setDisplayedStars(actualTotal);
-      
-      // Queue all unrewarded collections for rewards
-      setPendingCollectionRewards(unrewardedCollections);
-      setCollectionsAfterWin(true);
-      setShowCollections(true);
-      return; // Don't start new game yet
-    }
-    
-    // Check for collections unlock popup
-    if (pendingCollectionsUnlock) {
-      setShowCollectionsUnlock(true);
-      return; // Unlock popup will continue chain when closed
-    }
-    
-    // Check for leaderboard unlock popup
-    if (pendingLeaderboardUnlock) {
-      setShowLeaderboardUnlock(true);
-      return; // Unlock popup will continue chain when closed
-    }
-    
-    // No unrewarded collections - check for daily reward (new day)
-    if (tryShowDailyReward()) {
-      return; // Daily reward will continue chain when closed
-    }
-    
-    // Check for promo/shop unlock (first win after collections unlock)
-    if (pendingPromoUnlock) {
-      setShowPromoUnlock(true);
-      return; // Promo unlock popup will continue chain when closed
-    }
-    
-    // Check for event promos before starting new game
-    if (pendingTreasureHuntPromo) {
-      setShowTreasureHuntPromo(true);
-      return; // Promo will start new game when closed
-    }
-    if (pendingDungeonDigPromo) {
-      setShowDungeonDigPromo(true);
-      return; // Promo will start new game when closed
-    }
-    
-    // Check if we should start the next event in rotation
-    // This handles the case where previous event just ended
-    const eventsUnlocked = isEventAvailable(playerLevel);
-    const noActiveEvent = !treasureHuntEvent.active && !dungeonDigEvent.active;
-    const treasureFullyEnded = treasureHuntExpired && treasureHuntEvent.keys === 0;
-    const dungeonFullyEnded = dungeonDigExpired && dungeonDigEvent.shovels === 0;
-    
-    if (eventsUnlocked && noActiveEvent && (treasureFullyEnded || dungeonFullyEnded)) {
-      if (nextEventType === 'dungeon') {
-        // Start Dungeon Dig event
-        setPendingDungeonDigPromo(true);
-        setShowDungeonDigPromo(true);
-        return;
-      } else if (nextEventType === 'treasure') {
-        // Start Treasure Hunt event
-        setPendingTreasureHuntPromo(true);
-        setShowTreasureHuntPromo(true);
-        return;
-      }
-    }
-    
-    // Start new game
-    clearNoMoves();
-    setShowNewGameButton(false);
-    setNoMovesShownOnce(false);
-    newGame('solvable');
-  };
+  // Handle leaderboard close - wrapper to pass through to hook
+  const handleLeaderboardClose = () => handleLeaderboardCloseFromHook();
   
   // Reset daily quests progress
   const handleResetDailyQuests = () => {
@@ -2380,8 +1148,7 @@ export function GameBoard() {
   
   // Reset stars progress
   const handleResetStars = () => {
-    setTotalStars(0);
-    setDisplayedStars(0);
+    resetStarsProgress();
   };
   
   // Reset collections progress
@@ -2394,213 +1161,69 @@ export function GameBoard() {
     setHasNewCollectionItem(false);
   };
   
-  // Reset ALL player progress
-  const handleResetAll = () => {
-    // Reset stars
-    setTotalStars(0);
-    setDisplayedStars(0);
-    
-    // Reset daily quests
-    setDailyQuests(defaultDailyQuests);
-    setAcesCollected(0);
-    
-    // Reset collections
-    setCollections(defaultCollections);
-    setRewardedCollections(new Set());
-    setAllCollectionsRewarded(false);
-    setNewItemsInCollections(new Set());
-    setNewItemIds(new Set());
-    setHasNewCollectionItem(false);
-    
-    // Reset player XP/level
-    resetAllXP();
-    
-    // Reset monthly progress
-    setMonthlyProgress(0);
-    setMonthlyRewardClaimed(false);
-    
-    // Reset daily streak
-    setDailyStreak(0);
-    setLastLoginDate('');
-    setShowDailyReward(false);
-    setShowStreakPopup(false);
-    setPendingDailyReward(0);
-    setPendingStreak(0);
-    
-    // Clear all localStorage
-    localStorage.removeItem('solitaire_total_stars');
-    localStorage.removeItem('solitaire_daily_quests');
-    localStorage.removeItem('solitaire_daily_quests_date');
-    localStorage.removeItem('solitaire_aces_collected');
-    localStorage.removeItem('solitaire_monthly_progress');
-    localStorage.removeItem('solitaire_monthly_reward_claimed');
-    localStorage.removeItem('solitaire_daily_streak');
-    localStorage.removeItem('solitaire_last_login_date');
-    localStorage.removeItem('solitaire_collections');
-    localStorage.removeItem('solitaire_rewarded_collections');
-    localStorage.removeItem('solitaire_all_collections_rewarded');
-    localStorage.removeItem('solitaire_trophies');
-    localStorage.removeItem('solitaire_player_xp');
-    localStorage.removeItem('solitaire_leaderboard');
-    localStorage.removeItem('solitaire_leaderboard_position');
-    localStorage.removeItem('solitaire_season_info');
-    localStorage.removeItem('solitaire_season_stars');
-    localStorage.removeItem('solitaire_leaderboard_trophies');
-    localStorage.removeItem('solitaire_player_level');
-    
-    // Reset Treasure Hunt event (clears keys)
-    resetTreasureHuntEvent();
-    localStorage.removeItem('solitaire_treasure_hunt_promo_shown');
-    setTreasureHuntEvent(getTreasureHuntEvent());
-    setTreasureHuntPromoShown(false);
-    setPendingTreasureHuntPromo(false);
-    
-    // Reset Dungeon Dig event (clears shovels)
-    resetDungeonDigEvent();
-    localStorage.removeItem('solitaire_dungeon_dig_promo_shown');
-    setDungeonDigEvent(getDungeonDigEvent());
-    setDungeonDigExpired(false);
-    
-    // Reset Collections unlock
-    localStorage.removeItem('solitaire_collections_unlock_shown');
-    setCollectionsUnlockShown(false);
-    setPendingCollectionsUnlock(false);
-    
-    // Reset Leaderboard unlock
-    localStorage.removeItem('solitaire_leaderboard_unlock_shown');
-    setLeaderboardUnlockShown(false);
-    setPendingLeaderboardUnlock(false);
-    
-    // Reset Promo/Shop unlock
-    localStorage.removeItem('solitaire_promo_unlocked');
-    setPromoUnlocked(false);
-    setShowPromoUnlock(false);
-    setPendingPromoUnlock(false);
-    
-    // Reset first win flag so next game is extra easy
-    localStorage.removeItem('solitaire_first_win');
-    
-    setPlayerLevel(1);
-    
-    // Reset Points Event
-    const newPointsState = resetPointsEvent();
-    setPointsEventState(newPointsState);
-    setPackRewardsQueue([]);
-    setShowPackPopup(false);
-    
-    // Reset event rotation to treasure hunt (first event)
-    setNextEventType('treasure');
-    localStorage.removeItem('solitaire_next_event_type');
-    
-    // Reset leaderboard state - create fresh leaderboard with low-star players
-    const newSeasonInfo = getSeasonInfo();
-    setSeasonInfo(newSeasonInfo);
-    setSeasonStars(0);
-    // Initialize leaderboard with 0 stars - this will create players with low stars
-    const freshPlayers = initializeLeaderboard(0);
-    setLeaderboardPlayers(freshPlayers);
-    const position = freshPlayers.findIndex(p => p.isCurrentUser) + 1;
-    setLeaderboardOldPosition(position);
-    setLeaderboardNewPosition(position);
-    saveCurrentPosition(position);
-    setPendingLeaderboardShow(false);
-    setLeaderboardTrophies([]);
-    
-    // Trigger reset of internal Collections state (like hasNewTrophy)
-    setCollectionsResetKey(prev => prev + 1);
-  };
-  
-  // Test win function (temporary)
-  const handleTestWin = () => {
-    playSuccess();
-    // Add stars for winning immediately (persisted via localStorage effect)
-    addStars(STARS_PER_WIN);
-    
-    // Check if there are flying icons
-    if (flyingIcons.length > 0) {
-      setPendingWinScreen(true);
-    } else {
-      setShowWinScreen(true);
-    }
-  };
-  
-  // Test level up function (debug) - actually increases level
-  const handleTestLevelUp = () => {
-    // Force next level (updates XP in localStorage)
-    const newLevel = forceNextLevel();
-    
-    // Show level up screen
-    setPendingLevelUp(newLevel);
-    setShowLevelUp(true);
-  };
-  
-  // Handle next day (debug) - reset daily quests and give daily reward
-  const handleNextDay = () => {
-    // Reset daily quests progress (but keep monthly progress)
-    setDailyQuests(prev => prev.map(quest => ({
-      ...quest,
-      current: 0,
-      completed: false
-    })));
-    setAcesCollected(0);
-    
-    // Calculate next streak (simulate consecutive day, no limit)
-    const newStreak = dailyStreak + 1;
-    
-    // Set pending streak and reward based on day
-    setPendingStreak(newStreak);
-    setPendingDailyReward(getRewardStars(newStreak));
-    
-    // Show streak popup first if streak >= 2, otherwise show reward directly
-    if (newStreak >= 2) {
-      setShowStreakPopup(true);
-    } else {
-      setShowDailyReward(true);
-    }
-    
-    // Update streak and "last login" to simulate yesterday
-    // (so next "next day" click also works)
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    setLastLoginDate(yesterday.toDateString());
-    setDailyStreak(newStreak - 1); // Will be set to newStreak when claimed
-    
-    // Start new game
-    newGame('solvable');
-  };
-  
-  // Start Dungeon Dig event (debug) - ends Treasure Hunt if active, starts Dungeon Dig
-  const handleStartDungeonDig = () => {
-    // If Treasure Hunt is active, deactivate it
-    if (treasureHuntEvent.active) {
-      const updatedTreasureHunt = { 
-        ...treasureHuntEvent, 
-        active: false,
-        keys: 0  // Clear remaining keys
-      };
-      saveTreasureHuntEvent(updatedTreasureHunt);
-      setTreasureHuntEvent(updatedTreasureHunt);
-      clearAllKeys();
-      setTreasureHuntExpired(false);
-    }
-    
-    // Reset and activate Dungeon Dig
-    resetDungeonDigEvent();
-    const activated = activateDungeonDig(playerLevel);
-    if (activated) {
-      setDungeonDigEvent(activated);
-      setDungeonDigExpired(false);
-      setDungeonDigTimeRemaining('');
-      shovelsDistributedRef.current = false;
-    }
-    
-    // Set next event to treasure (after dungeon ends, treasure starts)
-    setNextEventType('treasure');
-    localStorage.setItem('solitaire_next_event_type', 'treasure');
-    
-    // Start new game
-    newGame('solvable');
-  };
+  // Debug actions hook - test win, level up, next day, start dungeon, reset all, drop collection item
+  const {
+    handleTestWin,
+    handleTestLevelUp,
+    handleNextDay,
+    handleStartDungeonDig,
+    handleResetAll,
+    handleDropCollectionItem,
+  } = useDebugActions({
+    playSuccess,
+    addStars,
+    resetStarsProgress,
+    setShowWinScreen,
+    setPendingWinScreen,
+    flyingIconsLength: flyingIcons.length,
+    setPendingLevelUp,
+    showPopupViaQueue,
+    starsPerLevelUp: STARS_PER_LEVELUP,
+    setDailyQuests,
+    setAcesCollected,
+    resetDailyQuests,
+    dailyStreak,
+    setDailyStreak,
+    setLastLoginDate,
+    setPendingStreak,
+    setPendingDailyReward,
+    collections,
+    setCollections,
+    setRewardedCollections,
+    setAllCollectionsRewarded,
+    setNewItemsInCollections,
+    setNewItemIds,
+    setHasNewCollectionItem,
+    setCollectionsUnlockShown,
+    setPendingCollectionsUnlock,
+    setCollectionsResetKey,
+    setFlyingIcons,
+    collectionsButtonRef,
+    setMonthlyProgress,
+    setMonthlyRewardClaimed,
+    treasureHuntEvent,
+    setTreasureHuntEvent,
+    setTreasureHuntPromoShown,
+    setPendingTreasureHuntPromo,
+    setTreasureHuntExpired,
+    dungeonDigEvent,
+    setDungeonDigEvent,
+    setDungeonDigExpired,
+    resetDungeonDig,
+    activateDungeonDigEvent,
+    setLeaderboardUnlockShown,
+    setPendingLeaderboardUnlock,
+    resetLeaderboardData,
+    setPromoUnlocked,
+    setPendingPromoUnlock,
+    setPointsEventState,
+    setPackRewardsQueue,
+    setShowPackPopup,
+    setNextEventType,
+    playerLevel,
+    setPlayerLevel,
+    newGame,
+  });
   
   // Handle shop purchase
   const handleShopPurchase = (item: ShopItem) => {
@@ -2614,208 +1237,16 @@ export function GameBoard() {
       setShowPackPopup(true);
     }
   };
-  
-  // Legacy shop purchase handler (for reference - removed old item collection logic)
-  const _legacyShopPurchaseHandler = (item: { items: number; guaranteed: number }) => {
-    // Collect items from collections
-    let itemsToCollect = item.items;
-    let guaranteedUnique = item.guaranteed;
-    
-    // First, collect guaranteed unique items
-    if (guaranteedUnique > 0) {
-      const uncollectedItems: Array<{ collectionId: string; itemId: string }> = [];
-      collections.forEach(collection => {
-        collection.items.forEach(collItem => {
-          if (!collItem.collected) {
-            uncollectedItems.push({ collectionId: collection.id, itemId: collItem.id });
-          }
-        });
-      });
-      
-      // Shuffle and take guaranteed unique items
-      const shuffled = [...uncollectedItems].sort(() => Math.random() - 0.5);
-      const uniqueToCollect = shuffled.slice(0, Math.min(guaranteedUnique, shuffled.length));
-      
-      uniqueToCollect.forEach(({ collectionId, itemId }) => {
-        setCollections(prev => prev.map(coll => {
-          if (coll.id === collectionId) {
-            return {
-              ...coll,
-              items: coll.items.map(i => i.id === itemId ? { ...i, collected: true } : i)
-            };
-          }
-          return coll;
-        }));
-        
-        // Mark as new item
-        setNewItemIds(prev => new Set(Array.from(prev).concat(itemId)));
-        setNewItemsInCollections(prev => {
-          const newSet = new Set(prev);
-          newSet.add(collectionId);
-          return newSet;
-        });
-        setHasNewCollectionItem(true);
-        
-        itemsToCollect--;
-      });
-    }
-    
-    // Then collect remaining items (can be duplicates)
-    for (let i = 0; i < itemsToCollect; i++) {
-      // Get all items (for duplicates probability)
-      const allItems: Array<{ collectionId: string; itemId: string; collected: boolean }> = [];
-      collections.forEach(collection => {
-        collection.items.forEach(collItem => {
-          allItems.push({ collectionId: collection.id, itemId: collItem.id, collected: collItem.collected });
-        });
-      });
-      
-      if (allItems.length === 0) break;
-      
-      const randomItem = allItems[Math.floor(Math.random() * allItems.length)];
-      
-      if (!randomItem.collected) {
-        setCollections(prev => prev.map(coll => {
-          if (coll.id === randomItem.collectionId) {
-            return {
-              ...coll,
-              items: coll.items.map(item => item.id === randomItem.itemId ? { ...item, collected: true } : item)
-            };
-          }
-          return coll;
-        }));
-        
-        // Mark as new item
-        setNewItemIds(prev => new Set(Array.from(prev).concat(randomItem.itemId)));
-        setNewItemsInCollections(prev => {
-          const newSet = new Set(prev);
-          newSet.add(randomItem.collectionId);
-          return newSet;
-        });
-        setHasNewCollectionItem(true);
-      }
-      // If already collected, it's a duplicate - no action needed
-    }
-    
-    // Close shop
-    setShowShop(false);
-    
-    // Check if any collections were completed by this purchase
-    // Use setTimeout to ensure state is updated
-    setTimeout(() => {
-      setCollections(currentCollections => {
-        // Find completed but unrewarded collections
-        const unrewardedCollections = currentCollections
-          .filter(c => c.items.every(i => i.collected) && !rewardedCollections.has(c.id))
-          .map(c => c.id);
-        
-        if (unrewardedCollections.length > 0) {
-          // Sync displayed stars before showing collections
-          const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
-          setDisplayedStars(actualTotal);
-          
-          // Queue unrewarded collections for rewards
-          setPendingCollectionRewards(unrewardedCollections);
-          
-          // Open collections to show rewards
-          setShowCollections(true);
-        }
-        
-        return currentCollections; // Don't change state
-      });
-    }, 100);
-  };
-  
-  // Handle subscription
-  const handleSubscribe = () => {
-    setIsSubscribed(true);
-    localStorage.setItem('solitaire_premium_subscription', 'true');
-    setShowShop(false);
-  };
-  
-  // Drop a unique collection item (one that player doesn't have yet)
-  const handleDropCollectionItem = () => {
-    // Find first incomplete collection and get uncollected items from it
-    let targetCollection = null;
-    const uncollectedItems: Array<{
-      collectionId: string;
-      itemId: string;
-      icon: string;
-      rarity: number;
-    }> = [];
-    
-    // Find first collection that is not complete
-    for (const collection of collections) {
-      const hasUncollected = collection.items.some(item => !item.collected);
-      if (hasUncollected) {
-        targetCollection = collection;
-        break;
-      }
-    }
-    
-    if (!targetCollection) {
-      console.log('All collection items already collected!');
-      return;
-    }
-    
-    // Get uncollected items only from target collection
-    for (const item of targetCollection.items) {
-      if (!item.collected) {
-        uncollectedItems.push({
-          collectionId: targetCollection.id,
-          itemId: item.id,
-          icon: item.icon,
-          rarity: item.rarity || 1
-        });
-      }
-    }
-    
-    // Pick a random uncollected item from the target collection
-    const randomItem = uncollectedItems[Math.floor(Math.random() * uncollectedItems.length)];
-    
-    // Mark item as collected IMMEDIATELY to prevent duplicates on rapid clicks
-    setCollections(prev => prev.map(collection => {
-      if (collection.id === randomItem.collectionId) {
-        return {
-          ...collection,
-          items: collection.items.map(item => 
-            item.id === randomItem.itemId ? { ...item, collected: true } : item
-          )
-        };
-      }
-      return collection;
-    }));
-    
-    // Get button position for animation target
-    const buttonRect = collectionsButtonRef.current?.getBoundingClientRect();
-    if (!buttonRect) return;
-    
-    // Start from center of screen (or any visible area)
-    const startX = window.innerWidth / 2;
-    const startY = window.innerHeight / 2;
-    
-    // Create flying icon (isDuplicate = false since we're debug dropping unique items)
-    const drop = {
-      id: `debug-drop-${Date.now()}-${Math.random()}`,
-      icon: randomItem.icon,
-      itemId: randomItem.itemId,
-      collectionId: randomItem.collectionId,
-      isDuplicate: false,
-      startX,
-      startY,
-      rarity: randomItem.rarity
-    };
-    
-    setFlyingIcons(prev => [...prev, drop]);
-  };
+  // NOTE: handleSubscribe moved to useShop hook
+  // NOTE: handleDropCollectionItem moved to useDebugActions hook
   
   // Handle star arriving at progress bar - update displayed stars and trigger pulse
   // Real stars are already saved to localStorage, this updates the visual display
   const handleStarArrived = (count: number = 1) => {
     // Increment displayed stars by count (visual update)
     setDisplayedStars(prev => prev + count);
-    // Trigger pulse animation by incrementing key
-    setStarPulseKey(prev => prev + 1);
+    // Trigger pulse animation
+    triggerStarPulse();
   };
   
   // Handle stars from other players - update displayed and total stars
@@ -2826,10 +1257,11 @@ export function GameBoard() {
     if (safeCount <= 0) return;
     
     // Increment displayed and total stars only (NOT seasonStars for leaderboard)
+    // Use addStarsBase to avoid season stars update
     setDisplayedStars(prev => prev + safeCount);
-    setTotalStars(prev => prev + safeCount); // Only totalStars, not addStars()
+    addStarsBase(safeCount); // Only totalStars, not addStars() which adds to season
     // Trigger pulse animation
-    setStarPulseKey(prev => prev + 1);
+    triggerStarPulse();
   };
   
   // Clean up any visual feedback when drag ends
@@ -2941,348 +1373,54 @@ export function GameBoard() {
             marginBottom: '0px'
           }} />
           
-          {/* Compact Event Icons Row - between progress bar and cards */}
-          <div 
-            className="flex items-center gap-3 mb-2"
-            style={{ 
-              visibility: (showDailyQuests || showCollections) ? 'hidden' : 'visible',
-              width: '584px',
-              paddingLeft: '120px',
-              position: 'relative',
-              zIndex: 10,
-              pointerEvents: 'auto',
-              boxSizing: 'border-box'
+          {/* Top Event Bar - Points Event, Treasure Hunt, Dungeon Dig icons */}
+          <TopEventBar
+            pointsEventIconRef={pointsEventIconRef}
+            treasureHuntIconRef={treasureHuntIconRef}
+            dungeonDigIconRef={dungeonDigIconRef}
+            miniatureContainerRef={miniatureContainerRef}
+            showDailyQuests={showDailyQuests}
+            showCollections={showCollections}
+            collectionsUnlocked={collectionsUnlocked}
+            promoUnlocked={promoUnlocked}
+            playerLevel={playerLevel}
+            pointsEventState={pointsEventState}
+            pointsEventPulse={pointsEventPulse}
+            animatingRewardIndex={animatingRewardIndex}
+            nextRewardDropping={nextRewardDropping}
+            rewardIconAnimating={rewardIconAnimating}
+            flyingRewardToMiniature={flyingRewardToMiniature}
+            treasureHuntEvent={treasureHuntEvent}
+            treasureHuntExpired={treasureHuntExpired}
+            treasureHuntTimeRemaining={treasureHuntTimeRemaining}
+            treasureHuntTimeCritical={treasureHuntTimeCritical}
+            treasureHuntPulse={treasureHuntPulse}
+            dungeonDigEvent={dungeonDigEvent}
+            dungeonDigExpired={dungeonDigExpired}
+            dungeonDigTimeRemaining={dungeonDigTimeRemaining}
+            dungeonDigTimeCritical={dungeonDigTimeCritical}
+            dungeonDigPulse={dungeonDigPulse}
+            nextEventType={nextEventType}
+            onShowLockedPointsEvent={() => popupQueue.showOnDemand({ type: 'lockedPointsEvent' })}
+            onShowPointsEvent={openPointsEventPopup}
+            onShowTreasureHunt={openTreasureHunt}
+            onShowDungeonDig={openDungeonDig}
+            onShowLockedDungeon={() => popupQueue.showOnDemand({ type: 'lockedDungeon' })}
+            onPromoStarArrived={(count) => {
+              const safeCount = typeof count === 'number' && !isNaN(count) ? count : 0;
+              if (safeCount <= 0) return;
+              addStars(safeCount);
+              setDisplayedStars(prev => prev + safeCount);
+              triggerStarPulse();
             }}
-          >
-            {/* Points Event - compact circle with progress ring */}
-            <div 
-              ref={pointsEventIconRef} 
-              className="transition-transform duration-150 hover:scale-110 cursor-pointer"
-              style={{ zIndex: 20, position: 'relative' }}
-              onClick={() => {
-                if (!collectionsUnlocked) {
-                  setShowLockedPointsEventPopup(true);
-                  return;
-                }
-                setShowPointsEventPopup(true);
-              }}
-            >
-              {/* Progress ring SVG - same thickness as level indicator */}
-              {collectionsUnlocked && (
-                <svg 
-                  className="absolute pointer-events-none"
-                  style={{ width: '74px', height: '74px', transform: 'rotate(-90deg)', left: '-6px', top: '-6px' }}
-                >
-                  {/* Background circle */}
-                  <circle
-                    cx="37"
-                    cy="37"
-                    r="33"
-                    fill="none"
-                    stroke="rgba(0,0,0,0.4)"
-                    strokeWidth="5"
-                  />
-                  {/* Progress circle */}
-                  <circle
-                    cx="37"
-                    cy="37"
-                    r="33"
-                    fill="none"
-                    stroke="url(#progressGradient)"
-                    strokeWidth="5"
-                    strokeLinecap="round"
-                    strokeDasharray={`${2 * Math.PI * 33}`}
-                    strokeDashoffset={`${2 * Math.PI * 33 * (1 - getProgressToNextReward(pointsEventState) / 100)}`}
-                    style={{ transition: 'stroke-dashoffset 0.3s ease-out' }}
-                  />
-                  <defs>
-                    <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#f472b6" />
-                      <stop offset="100%" stopColor="#c026d3" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-              )}
-              <div
-                className="relative flex items-center justify-center rounded-full overflow-visible"
-                style={{
-                  width: '62px',
-                  height: '62px',
-                  background: collectionsUnlocked 
-                    ? 'linear-gradient(135deg, #1e3a5f 0%, #0f2744 100%)'
-                    : 'linear-gradient(135deg, #4b5563 0%, #374151 100%)',
-                  boxShadow: '0 3px 10px rgba(0,0,0,0.3)',
-                  border: '2px solid rgba(255,255,255,0.25)',
-                  pointerEvents: 'auto',
-                }}
-              >
-                {/* Dynamic reward icon based on next reward */}
-                {(() => {
-                  // Use animating index during animation, otherwise current index
-                  const displayIndex = animatingRewardIndex ?? pointsEventState.currentRewardIndex;
-                  const currentReward = getRewardAtIndex(displayIndex);
-                  const isStars = currentReward.type === 'stars';
-                  const packRarity = currentReward.packRarity || 1;
-                  const packColors: Record<number, string> = {
-                    1: '#9ca3af', // gray
-                    2: '#22c55e', // green
-                    3: '#3b82f6', // blue
-                    4: '#a855f7', // purple
-                    5: '#ef4444', // red/gold
-                  };
-                  
-                  // Get next reward for drop animation
-                  const nextReward = getRewardAtIndex(pointsEventState.currentRewardIndex);
-                  const nextIsStars = nextReward.type === 'stars';
-                  const nextPackRarity = nextReward.packRarity || 1;
-                  
-                  return (
-                    <div className="relative" style={{ width: '40px', height: '40px' }}>
-                      {/* Current reward icon - hidden when flying copy is animating to miniature */}
-                      {!nextRewardDropping && !rewardIconAnimating && (
-                        <div 
-                          className="absolute inset-0 flex items-center justify-center"
-                          style={{ 
-                            filter: collectionsUnlocked ? 'none' : 'grayscale(0.5) brightness(0.7)',
-                          }}
-                        >
-                          {isStars ? (
-                            <StarsReward 
-                              stars={currentReward.stars || 0} 
-                              size="md" 
-                              pulse={pointsEventPulse}
-                            />
-                          ) : (
-                            <span className={`transition-transform duration-150 inline-block ${pointsEventPulse ? 'scale-110' : 'scale-100'}`}>
-                              <MiniCardPack 
-                                color={COLLECTION_PACKS[packRarity as 1|2|3|4|5]?.color || '#9ca3af'} 
-                                stars={packRarity} 
-                                size={32} 
-                              />
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Next reward dropping from above into button */}
-                      {nextRewardDropping && (
-                        <div 
-                          className="absolute inset-0 flex items-center justify-center"
-                          style={{
-                            animation: 'rewardDrop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
-                          }}
-                        >
-                          {nextIsStars ? (
-                            <StarsReward stars={nextReward.stars || 0} size="md" />
-                          ) : (
-                            <MiniCardPack 
-                              color={COLLECTION_PACKS[nextPackRarity as 1|2|3|4|5]?.color || '#9ca3af'} 
-                              stars={nextPackRarity} 
-                              size={32} 
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-                {!collectionsUnlocked && (
-                  <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {COLLECTIONS_REQUIRED_LEVEL}</span>
-                )}
-              </div>
-          </div>
-          
-            {/* LiveOps Event Icon - shows one active event at a time */}
-            {/* Show TreasureHunt when: active, OR expired but has keys, OR locked and nextEvent is treasure */}
-            {(treasureHuntEvent.active || (treasureHuntExpired && treasureHuntEvent.keys > 0) || (!isEventAvailable(playerLevel) && nextEventType === 'treasure')) && (
-              <div ref={treasureHuntIconRef} style={{ zIndex: 20 }} className="relative">
-                <button
-                  onClick={() => {
-                    // If event is locked, only show locked popup (handled inside TreasureHuntPopup)
-                    setShowTreasureHunt(true);
-                  }}
-                  className="relative flex items-center justify-center rounded-full transition-all duration-150 cursor-pointer hover:scale-110"
-                  style={{
-                    width: '62px',
-                    height: '62px',
-                    background: isEventAvailable(playerLevel)
-                      ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                      : 'linear-gradient(135deg, #4b5563 0%, #374151 100%)',
-                    boxShadow: treasureHuntPulse 
-                      ? '0 0 14px rgba(251, 191, 36, 0.6), 0 3px 10px rgba(0,0,0,0.3)'
-                      : '0 3px 10px rgba(0,0,0,0.3)',
-                    border: '2px solid rgba(255,255,255,0.25)',
-                    transform: treasureHuntPulse ? 'scale(1.1)' : undefined,
-                    pointerEvents: 'auto',
-                  }}
-                >
-                  <span className="text-3xl" style={{ 
-                    filter: isEventAvailable(playerLevel) ? 'none' : 'grayscale(0.5) brightness(0.7)',
-                  }}>🎁</span>
-                  {isEventAvailable(playerLevel) && treasureHuntEvent.keys > 0 && (
-                    <div className="absolute -top-1 -right-1 bg-yellow-500 text-yellow-900 rounded-full w-6 h-6 flex items-center justify-center shadow-lg">
-                      <span className="text-xs font-bold">{treasureHuntEvent.keys}</span>
-                    </div>
-                  )}
-                  {!isEventAvailable(playerLevel) && (
-                    <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {getRequiredLevel()}</span>
-                  )}
-                </button>
-                {/* Timer display */}
-                {treasureHuntEvent.active && treasureHuntTimeRemaining && !treasureHuntExpired && (
-                  <span 
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-xs px-1.5 py-px rounded-full font-mono font-bold shadow-lg whitespace-nowrap pointer-events-none"
-                    style={{
-                      background: treasureHuntTimeCritical ? 'rgba(239, 68, 68, 0.95)' : 'rgba(0, 0, 0, 0.9)',
-                      color: '#fff',
-                      animation: treasureHuntTimeCritical ? 'pulse 1s ease-in-out infinite' : undefined,
-                    }}
-                  >
-                    {treasureHuntTimeRemaining}
-                  </span>
-                )}
-                {/* Expired but has keys */}
-                {treasureHuntExpired && treasureHuntEvent.keys > 0 && (
-                  <span 
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-[9px] px-1.5 py-px rounded-full font-bold shadow-lg whitespace-nowrap pointer-events-none"
-                    style={{
-                      background: 'rgba(239, 68, 68, 0.95)',
-                      color: '#fff',
-                    }}
-                  >
-                    Потрать!
-                  </span>
-                )}
-              </div>
-            )}
-            
-            {/* Show DungeonDig when: active, OR expired but has shovels, OR locked and nextEvent is dungeon */}
-            {(dungeonDigEvent.active || (dungeonDigExpired && dungeonDigEvent.shovels > 0) || (!isDungeonAvailable(playerLevel) && nextEventType === 'dungeon')) && (
-              <div ref={dungeonDigIconRef} style={{ zIndex: 20 }} className="relative">
-                <button
-                  onClick={() => {
-                    // If event is locked, show locked popup instead of dungeon popup
-                    if (!isDungeonAvailable(playerLevel)) {
-                      setShowLockedDungeonPopup(true);
-                    } else {
-                      setShowDungeonDig(true);
-                    }
-                  }}
-                  className="relative flex items-center justify-center rounded-full transition-all duration-150 cursor-pointer hover:scale-110"
-                  style={{
-                    width: '62px',
-                    height: '62px',
-                    background: isDungeonAvailable(playerLevel)
-                      ? 'linear-gradient(135deg, #78350f 0%, #92400e 100%)'
-                      : 'linear-gradient(135deg, #4b5563 0%, #374151 100%)',
-                    boxShadow: dungeonDigPulse 
-                      ? '0 0 14px rgba(180, 83, 9, 0.6), 0 3px 10px rgba(0,0,0,0.3)'
-                      : '0 3px 10px rgba(0,0,0,0.3)',
-                    border: '2px solid rgba(255,255,255,0.25)',
-                    transform: dungeonDigPulse ? 'scale(1.1)' : undefined,
-                    pointerEvents: 'auto',
-                  }}
-                >
-                  <span className="text-3xl" style={{ 
-                    filter: isDungeonAvailable(playerLevel) ? 'none' : 'grayscale(0.5) brightness(0.7)',
-                  }}>⛏️</span>
-                  {isDungeonAvailable(playerLevel) && dungeonDigEvent.shovels > 0 && (
-                    <div className="absolute -top-1 -right-1 bg-amber-600 text-amber-100 rounded-full w-6 h-6 flex items-center justify-center shadow-lg">
-                      <span className="text-xs font-bold">{dungeonDigEvent.shovels}</span>
-                    </div>
-                  )}
-                  {!isDungeonAvailable(playerLevel) && (
-                    <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {getDungeonRequiredLevel()}</span>
-                  )}
-                </button>
-                {/* Timer display */}
-                {dungeonDigEvent.active && dungeonDigTimeRemaining && !dungeonDigExpired && (
-                  <span 
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-xs px-1.5 py-px rounded-full font-mono font-bold shadow-lg whitespace-nowrap pointer-events-none"
-                    style={{
-                      background: dungeonDigTimeCritical ? 'rgba(239, 68, 68, 0.95)' : 'rgba(0, 0, 0, 0.9)',
-                      color: '#fff',
-                      animation: dungeonDigTimeCritical ? 'pulse 1s ease-in-out infinite' : undefined,
-                    }}
-                  >
-                    {dungeonDigTimeRemaining}
-                  </span>
-                )}
-                {/* Expired but has shovels */}
-                {dungeonDigExpired && dungeonDigEvent.shovels > 0 && (
-                  <span 
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-1/2 text-[9px] px-1.5 py-px rounded-full font-bold shadow-lg whitespace-nowrap pointer-events-none"
-                    style={{
-                      background: 'rgba(239, 68, 68, 0.95)',
-                      color: '#fff',
-                    }}
-                  >
-                    Потрать!
-                  </span>
-                )}
-              </div>
-            )}
-            
-            {/* Promo Widget - compact mode (only when promo unlocked) */}
-            {promoUnlocked && (
-              <div style={{ zIndex: 20 }}>
-                <PromoWidget 
-                  compact={true}
-                  onStarArrived={(count) => {
-                    const safeCount = typeof count === 'number' && !isNaN(count) ? count : 0;
-                    if (safeCount <= 0) return;
-                    addStars(safeCount);
-                    setDisplayedStars(prev => prev + safeCount);
-                    setStarPulseKey(prev => prev + 1);
-                  }}
-                  onCollectionCardArrived={() => {
-                    setCollectionButtonPulse(true);
-                    setTimeout(() => setCollectionButtonPulse(false), 150);
-                  }}
-                  onPurchase={(packId, stars, cards) => {
-                    console.log(`Pack purchased: ${packId}, stars: ${stars}, cards: ${cards}`);
-                  }}
-                />
-              </div>
-            )}
-            
-            {/* Pending rewards miniatures - positioned after all event icons */}
-            {playerLevel >= COLLECTIONS_REQUIRED_LEVEL && pointsEventState.pendingRewards.length > 0 && (
-              <div 
-                ref={miniatureContainerRef}
-                className="flex items-center gap-1 ml-1"
-                style={{ zIndex: 20 }}
-              >
-                {pointsEventState.pendingRewards.slice(0, 4).map((reward) => {
-                  const isFlying = flyingRewardToMiniature?.id === reward.id;
-                  return (
-                    <div
-                      key={reward.id}
-                      className="flex items-center justify-center"
-                      style={{ 
-                        width: '36px', 
-                        height: '48px',
-                        opacity: isFlying ? 0 : 1,
-                      }}
-                    >
-                      {reward.type === 'pack' && reward.packRarity ? (
-                        <MiniCardPack 
-                          color={COLLECTION_PACKS[reward.packRarity].color} 
-                          stars={reward.packRarity} 
-                          size={29} 
-                        />
-                      ) : (
-                        <span className="text-2xl">⭐</span>
-                      )}
-                    </div>
-                  );
-                })}
-                {pointsEventState.pendingRewards.length > 4 && (
-                  <span className="text-xs text-white/70 font-bold">+{pointsEventState.pendingRewards.length - 4}</span>
-                )}
-              </div>
-            )}
-          </div>
+            onPromoCollectionCardArrived={() => {
+              setCollectionButtonPulse(true);
+              setTimeout(() => setCollectionButtonPulse(false), 150);
+            }}
+            onPromoPurchase={(packId, stars, cards) => {
+              console.log(`Pack purchased: ${packId}, stars: ${stars}, cards: ${cards}`);
+            }}
+          />
           
           {/* Game field container - no side panels */}
           {/* Note: onDoubleClick and onTouchEnd handlers moved to parent data-game-board to cover entire screen */}
@@ -3419,10 +1557,10 @@ export function GameBoard() {
         }}
       />
       
-      {/* Level Up Screen */}
+      {/* Level Up Screen - rendered via queue */}
       <LevelUpScreen
-        isVisible={showLevelUp}
-        newLevel={pendingLevelUp || 1}
+        isVisible={popupQueue.current?.type === 'levelUp'}
+        newLevel={popupQueue.current?.type === 'levelUp' ? popupQueue.current.level : (pendingLevelUp || 1)}
         starsReward={STARS_PER_LEVELUP}
         onComplete={handleLevelUpComplete}
         progressBarRef={progressBarRef}
@@ -3461,7 +1599,7 @@ export function GameBoard() {
       <Shop
         isVisible={showShop}
         onClose={() => {
-          setShowShop(false);
+          closeShop();
           tryShowLeaderboard();
         }}
         onPurchase={handleShopPurchase}
@@ -3480,20 +1618,20 @@ export function GameBoard() {
         }}
       />
       
-      {/* Streak Popup - shown before daily reward if streak >= 2 */}
+      {/* Streak Popup - shown before daily reward if streak >= 2 - rendered via queue */}
       <StreakPopup
-        isVisible={showStreakPopup && pendingStreak >= 2}
-        streakDay={pendingStreak}
+        isVisible={isStreakShowing}
+        streakDay={isStreakShowing && popupQueue.current?.type === 'streak' ? popupQueue.current.count : pendingStreak}
         onContinue={() => {
-          setShowStreakPopup(false);
-          setShowDailyReward(true);
+          popupQueue.dismiss();
+          showPopupViaQueue({ type: 'dailyReward', day: pendingStreak, stars: pendingDailyReward });
         }}
       />
       
-      {/* Daily Reward Popup */}
+      {/* Daily Reward Popup - rendered via queue */}
       <DailyRewardPopup
-        isVisible={showDailyReward}
-        currentDay={pendingStreak}
+        isVisible={isDailyRewardShowing}
+        currentDay={isDailyRewardShowing && popupQueue.current?.type === 'dailyReward' ? popupQueue.current.day : pendingStreak}
         previousStreak={dailyStreak}
         onClaim={claimDailyReward}
         progressBarRef={progressBarRef}
@@ -3510,445 +1648,41 @@ export function GameBoard() {
         seasonInfo={seasonInfo}
       />
       
-      {/* Locked Points Event Popup (shown when clicking locked button) */}
-      {showLockedPointsEventPopup && ReactDOM.createPortal(
-        <div 
-          className="fixed inset-0 z-[10005] flex items-center justify-center"
-          onClick={() => setShowLockedPointsEventPopup(false)}
-        >
-          {/* Backdrop - appears instantly */}
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-          <div 
-            className="relative bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 rounded-2xl p-6 max-w-sm w-full mx-4 border-2 border-gray-600/50 shadow-2xl"
-            onClick={e => e.stopPropagation()}
-            style={{ animation: 'modalSlideIn 0.2s ease-out' }}
-          >
-            {/* Header */}
-            <div className="text-center mb-5">
-              <div className="text-5xl mb-3">🔒</div>
-              <h2 className="text-xl font-bold text-gray-200 mb-1">Функция заблокирована</h2>
-            </div>
-            
-            {/* Info */}
-            <div className="bg-black/30 rounded-xl p-4 mb-5">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl">📦</span>
-                <div>
-                  <h3 className="text-lg font-bold text-blue-400">Ивент: Паки</h3>
-                  <p className="text-white/70 text-sm">Зарабатывайте награды за игру</p>
-                </div>
-              </div>
-              <p className="text-white/60 text-sm mb-3">
-                Убирайте карты с поля, заполняйте прогресс бар и получайте паки с предметами коллекций и звёзды!
-              </p>
-              <div className="flex items-center gap-2 bg-blue-500/20 rounded-lg px-3 py-2">
-                <span className="text-xl">⭐</span>
-                <span className="text-blue-300 text-sm font-medium">
-                  Разблокируется на {COLLECTIONS_REQUIRED_LEVEL} уровне
-                </span>
-              </div>
-            </div>
-            
-            {/* Close button */}
-            <button
-              onClick={() => setShowLockedPointsEventPopup(false)}
-              className="w-full py-2.5 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-semibold rounded-xl transition-all shadow-lg"
-            >
-              Понятно
-            </button>
-          </div>
-        </div>,
-        document.body
-      )}
+      {/* Locked Feature Popups */}
+      <LockedFeaturePopups />
       
-      {/* Locked Collections Popup (shown when clicking locked button) */}
-      {showLockedCollectionsPopup && ReactDOM.createPortal(
-        <div 
-          className="fixed inset-0 z-[10005] flex items-center justify-center"
-          onClick={() => setShowLockedCollectionsPopup(false)}
-        >
-          {/* Backdrop - appears instantly */}
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-          <div 
-            className="relative bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 rounded-2xl p-6 max-w-sm w-full mx-4 border-2 border-gray-600/50 shadow-2xl"
-            onClick={e => e.stopPropagation()}
-            style={{ animation: 'modalSlideIn 0.2s ease-out' }}
-          >
-            {/* Header */}
-            <div className="text-center mb-5">
-              <div className="text-5xl mb-3">🔒</div>
-              <h2 className="text-xl font-bold text-gray-200 mb-1">Функция заблокирована</h2>
-            </div>
-            
-            {/* Info */}
-            <div className="bg-black/30 rounded-xl p-4 mb-5">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl">🏆</span>
-                <div>
-                  <h3 className="text-lg font-bold text-amber-400">Коллекции</h3>
-                  <p className="text-white/70 text-sm">Собирайте уникальные предметы</p>
-                </div>
-              </div>
-              <p className="text-white/60 text-sm mb-3">
-                Открывайте паки с предметами и собирайте полные коллекции для получения наград в звёздах!
-              </p>
-              <div className="flex items-center gap-2 bg-amber-500/20 rounded-lg px-3 py-2">
-                <span className="text-xl">⭐</span>
-                <span className="text-amber-300 text-sm font-medium">
-                  Разблокируется на 2 уровне
-                </span>
-              </div>
-            </div>
-            
-            {/* Close button */}
-            <button
-              onClick={() => setShowLockedCollectionsPopup(false)}
-              className="w-full py-2.5 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-semibold rounded-xl transition-all shadow-lg"
-            >
-              Понятно
-            </button>
-          </div>
-        </div>,
-        document.body
-      )}
-      
-      {/* Locked Leaderboard Popup (shown when clicking locked button) */}
-      {showLockedLeaderboardPopup && ReactDOM.createPortal(
-        <div 
-          className="fixed inset-0 z-[10005] flex items-center justify-center"
-          onClick={() => setShowLockedLeaderboardPopup(false)}
-        >
-          {/* Backdrop - appears instantly */}
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-          <div 
-            className="relative bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 rounded-2xl p-6 max-w-sm w-full mx-4 border-2 border-gray-600/50 shadow-2xl"
-            onClick={e => e.stopPropagation()}
-            style={{ animation: 'modalSlideIn 0.2s ease-out' }}
-          >
-            {/* Header */}
-            <div className="text-center mb-5">
-              <div className="text-5xl mb-3">🔒</div>
-              <h2 className="text-xl font-bold text-gray-200 mb-1">Функция заблокирована</h2>
-            </div>
-            
-            {/* Info */}
-            <div className="bg-black/30 rounded-xl p-4 mb-5">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl">🏆</span>
-                <div>
-                  <h3 className="text-lg font-bold text-cyan-400">Турнир</h3>
-                  <p className="text-white/70 text-sm">Соревнуйтесь с другими игроками</p>
-                </div>
-              </div>
-              <p className="text-white/60 text-sm mb-3">
-                Соревнуйтесь с 20 игроками в группе, набирайте звёзды и поднимайтесь в турнире. Лучшие игроки получают призы!
-              </p>
-              <div className="flex items-center gap-2 bg-cyan-500/20 rounded-lg px-3 py-2">
-                <span className="text-xl">⭐</span>
-                <span className="text-cyan-300 text-sm font-medium">
-                  Разблокируется на {LEADERBOARD_REQUIRED_LEVEL} уровне
-                </span>
-              </div>
-            </div>
-            
-            {/* Close button */}
-            <button
-              onClick={() => setShowLockedLeaderboardPopup(false)}
-              className="w-full py-2.5 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-semibold rounded-xl transition-all shadow-lg"
-            >
-              Понятно
-            </button>
-          </div>
-        </div>,
-        document.body
-      )}
-      
-      {/* Locked Dungeon Dig Popup (shown when clicking locked button) */}
-      {showLockedDungeonPopup && ReactDOM.createPortal(
-        <div 
-          className="fixed inset-0 z-[10005] flex items-center justify-center"
-          onClick={() => setShowLockedDungeonPopup(false)}
-        >
-          {/* Backdrop - appears instantly */}
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-          <div 
-            className="relative bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 rounded-2xl p-6 max-w-sm w-full mx-4 border-2 border-gray-600/50 shadow-2xl"
-            onClick={e => e.stopPropagation()}
-            style={{ animation: 'modalSlideIn 0.2s ease-out' }}
-          >
-            {/* Header */}
-            <div className="text-center mb-5">
-              <div className="text-5xl mb-3">🔒</div>
-              <h2 className="text-xl font-bold text-gray-200 mb-1">Функция заблокирована</h2>
-            </div>
-            
-            {/* Info */}
-            <div className="bg-black/30 rounded-xl p-4 mb-5">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl">⛏️</span>
-                <div>
-                  <h3 className="text-lg font-bold text-amber-400">Подземелье</h3>
-                  <p className="text-white/70 text-sm">Копай и открывай награды</p>
-                </div>
-              </div>
-              <p className="text-white/60 text-sm mb-3">
-                Исследуй подземелье, собирай лопатки в пасьянсе и открывай тайлы с наградами. Найди выход на следующий этаж!
-              </p>
-              <div className="flex items-center gap-2 bg-amber-500/20 rounded-lg px-3 py-2">
-                <span className="text-xl">⭐</span>
-                <span className="text-amber-300 text-sm font-medium">
-                  Разблокируется на {getDungeonRequiredLevel()} уровне
-                </span>
-              </div>
-            </div>
-            
-            {/* Close button */}
-            <button
-              onClick={() => setShowLockedDungeonPopup(false)}
-              className="w-full py-2.5 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-semibold rounded-xl transition-all shadow-lg"
-            >
-              Понятно
-            </button>
-          </div>
-        </div>,
-        document.body
-      )}
-      
-      {/* Collections Unlock Popup (shown when reaching level 2) */}
-      {showCollectionsUnlock && ReactDOM.createPortal(
-        <div 
-          className="fixed inset-0 z-[10005] flex items-center justify-center"
-          onClick={handleCollectionsUnlockClose}
-        >
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" style={{ animation: 'fadeIn 0.15s ease-out' }} />
-          <div 
-            className="relative bg-gradient-to-br from-amber-900 via-orange-900 to-amber-900 rounded-2xl p-6 max-w-md w-full mx-4 border-2 border-amber-500/50 shadow-2xl"
-            onClick={e => e.stopPropagation()}
-            style={{ animation: 'modalSlideIn 0.2s ease-out' }}
-          >
-            {/* Header */}
-            <div className="text-center mb-6">
-              <div className="text-6xl mb-3">🎉</div>
-              <h2 className="text-2xl font-bold text-amber-300 mb-1">Новая функция!</h2>
-              <p className="text-white/80">Достигнут 2 уровень</p>
-            </div>
-            
-            {/* Collections explanation */}
-            <div className="bg-black/30 rounded-xl p-4 mb-4">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-4xl">🏆</span>
-                <div>
-                  <h3 className="text-lg font-bold text-white">Коллекции</h3>
-                  <p className="text-white/70 text-sm">Собирайте уникальные предметы</p>
-                </div>
-              </div>
-              <p className="text-white/60 text-sm">
-                Открывайте паки с предметами и собирайте полные коллекции. 
-                За каждую собранную коллекцию вы получите награду в звёздах!
-              </p>
-            </div>
-            
-            {/* Points Event explanation */}
-            <div className="bg-black/30 rounded-xl p-4 mb-6">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-4xl">📦</span>
-                <div>
-                  <h3 className="text-lg font-bold text-white">Ивент: Паки</h3>
-                  <p className="text-white/70 text-sm">Зарабатывайте награды за игру</p>
-                </div>
-              </div>
-              <p className="text-white/60 text-sm">
-                Убирайте карты с поля, заполняйте прогресс бар и получайте паки с предметами 
-                коллекций и звёзды. Чем выше редкость пака - тем ценнее предметы!
-              </p>
-            </div>
-            
-            {/* Continue button */}
-            <button
-              onClick={handleCollectionsUnlockClose}
-              className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold rounded-xl transition-all shadow-lg text-lg"
-            >
-              Понятно! 🎮
-            </button>
-          </div>
-        </div>,
-        document.body
-      )}
-      
-      {/* Leaderboard Unlock Popup (shown when reaching level 4) */}
-      {showLeaderboardUnlock && ReactDOM.createPortal(
-        <div 
-          className="fixed inset-0 z-[10005] flex items-center justify-center"
-          onClick={handleLeaderboardUnlockClose}
-        >
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" style={{ animation: 'fadeIn 0.15s ease-out' }} />
-          <div 
-            className="relative bg-gradient-to-br from-cyan-900 via-blue-900 to-cyan-900 rounded-2xl p-6 max-w-md w-full mx-4 border-2 border-cyan-500/50 shadow-2xl"
-            onClick={e => e.stopPropagation()}
-            style={{ animation: 'modalSlideIn 0.2s ease-out' }}
-          >
-            {/* Header */}
-            <div className="text-center mb-6">
-              <div className="text-6xl mb-3">🎉</div>
-              <h2 className="text-2xl font-bold text-cyan-300 mb-1">Новая функция!</h2>
-              <p className="text-white/80">Достигнут {LEADERBOARD_REQUIRED_LEVEL} уровень</p>
-            </div>
-            
-            {/* Tournament explanation */}
-            <div className="bg-black/30 rounded-xl p-4 mb-6">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-4xl">🏆</span>
-                <div>
-                  <h3 className="text-lg font-bold text-white">Турнир</h3>
-                  <p className="text-white/70 text-sm">Соревнуйтесь с другими игроками</p>
-                </div>
-              </div>
-              <p className="text-white/60 text-sm">
-                Вы находитесь в группе из 20 игроков. Набирайте звёзды за победы и поднимайтесь в турнире. 
-                В конце сезона лучшие игроки получат награды!
-              </p>
-            </div>
-            
-            {/* Continue button */}
-            <button
-              onClick={handleLeaderboardUnlockClose}
-              className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-bold rounded-xl transition-all shadow-lg text-lg"
-            >
-              Понятно! 🎮
-            </button>
-          </div>
-        </div>,
-        document.body
-      )}
-      
-      {/* Promo/Shop Unlock Popup (shown on first win after collections unlock) */}
-      {showPromoUnlock && ReactDOM.createPortal(
-        <div 
-          className="fixed inset-0 z-[10005] flex items-center justify-center"
-          onClick={handlePromoUnlockClose}
-        >
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" style={{ animation: 'fadeIn 0.15s ease-out' }} />
-          <div 
-            className="relative bg-gradient-to-br from-purple-900 via-pink-900 to-purple-900 rounded-2xl p-6 max-w-md w-full mx-4 border-2 border-pink-500/50 shadow-2xl"
-            onClick={e => e.stopPropagation()}
-            style={{ animation: 'modalSlideIn 0.2s ease-out' }}
-          >
-            {/* Header */}
-            <div className="text-center mb-6">
-              <div className="text-6xl mb-3">🎁</div>
-              <h2 className="text-2xl font-bold text-pink-300 mb-1">Специальные предложения!</h2>
-              <p className="text-white/80">Открыт доступ к акциям</p>
-            </div>
-            
-            {/* Promo explanation */}
-            <div className="bg-black/30 rounded-xl p-4 mb-6">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-4xl">🛍️</span>
-                <div>
-                  <h3 className="text-lg font-bold text-white">Магазин акций</h3>
-                  <p className="text-white/70 text-sm">Выгодные наборы с ограниченным временем</p>
-                </div>
-              </div>
-              <p className="text-white/60 text-sm">
-                Теперь вам доступны специальные предложения! Следите за таймером — 
-                акции обновляются регулярно. Покупайте наборы звёзд и паки коллекций 
-                по выгодным ценам!
-              </p>
-            </div>
-            
-            {/* Features list */}
-            <div className="flex justify-around mb-6 text-center">
-              <div>
-                <div className="text-2xl mb-1">⭐</div>
-                <div className="text-xs text-white/70">Звёзды</div>
-              </div>
-              <div>
-                <div className="text-2xl mb-1">🎴</div>
-                <div className="text-xs text-white/70">Паки</div>
-              </div>
-              <div>
-                <div className="text-2xl mb-1">⏰</div>
-                <div className="text-xs text-white/70">Таймер</div>
-              </div>
-            </div>
-            
-            {/* Continue button */}
-            <button
-              onClick={handlePromoUnlockClose}
-              className="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-400 hover:to-purple-400 text-white font-bold rounded-xl transition-all shadow-lg text-lg"
-            >
-              Отлично! 🛒
-            </button>
-          </div>
-        </div>,
-        document.body
-      )}
-      
-      {/* Treasure Hunt Promo (shown when event unlocks) */}
-      <TreasureHuntPromo
-        isVisible={showTreasureHuntPromo}
-        onClose={handleTreasureHuntPromoClose}
+      {/* Unlock Popups (Collections, Leaderboard, Promo) - rendered via queue */}
+      <UnlockPopups
+        onCollectionsUnlockClose={handleCollectionsUnlockClose}
+        onLeaderboardUnlockClose={handleLeaderboardUnlockClose}
+        onPromoUnlockClose={handlePromoUnlockClose}
       />
       
-      {/* Dungeon Dig Promo (shown when event starts in rotation) */}
-      <DungeonDigPromo
-        isVisible={showDungeonDigPromo}
-        onClose={handleDungeonDigPromoClose}
-      />
+      {/* Treasure Hunt Promo (shown when event unlocks) - rendered via queue */}
+      {popupQueue.current?.type === 'treasureHuntPromo' && (
+        <TreasureHuntPromo onClose={handleTreasureHuntPromoClose} />
+      )}
+      
+      {/* Dungeon Dig Promo (shown when event starts in rotation) - rendered via queue */}
+      {popupQueue.current?.type === 'dungeonDigPromo' && (
+        <DungeonDigPromo onClose={handleDungeonDigPromoClose} />
+      )}
       
       {/* Event Ended Popup */}
-      {showEventEndedPopup && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div 
-            className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 mx-4 shadow-2xl border border-gray-700 max-w-sm text-center"
-            style={{
-              animation: 'modalSlideIn 0.3s ease-out'
-            }}
-          >
-            <div className="text-5xl mb-4">⏰</div>
-            <h2 className="text-xl font-bold text-white mb-2">
-              Время вышло!
-            </h2>
-            {treasureHuntEvent.keys > 0 ? (
-              <>
-                <p className="text-gray-300 mb-4">
-                  Время ивента истекло, но ты ещё можешь потратить собранные ключи!
-                </p>
-                <div className="flex items-center justify-center gap-2 text-yellow-400 mb-4">
-                  <span>🔑</span>
-                  <span className="font-bold">Осталось ключей: {treasureHuntEvent.keys}</span>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowEventEndedPopup(false);
-                    setShowTreasureHunt(true);
-                  }}
-                  className="w-full py-3 px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold rounded-xl shadow-lg transition-all"
-                >
-                  🔑 Потратить ключи
-                </button>
-              </>
-            ) : (
-              <>
-                <p className="text-gray-300 mb-4">
-                  Ивент "Охота за сокровищами" завершён. Не переживай - скоро будут новые события!
-                </p>
-                <button
-                  onClick={() => setShowEventEndedPopup(false)}
-                  className="w-full py-3 px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold rounded-xl shadow-lg transition-all"
-                >
-                  Понятно
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      <EventEndedPopup
+        isVisible={showEventEndedPopup}
+        event={treasureHuntEvent}
+        onClose={() => popupQueue.closeOnDemand()}
+        onSpendKeys={() => {
+          popupQueue.closeOnDemand();
+          openTreasureHunt();
+        }}
+      />
       
       {/* Treasure Hunt Popup */}
       <TreasureHuntPopup
         isVisible={showTreasureHunt}
-        onClose={() => setShowTreasureHunt(false)}
+        onClose={closeTreasureHunt}
         event={treasureHuntEvent}
         onEventUpdate={setTreasureHuntEvent}
         onRewardClaimed={(reward, chestPosition) => {
@@ -4004,7 +1738,7 @@ export function GameBoard() {
       <DungeonDigPopup
         isVisible={showDungeonDig}
         onClose={() => {
-          setShowDungeonDig(false);
+          closeDungeonDig();
           setDungeonEventCompleteOverlay(false);
         }}
         onEventComplete={() => {
@@ -4101,57 +1835,21 @@ export function GameBoard() {
       />
       
       {/* Dungeon Event Ended Popup */}
-      {showDungeonEndedPopup && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div 
-            className="relative bg-gradient-to-br from-stone-800 to-stone-900 rounded-2xl p-6 mx-4 shadow-2xl border border-stone-700 max-w-sm text-center"
-            style={{ animation: 'modalSlideIn 0.3s ease-out' }}
-          >
-            <div className="text-5xl mb-4">⏰</div>
-            <h2 className="text-xl font-bold text-white mb-2">
-              Время вышло!
-            </h2>
-            {dungeonDigEvent.shovels > 0 ? (
-              <>
-                <p className="text-gray-300 mb-4">
-                  Время ивента истекло, но ты ещё можешь использовать лопатки!
-                </p>
-                <div className="flex items-center justify-center gap-2 text-amber-400 mb-4">
-                  <span>🪏</span>
-                  <span className="font-bold">Осталось: {dungeonDigEvent.shovels}</span>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowDungeonEndedPopup(false);
-                    setShowDungeonDig(true);
-                  }}
-                  className="w-full py-3 px-6 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold rounded-xl shadow-lg transition-all"
-                >
-                  🪏 Копать
-                </button>
-              </>
-            ) : (
-              <>
-                <p className="text-gray-300 mb-4">
-                  Ивент "Подземелье" завершён. Скоро начнётся новый ивент!
-                </p>
-                <button
-                  onClick={() => setShowDungeonEndedPopup(false)}
-                  className="w-full py-3 px-6 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold rounded-xl shadow-lg transition-all"
-                >
-                  Понятно
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      <DungeonEndedPopup
+        isVisible={showDungeonEndedPopup}
+        event={dungeonDigEvent}
+        onClose={() => popupQueue.closeOnDemand()}
+        onSpendShovels={() => {
+          popupQueue.closeOnDemand();
+          openDungeonDig();
+        }}
+      />
       
       {/* Points Event Popup */}
       <PointsEventPopup
         isVisible={showPointsEventPopup}
         eventState={pointsEventState}
-        onClose={() => setShowPointsEventPopup(false)}
+        onClose={closePointsEventPopup}
       />
       
       {/* Collection Pack Popup */}
@@ -4299,7 +1997,7 @@ export function GameBoard() {
         isVisible={showCollections}
         collections={collections}
         onClose={() => {
-          setShowCollections(false);
+          closeCollections();
           // If there were pending collection rewards, check if more in queue
           if (pendingCollectionRewards.length > 0) {
             // Remove the first (just shown) collection from queue
@@ -4312,7 +2010,7 @@ export function GameBoard() {
             
             if (remaining.length > 0) {
               // Show next collection reward
-              setTimeout(() => setShowCollections(true), 300);
+              setTimeout(() => openCollections(), 300);
             } else if (collectionsAfterWin) {
               // No more rewards and was opened after win - check leaderboard then start new game
               setCollectionsAfterWin(false);
@@ -4416,9 +2114,9 @@ export function GameBoard() {
           setAllCollectionsRewarded(false);
           
           // Close and reopen to trigger grand prize flow
-          setShowCollections(false);
+          closeCollections();
           setTimeout(() => {
-            setShowCollections(true);
+            openCollections();
           }, 100);
         }}
         resetKey={collectionsResetKey}
@@ -4434,7 +2132,7 @@ export function GameBoard() {
             transform: `translateX(-50%) scale(${scale})`,
             transformOrigin: 'top center',
             width: '584px',
-            zIndex: (showWinScreen || showLevelUp || showDailyQuests || showCollections) ? 10002 : 10
+            zIndex: (showWinScreen || isLevelUpShowing || showDailyQuests || showCollections) ? 10002 : 10
           }}
         >
           <DonationProgress
@@ -4456,269 +2154,72 @@ export function GameBoard() {
             onDebugClick={handleDebugClick}
             pulseKey={starPulseKey}
             onOtherPlayerStars={handleOtherPlayerStars}
-            disableOtherPlayerNotifications={showDailyQuests || showCollections || showWinScreen || showLevelUp || showShop}
+            disableOtherPlayerNotifications={showDailyQuests || showCollections || showWinScreen || isLevelUpShowing || showShop}
           />
         </div>,
         document.body
       )}
       
-      {/* Bottom Buttons - Icons on Cushions Design */}
-      {/* Hide when any popup is open (except pack popup - need collections button for flying items) */}
-      {!showDailyQuests && !showWinScreen && !showCollections && !showShop && 
-       !showLeaderboard && !showTreasureHunt && !showTreasureHuntPromo && !showDungeonDig && !showDungeonDigPromo && !showCollectionsUnlock && !showLockedCollectionsPopup &&
-       !showLockedPointsEventPopup && !showLockedLeaderboardPopup && !showLeaderboardUnlock && !showPromoUnlock &&
-       !showLevelUp && !showStreakPopup && !showDailyReward && (
-        <div className="fixed bottom-[49px] left-1/2 -translate-x-1/2 z-40 flex items-end gap-2 pb-0 pointer-events-none" style={{ paddingTop: '40px' }}>
-          {/* New Game Button - shown when no moves available */}
-          {showNewGameButton && (
-            <button
-              onClick={() => {
-                clearNoMoves();
-                setShowNewGameButton(false);
-                setNoMovesShownOnce(false);
-                newGame('solvable');
-              }}
-              className="relative w-14 h-8 flex items-center justify-center bg-gradient-to-b from-red-400 to-red-600 hover:from-red-300 hover:to-red-500 rounded-xl shadow-lg border-b-4 border-red-700 transition-all hover:scale-105 animate-pulse pointer-events-auto"
-              title="Новая раскладка"
-            >
-              <span className="absolute -top-9 text-[2.75rem]" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>🔄</span>
-            </button>
-          )}
-          
-          {/* Undo Button */}
-          <button
-            onClick={() => {
-              if (canUndo) undo();
-            }}
-            disabled={!canUndo}
-            className={`relative w-14 h-8 flex items-center justify-center rounded-xl shadow-lg border-b-4 transition-all pointer-events-auto ${
-              canUndo
-                ? 'bg-gradient-to-b from-slate-400 to-slate-500 hover:from-slate-300 hover:to-slate-400 border-slate-600 hover:scale-105'
-                : 'bg-gradient-to-b from-gray-400 to-gray-500 border-gray-600 opacity-40 cursor-not-allowed'
-            }`}
-            title="Отменить ход"
-          >
-            <span className={`absolute -top-9 text-[2.75rem] ${!canUndo ? 'opacity-40' : ''}`} style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>↩️</span>
-          </button>
-          
-          {/* Hint Button */}
-          <button
-            onClick={() => {
-              getHint();
-              setTimeout(() => clearHint(), 350);
-            }}
-            className="relative w-14 h-8 flex items-center justify-center bg-gradient-to-b from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 rounded-xl shadow-lg border-b-4 border-amber-600 transition-all hover:scale-105 pointer-events-auto"
-            title="Подсказка"
-          >
-            <span className="absolute -top-9 text-[2.75rem]" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>💡</span>
-          </button>
-          
-          {/* Daily Quests Button */}
-          <button
-            onClick={() => {
-              const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
-              setDisplayedStars(actualTotal);
-              setShowDailyQuests(true);
-            }}
-            className="relative w-14 h-8 flex items-center justify-center bg-gradient-to-b from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 rounded-xl shadow-lg border-b-4 border-purple-700 transition-all hover:scale-105 pointer-events-auto"
-            title="Задания"
-          >
-            <span className="absolute -top-9 text-[2.75rem]" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>📋</span>
-            {(() => {
-              const completed = dailyQuests.filter(q => q.completed).length;
-              const total = dailyQuests.length;
-              return (
-                <span className={`absolute top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${completed === total ? 'bg-green-500 text-white' : 'bg-white text-gray-800'}`}>
-                  {completed}/{total}
-                </span>
-              );
-            })()}
-          </button>
-          
-          {/* Shop Button */}
-          <button
-            onClick={() => {
-              const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
-              setDisplayedStars(actualTotal);
-              setShowShop(true);
-            }}
-            className="relative w-14 h-8 flex items-center justify-center bg-gradient-to-b from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 rounded-xl shadow-lg border-b-4 border-teal-700 transition-all hover:scale-105 pointer-events-auto"
-            title="Магазин"
-          >
-            <span className="absolute -top-9 text-[2.75rem]" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>🛒</span>
-            {isSubscribed && (
-              <span className="absolute -top-3 -right-1 text-lg drop-shadow-md">👑</span>
-            )}
-          </button>
-          
-          {/* Collections Button */}
-          <button
-            ref={collectionsUnlocked ? collectionsButtonRef : undefined}
-            data-collections-button
-            onClick={() => {
-              if (!collectionsUnlocked) {
-                setShowLockedCollectionsPopup(true);
-                return;
-              }
-              const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
-              setDisplayedStars(actualTotal);
-              const unrewardedCollections = collections
-                .filter(c => c.items.every(i => i.collected) && !rewardedCollections.has(c.id))
-                .map(c => c.id);
-              if (unrewardedCollections.length > 0) {
-                setPendingCollectionRewards(unrewardedCollections);
-              }
-              setCollectionsAfterWin(false);
-              setShowCollections(true);
-            }}
-            className={`relative w-14 h-8 flex items-center justify-center rounded-xl shadow-lg border-b-4 transition-all pointer-events-auto ${
-              collectionsUnlocked 
-                ? 'bg-gradient-to-b from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 border-orange-700 hover:scale-105' 
-                : 'bg-gradient-to-b from-gray-500 to-gray-600 border-gray-700 opacity-70'
-            }`}
-            style={collectionButtonPulse ? { animation: 'collection-pop 0.15s ease-out' } : undefined}
-            title={collectionsUnlocked ? 'Коллекции' : `Коллекции (LVL ${COLLECTIONS_REQUIRED_LEVEL})`}
-          >
-            {collectionsUnlocked ? (
-              <svg className="absolute -top-7" width="34" height="46" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>
-                {/* Pack background - purple/gold gradient for legendary feel */}
-                <rect x="0" y="0" width="36" height="48" rx="5" fill="url(#packGradient5)" />
-                <rect x="0" y="0" width="36" height="48" rx="5" fill="url(#packShine5)" />
-                {/* 5 stars in arc pattern */}
-                <text x="18" y="20" textAnchor="middle" fontSize="8" fill="#fbbf24" style={{ textShadow: '0 0 6px rgba(251, 191, 36, 1)' }}>★ ★ ★</text>
-                <text x="18" y="32" textAnchor="middle" fontSize="10" fill="#fbbf24" style={{ textShadow: '0 0 6px rgba(251, 191, 36, 1)' }}>★ ★</text>
-                {/* Border glow */}
-                <rect x="1" y="1" width="34" height="46" rx="4" fill="none" stroke="rgba(251, 191, 36, 0.5)" strokeWidth="1" />
-                <defs>
-                  <linearGradient id="packGradient5" x1="0" y1="0" x2="36" y2="48">
-                    <stop offset="0%" stopColor="#7c3aed" />
-                    <stop offset="50%" stopColor="#6d28d9" />
-                    <stop offset="100%" stopColor="#4c1d95" />
-                  </linearGradient>
-                  <linearGradient id="packShine5" x1="0" y1="0" x2="36" y2="48">
-                    <stop offset="0%" stopColor="rgba(255,255,255,0.3)" />
-                    <stop offset="50%" stopColor="rgba(255,255,255,0)" />
-                    <stop offset="100%" stopColor="rgba(0,0,0,0.2)" />
-                  </linearGradient>
-                </defs>
-              </svg>
-            ) : (
-              <svg className="absolute -top-6" width="28" height="38" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))', opacity: 0.5 }}>
-                <rect x="0" y="0" width="36" height="48" rx="5" fill="#6b7280" />
-                <text x="18" y="20" textAnchor="middle" fontSize="8" fill="#9ca3af">★ ★ ★</text>
-                <text x="18" y="32" textAnchor="middle" fontSize="10" fill="#9ca3af">★ ★</text>
-              </svg>
-            )}
-            {collectionsUnlocked ? (
-              <span className={`absolute top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${completedCollectionsCount === collections.length ? 'bg-green-500 text-white' : 'bg-white text-gray-800'}`}>
-              {completedCollectionsCount}/{collections.length}
-            </span>
-            ) : (
-              <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {COLLECTIONS_REQUIRED_LEVEL}</span>
-            )}
-            {collectionsUnlocked && hasNewCollectionItem && !allCollectionsRewarded && (
-              <span className="absolute -top-2 -left-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md animate-bounce">!</span>
-            )}
-          </button>
-          
-          {/* Leaderboard Button */}
-          <button
-            onClick={() => {
-              if (!leaderboardUnlocked) {
-                setShowLockedLeaderboardPopup(true);
-                return;
-              }
-              const currentSeasonStars = getSeasonStars();
-              const result = updateCurrentUserStars(currentSeasonStars);
-              setLeaderboardPlayers(result.players);
-              setLeaderboardOldPosition(result.oldPosition);
-              setLeaderboardNewPosition(result.newPosition);
-              setShowLeaderboard(true);
-              setShowOvertakenNotification(false);
-            }}
-            className={`relative w-14 h-8 flex items-center justify-center rounded-xl shadow-lg border-b-4 transition-all pointer-events-auto ${
-              leaderboardUnlocked 
-                ? `bg-gradient-to-b from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 border-blue-700 hover:scale-105 ${showOvertakenNotification ? 'animate-pulse ring-2 ring-red-500' : ''}`
-                : 'bg-gradient-to-b from-gray-500 to-gray-600 border-gray-700 opacity-70'
-            }`}
-            title={leaderboardUnlocked ? `Турнир ${leaderboardNewPosition}/20` : `Турнир (LVL ${LEADERBOARD_REQUIRED_LEVEL})`}
-          >
-            <span className={`absolute -top-9 text-[2.75rem] ${leaderboardUnlocked ? '' : 'opacity-50'}`} style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>🏆</span>
-            {leaderboardUnlocked ? (
-              <>
-                <span className="absolute top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold bg-white text-gray-800 shadow-md">
-                  {leaderboardNewPosition}
-                </span>
-                {showOvertakenNotification && (
-                  <span className="absolute -top-2 -left-1 flex h-5 w-5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 text-[10px] items-center justify-center shadow-md">⬇️</span>
-              </span>
-                )}
-              </>
-            ) : (
-              <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 text-sm px-2 py-0.5 rounded-full bg-black/90 text-white font-bold shadow-lg whitespace-nowrap">🔒 {LEADERBOARD_REQUIRED_LEVEL}</span>
-            )}
-          </button>
-          
-          {/* Overtaken notification toast - positioned just above buttons */}
-          {leaderboardUnlocked && showOvertakenNotification && (
-            <div 
-              className="absolute bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-500/90 text-white text-xs px-3 py-1.5 rounded-lg shadow-lg"
-              style={{ animation: 'slideUp 0.3s ease-out' }}
-            >
-              😱 Вас обогнали!
-            </div>
-          )}
-        </div>
-      )}
-      
-      {/* Collections Button - visible during Treasure Hunt and Dungeon Dig popups for flying icons */}
-      {/* Not clickable, just a target for flying collection items */}
-      {(showTreasureHunt || showDungeonDig) && (
-        <div className="fixed bottom-[49px] left-1/2 -translate-x-1/2 z-[10001] flex items-end gap-2 pb-0 pointer-events-none" style={{ paddingTop: '40px' }}>
-          {/* Invisible spacers to match cushion button row layout (undo, hint, quests, shop, collections) */}
-          <div className="w-14 h-8 opacity-0"></div>
-          <div className="w-14 h-8 opacity-0"></div>
-          <div className="w-14 h-8 opacity-0"></div>
-          <div className="w-14 h-8 opacity-0"></div>
-          <div className="w-14 h-8 opacity-0"></div>
-          {/* Actual visible Collections button */}
-          <div
-            ref={collectionsButtonRef}
-            data-collections-button
-            className="relative w-14 h-8 flex items-center justify-center bg-gradient-to-b from-amber-500 to-orange-600 rounded-xl shadow-lg border-b-4 border-orange-700"
-            style={collectionButtonPulse ? { animation: 'collection-pop 0.15s ease-out' } : undefined}
-          >
-            <svg className="absolute -top-8" width="34" height="46" viewBox="0 0 36 48" fill="none" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>
-              <rect x="0" y="0" width="36" height="48" rx="5" fill="url(#packGradient5b)" />
-              <rect x="0" y="0" width="36" height="48" rx="5" fill="url(#packShine5b)" />
-              <text x="18" y="20" textAnchor="middle" fontSize="8" fill="#fbbf24" style={{ textShadow: '0 0 6px rgba(251, 191, 36, 1)' }}>★ ★ ★</text>
-              <text x="18" y="32" textAnchor="middle" fontSize="10" fill="#fbbf24" style={{ textShadow: '0 0 6px rgba(251, 191, 36, 1)' }}>★ ★</text>
-              <rect x="1" y="1" width="34" height="46" rx="4" fill="none" stroke="rgba(251, 191, 36, 0.5)" strokeWidth="1" />
-              <defs>
-                <linearGradient id="packGradient5b" x1="0" y1="0" x2="36" y2="48">
-                  <stop offset="0%" stopColor="#7c3aed" />
-                  <stop offset="50%" stopColor="#6d28d9" />
-                  <stop offset="100%" stopColor="#4c1d95" />
-                </linearGradient>
-                <linearGradient id="packShine5b" x1="0" y1="0" x2="36" y2="48">
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.3)" />
-                  <stop offset="50%" stopColor="rgba(255,255,255,0)" />
-                  <stop offset="100%" stopColor="rgba(0,0,0,0.2)" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <span className={`absolute top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${completedCollectionsCount === collections.length ? 'bg-green-500 text-white' : 'bg-white text-gray-800'}`}>
-              {completedCollectionsCount}/{collections.length}
-            </span>
-            {hasNewCollectionItem && !allCollectionsRewarded && (
-              <span className="absolute -top-2 -left-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md">!</span>
-            )}
-          </div>
-          <div className="w-14 h-8 opacity-0"></div>
-        </div>
-      )}
+      {/* Bottom Buttons Row */}
+      <BottomButtonRow
+        isVisible={!showWinScreen && !popupQueue.onDemandPopup && !popupQueue.current}
+        showSecondaryCollectionsButton={showTreasureHunt || showDungeonDig}
+        showNewGameButton={showNewGameButton}
+        canUndo={canUndo}
+        dailyQuests={dailyQuests}
+        collectionsUnlocked={collectionsUnlocked}
+        leaderboardUnlocked={leaderboardUnlocked}
+        isSubscribed={isSubscribed}
+        collections={collections}
+        completedCollectionsCount={completedCollectionsCount}
+        hasNewCollectionItem={hasNewCollectionItem}
+        allCollectionsRewarded={allCollectionsRewarded}
+        rewardedCollections={rewardedCollections}
+        collectionButtonPulse={collectionButtonPulse}
+        leaderboardNewPosition={leaderboardNewPosition}
+        showOvertakenNotification={showOvertakenNotification}
+        collectionsButtonRef={collectionsButtonRef}
+        onNewGame={() => {
+          clearNoMoves();
+          setShowNewGameButton(false);
+          setNoMovesShownOnce(false);
+          newGame('solvable');
+        }}
+        onUndo={() => { if (canUndo) undo(); }}
+        onHint={() => {
+          getHint();
+          setTimeout(() => clearHint(), 350);
+        }}
+        onShowDailyQuests={() => {
+          const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
+          setDisplayedStars(actualTotal);
+          openDailyQuests();
+        }}
+        onShowShop={() => {
+          const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
+          setDisplayedStars(actualTotal);
+          openShop();
+        }}
+        onShowCollections={() => {
+          const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);
+          setDisplayedStars(actualTotal);
+          const unrewardedCollections = collections
+            .filter(c => c.items.every(i => i.collected) && !rewardedCollections.has(c.id))
+            .map(c => c.id);
+          if (unrewardedCollections.length > 0) {
+            setPendingCollectionRewards(unrewardedCollections);
+          }
+          setCollectionsAfterWin(false);
+          openCollections();
+        }}
+        onShowLeaderboard={() => {
+          // Leaderboard data is already managed by useLeaderboard hook
+          openLeaderboard();
+          setShowOvertakenNotification(false);
+        }}
+        onShowLockedCollections={() => popupQueue.showOnDemand({ type: 'lockedCollections' })}
+        onShowLockedLeaderboard={() => popupQueue.showOnDemand({ type: 'lockedLeaderboard' })}
+      />
       
       {/* Flying Collection Icons */}
       {flyingIcons.map(icon => {
@@ -4739,9 +2240,7 @@ export function GameBoard() {
       })}
       
       {/* Collision Particles */}
-      {collisionParticles.map(particle => (
-        <CollisionParticleComponent key={particle.id} particle={particle} />
-      ))}
+      <CollisionParticles particles={collisionParticles} />
       
       {/* Flying Cards for parallel auto-collect animation */}
       <FlyingCardsContainer />
@@ -4749,99 +2248,9 @@ export function GameBoard() {
   );
 }
 
-// Collision particle component
-function CollisionParticleComponent({ particle }: { particle: { id: number; x: number; y: number; vx: number; vy: number; size: number; color: string } }) {
-  const elementRef = useRef<HTMLDivElement>(null);
-  const startTimeRef = useRef<number | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const [isVisible, setIsVisible] = useState(true);
-  
-  useEffect(() => {
-    const duration = 500;
-    let x = particle.x;
-    let y = particle.y;
-    let vx = particle.vx;
-    let vy = particle.vy;
-    
-    const animate = (timestamp: number) => {
-      if (!elementRef.current) {
-        rafRef.current = requestAnimationFrame(animate);
-        return;
-      }
-      
-      if (startTimeRef.current === null) {
-        startTimeRef.current = timestamp;
-      }
-      
-      const elapsed = timestamp - startTimeRef.current;
-      const progress = Math.min(elapsed / duration, 1);
-      
-      x += vx;
-      y += vy;
-      vy += 0.15; // gravity
-      vx *= 0.98; // friction
-      
-      const opacity = 1 - progress;
-      const scale = 1 - progress * 0.5;
-      
-      elementRef.current.style.left = `${x}px`;
-      elementRef.current.style.top = `${y}px`;
-      elementRef.current.style.opacity = `${opacity}`;
-      elementRef.current.style.transform = `translate(-50%, -50%) scale(${scale})`;
-      
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate);
-      } else {
-        setIsVisible(false);
-      }
-    };
-    
-    rafRef.current = requestAnimationFrame(animate);
-    
-    return () => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-      }
-    };
-  }, [particle]);
-  
-  if (!isVisible) return null;
-  
-  return ReactDOM.createPortal(
-    <div
-      ref={elementRef}
-      className="fixed pointer-events-none z-[10001] rounded-full"
-      style={{
-        left: particle.x,
-        top: particle.y,
-        width: particle.size,
-        height: particle.size,
-        backgroundColor: particle.color,
-        transform: 'translate(-50%, -50%)',
-        boxShadow: `0 0 ${particle.size}px ${particle.color}`
-      }}
-    />,
-    document.body
-  );
-}
-
 // Flying star component for treasure hunt rewards (two-phase: scatter then fly)
 interface TreasureFlyingStarProps {
-  star: {
-    id: number;
-    value: number;
-    startX: number;
-    startY: number;
-    scatterX: number;
-    scatterY: number;
-    targetX: number;
-    targetY: number;
-    controlX: number;
-    controlY: number;
-    scatterDuration: number;
-    flyDelay: number;
-    flyDuration: number;
-  };
+  star: TreasureFlyingStar;
   onArrived: () => void;
 }
 

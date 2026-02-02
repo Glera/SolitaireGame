@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { Card as CardType } from '../../lib/solitaire/types';
 import { Card } from './Card';
+import { useGameScaleContext } from '../../contexts/GameScaleContext';
 
 interface FlyingCardData {
   id: string;
@@ -48,6 +49,7 @@ export function launchFlyingCard(
 // Component to render a single flying card
 function FlyingCardItem({ data }: { data: FlyingCardData }) {
   const [progress, setProgress] = useState(0);
+  const { scale: gameScale } = useGameScaleContext();
   
   useEffect(() => {
     const animate = () => {
@@ -73,11 +75,11 @@ function FlyingCardItem({ data }: { data: FlyingCardData }) {
   const x = data.startRect.left + (data.endRect.left - data.startRect.left) * easedProgress;
   const y = data.startRect.top + (data.endRect.top - data.startRect.top) * easedProgress;
   
-  // Scale down as card flies, more aggressively at the end
-  const scale = 1 - (0.3 * easedProgress);
+  // Apply game scale to match board cards - no shrinking during flight
+  const scale = gameScale;
   
-  // Fade out starting at 70% progress
-  const opacity = progress < 0.7 ? 1 : Math.max(0, 1 - (progress - 0.7) / 0.3);
+  // Fade out starting at 80% progress
+  const opacity = progress < 0.8 ? 1 : Math.max(0, 1 - (progress - 0.8) / 0.2);
   
   return (
     <div
@@ -87,6 +89,7 @@ function FlyingCardItem({ data }: { data: FlyingCardData }) {
         left: x,
         top: y,
         transform: `scale(${scale}) translateZ(0)`,
+        transformOrigin: 'top left',
         zIndex: 10000,
         pointerEvents: 'none',
         opacity,

@@ -69,6 +69,12 @@ import { loadEvent, saveEvent, clearEvent } from './storage';
 
 /** @deprecated Use useTreasureHuntStore instead */
 export function getTreasureHuntEvent() {
+  // Load directly from localStorage to ensure we get persisted state
+  const stored = loadEvent();
+  if (stored) {
+    return stored;
+  }
+  // Fallback to store (which may have default empty event)
   return useTreasureHuntStore.getState().event;
 }
 
@@ -80,7 +86,25 @@ export function saveTreasureHuntEvent(event: import('./types').TreasureHuntEvent
 
 /** @deprecated Use useTreasureHuntStore.getState().activate() instead */
 export function activateTreasureHunt(playerLevel: number) {
-  return useTreasureHuntStore.getState().activate(playerLevel);
+  if (!logic.isLevelSufficient(playerLevel)) {
+    return null;
+  }
+  
+  // Load from localStorage to ensure we have current state
+  let currentEvent = loadEvent();
+  if (!currentEvent) {
+    currentEvent = logic.createEvent();
+  }
+  
+  if (currentEvent.activated) {
+    return currentEvent;
+  }
+  
+  const activatedEvent = logic.activateEvent(currentEvent);
+  saveEvent(activatedEvent);
+  // Also update store to keep in sync
+  useTreasureHuntStore.setState({ event: activatedEvent });
+  return activatedEvent;
 }
 
 /** @deprecated Use logic.isLevelSufficient() instead */
@@ -95,8 +119,13 @@ export function getRequiredLevel() {
 
 /** @deprecated Use useTreasureHuntStore.getState().addKeys() instead */
 export function addKeys(amount: number) {
-  useTreasureHuntStore.getState().addKeys(amount);
-  return useTreasureHuntStore.getState().event;
+  // Load from localStorage to ensure we have current state
+  const currentEvent = loadEvent() || logic.createEvent();
+  const updatedEvent = logic.addKeys(currentEvent, amount);
+  saveEvent(updatedEvent);
+  // Also update store to keep in sync
+  useTreasureHuntStore.setState({ event: updatedEvent });
+  return updatedEvent;
 }
 
 /** @deprecated Use logic.DEFAULT_CONFIG.milestoneRewards instead */
@@ -109,15 +138,21 @@ export function getMilestoneToShowLegacy(event: import('./types').TreasureHuntEv
 
 /** @deprecated Use useTreasureHuntStore.getState().claimMilestone() instead */
 export function claimMilestone(roomIdx: number) {
-  const stars = useTreasureHuntStore.getState().claimMilestone(roomIdx);
-  return { event: useTreasureHuntStore.getState().event, stars };
+  const currentEvent = loadEvent() || logic.createEvent();
+  const result = logic.claimMilestone(currentEvent, roomIdx);
+  saveEvent(result.event);
+  useTreasureHuntStore.setState({ event: result.event });
+  return { event: result.event, stars: result.stars };
 }
 
 /** @deprecated Use useTreasureHuntStore.getState().openChest() instead */
 export function openChest(roomId: number, chestId: string) {
-  const result = useTreasureHuntStore.getState().openChest(roomId, chestId);
+  const currentEvent = loadEvent() || logic.createEvent();
+  const result = logic.openChest(currentEvent, roomId, chestId);
+  saveEvent(result.event);
+  useTreasureHuntStore.setState({ event: result.event });
   return { 
-    event: useTreasureHuntStore.getState().event, 
+    event: result.event, 
     reward: result.reward,
     milestoneUnlocked: result.milestoneUnlocked 
   };
@@ -135,8 +170,11 @@ export function isEventCompleteLegacy(event: import('./types').TreasureHuntEvent
 
 /** @deprecated Use useTreasureHuntStore.getState().claimGrandPrize() instead */
 export function claimGrandPrize() {
-  const result = useTreasureHuntStore.getState().claimGrandPrize();
-  return { event: useTreasureHuntStore.getState().event, ...result };
+  const currentEvent = loadEvent() || logic.createEvent();
+  const result = logic.claimGrandPrize(currentEvent);
+  saveEvent(result.event);
+  useTreasureHuntStore.setState({ event: result.event });
+  return { event: result.event, stars: result.stars, packRarity: result.packRarity };
 }
 
 /** @deprecated Use logic.formatTimeRemaining() instead */
