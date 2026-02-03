@@ -34,8 +34,8 @@ export function useGameScale(): GameDimensions {
       const AD_SPACE = 70;          // Bottom ad space for banner
       const PROGRESS_BAR = 85;      // Progress bar container + margins
       const EVENTS_ROW = 55;        // Top events row (icons + margins)
-      const BOTTOM_BUTTONS = 100;   // Bottom control buttons with margins (increased)
-      const PADDING = 50;           // Padding and spacing between elements (increased)
+      const BOTTOM_BUTTONS = 100;   // Bottom control buttons with margins
+      const PADDING = 50;           // Padding and spacing between elements
       
       const reservedHeight = AD_SPACE + PROGRESS_BAR + EVENTS_ROW + BOTTOM_BUTTONS + PADDING;
       const availableHeight = containerHeight - reservedHeight;

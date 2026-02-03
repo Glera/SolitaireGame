@@ -206,7 +206,9 @@ export function Card({
       className={cn(
         "w-20 h-[104px] cursor-pointer select-none relative",
         isDragging && "opacity-0 pointer-events-none",
-        isAnimating && "opacity-0 pointer-events-none",
+        // Animating cards are invisible but still allow clicks to pass through
+        // (clicks on them will be ignored in performCardAction)
+        isAnimating && "opacity-0",
         className
       )}
       style={{ 

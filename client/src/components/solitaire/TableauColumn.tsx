@@ -117,11 +117,22 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       return;
     }
     
-    // Note: pointer-events-none on animating cards prevents the duplication bug
-    // No additional blocking needed here
+    // Ignore clicks on cards that are currently animating (prevents duplication)
+    if (animatingCard && animatingCard.card.id === card.id) {
+      return;
+    }
+    
+    // Also ignore if this card is part of an animating stack
+    if (animatingCard?.stackCards?.some(sc => sc.id === card.id)) {
+      return;
+    }
 
-    // Get all cards from this index to the end (the stack we want to move)
-    const cardsToMove = cards.slice(cardIndex);
+    // Get cards to move, excluding any that are currently animating
+    const cardsToMove = cards.slice(cardIndex).filter(c => {
+      if (animatingCard?.card.id === c.id) return false;
+      if (animatingCard?.stackCards?.some(sc => sc.id === c.id)) return false;
+      return true;
+    });
 
     // Only allow moving if it's a single card (for now, stacks to tableau need special logic)
     if (cardsToMove.length === 1) {
@@ -270,7 +281,25 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   const movableCards = getMovableCardsFromTableau(columnIndex);
-  const movableStartIndex = cards.length - movableCards.length;
+  
+  // Count how many cards from the TOP are currently animating away from this column
+  // These cards should be considered "already gone" for playability calculation
+  const animatingCardsCount = (() => {
+    if (!animatingCard) return 0;
+    if (animatingCard.sourceTableauColumn !== columnIndex) return 0;
+    if (animatingCard.isReturnAnimation || animatingCard.isUndoAnimation) return 0;
+    
+    // Count the animating card and any stack cards
+    if (animatingCard.stackCards) {
+      return animatingCard.stackCards.length;
+    }
+    return 1;
+  })();
+  
+  // Adjust movableStartIndex to account for animating cards
+  // If top card is animating, the card below it becomes playable immediately
+  const effectiveCardsLength = cards.length - animatingCardsCount;
+  const movableStartIndex = effectiveCardsLength - movableCards.length + animatingCardsCount;
 
   // Check if this card is being dragged from this column or animating
   const isCardBeingDragged = (cardIndex: number) => {
