@@ -209,7 +209,10 @@ export function DailyQuests({
     // Capture quests snapshot at window open time
     // Read from localStorage to get the latest data (avoid stale props issue)
     const savedQuests = localStorage.getItem('solitaire_daily_quests');
+    console.log('🎯 DailyQuests OPENING - localStorage:', savedQuests);
+    console.log('🎯 DailyQuests OPENING - props quests:', JSON.stringify(quests.map(q => ({ id: q.id, current: q.current, completed: q.completed }))));
     const freshQuests = savedQuests ? JSON.parse(savedQuests) : quests;
+    console.log('🎯 DailyQuests OPENING - freshQuests:', JSON.stringify(freshQuests.map((q: any) => ({ id: q.id, current: q.current, completed: q.completed }))));
     questsSnapshotRef.current = [...freshQuests];
     setDisplayQuests(freshQuests); // Update display quests for rendering
     const currentQuests = questsSnapshotRef.current;

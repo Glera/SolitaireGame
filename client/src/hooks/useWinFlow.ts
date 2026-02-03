@@ -182,6 +182,7 @@ export function useWinFlow(callbacks: WinFlowCallbacks): WinFlowActions {
   // Update daily quest progress on win
   // Uses functional update to ensure we have the latest quest state (avoid stale closure)
   const updateDailyQuestsOnWin = useCallback(() => {
+    console.log('🎯 updateDailyQuestsOnWin CALLED');
     const { setDailyQuests, setAcesCollected, addStars } = callbacks;
     
     const acesInGame = 4;
@@ -192,12 +193,14 @@ export function useWinFlow(callbacks: WinFlowCallbacks): WinFlowActions {
       newAcesTotal = prev + acesInGame;
       // Save to localStorage immediately for proceedToDailyQuests to read
       localStorage.setItem('solitaire_aces_collected', newAcesTotal.toString());
+      console.log('🎯 updateDailyQuestsOnWin - aces updated:', { prev, newAcesTotal });
       return newAcesTotal;
     });
     
     // Use functional update for quests to avoid stale closure issue
     let starsToAdd = 0;
     setDailyQuests(prevQuests => {
+      console.log('🎯 updateDailyQuestsOnWin - prevQuests:', JSON.stringify(prevQuests.map(q => ({ id: q.id, current: q.current }))));
       const updatedQuests = prevQuests.map(quest => {
         if ((quest.id === 'daily-games' || quest.id === 'daily-wins') && !quest.completed) {
           const newCurrent = quest.current + 1;
@@ -217,6 +220,7 @@ export function useWinFlow(callbacks: WinFlowCallbacks): WinFlowActions {
       });
       
       // Save to localStorage immediately for proceedToDailyQuests to read
+      console.log('🎯 updateDailyQuestsOnWin - saving to localStorage:', JSON.stringify(updatedQuests.map(q => ({ id: q.id, current: q.current }))));
       localStorage.setItem('solitaire_daily_quests', JSON.stringify(updatedQuests));
       
       // Award stars after updating quests
