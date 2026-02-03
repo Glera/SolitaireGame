@@ -102,10 +102,8 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
 
   // Core card action logic (used by both click and tap handlers)
   const performCardAction = (cardIndex: number) => {
-    console.log('🎯 TableauColumn performCardAction:', { columnIndex, cardIndex, cardsLength: cards.length });
     const card = cards[cardIndex];
     if (!card || !card.faceUp) {
-      console.log('🎯 TableauColumn performCardAction: card not found or face down');
       return;
     }
     
@@ -183,7 +181,6 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   
   // Update tap ref to use the stored card index
   handleTapRef.current = () => {
-    console.log('🎯 TableauColumn handleTapRef called:', { touchedCardIndex: touchedCardIndexRef.current, columnIndex });
     if (touchedCardIndexRef.current >= 0) {
       performCardAction(touchedCardIndexRef.current);
     }
@@ -465,7 +462,6 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
               onDragStart={(e) => handleDragStart(e, index)}
               onDragEnd={handleDragEnd}
               onTouchStart={(e) => {
-                console.log('🎯 TableauColumn onTouchStart:', { columnIndex, cardIndex: index, cardId: card.id, faceUp: card.faceUp });
                 // Always store the touched card index for tap handling
                 touchedCardIndexRef.current = index;
                 

@@ -190,6 +190,8 @@ export function useWinFlow(callbacks: WinFlowCallbacks): WinFlowActions {
     let newAcesTotal = 0;
     setAcesCollected(prev => {
       newAcesTotal = prev + acesInGame;
+      // Save to localStorage immediately for proceedToDailyQuests to read
+      localStorage.setItem('solitaire_aces_collected', newAcesTotal.toString());
       return newAcesTotal;
     });
     
@@ -205,7 +207,7 @@ export function useWinFlow(callbacks: WinFlowCallbacks): WinFlowActions {
         }
         if (quest.id === 'daily-aces' && !quest.completed) {
           // Read aces from localStorage to get the latest value
-          const currentAces = parseInt(localStorage.getItem('solitaire_aces_collected') || '0', 10) + acesInGame;
+          const currentAces = parseInt(localStorage.getItem('solitaire_aces_collected') || '0', 10);
           const newCurrent = Math.min(currentAces, quest.target);
           const completed = newCurrent >= quest.target;
           if (completed) starsToAdd += quest.reward;
@@ -213,6 +215,9 @@ export function useWinFlow(callbacks: WinFlowCallbacks): WinFlowActions {
         }
         return quest;
       });
+      
+      // Save to localStorage immediately for proceedToDailyQuests to read
+      localStorage.setItem('solitaire_daily_quests', JSON.stringify(updatedQuests));
       
       // Award stars after updating quests
       if (starsToAdd > 0) {
@@ -305,9 +310,12 @@ export function useWinFlow(callbacks: WinFlowCallbacks): WinFlowActions {
   
   // Proceed to daily quests
   const proceedToDailyQuests = useCallback((skipChecks?: SkipChecks) => {
-    const { dailyQuests, setDisplayedStars, setDailyQuestsAfterWin, openDailyQuests, tryShowLeaderboard } = callbacks;
+    const { setDisplayedStars, setDailyQuestsAfterWin, openDailyQuests, tryShowLeaderboard } = callbacks;
     
-    const allCompleted = dailyQuests.every((quest: any) => quest.completed);
+    // Read quests from localStorage to get the latest state (avoid stale closure)
+    const savedQuests = localStorage.getItem('solitaire_daily_quests');
+    const currentQuests = savedQuests ? JSON.parse(savedQuests) : [];
+    const allCompleted = currentQuests.every((quest: any) => quest.completed);
     
     if (allCompleted) {
       if (tryShowLeaderboard(() => proceedToCollectionsOrNewGame(skipChecks))) {
