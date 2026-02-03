@@ -2346,11 +2346,10 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           if (dstColumn.length === 0) {
             // Can move King to empty column
             if (card.rank === 'K') {
-              // Only useful if we're not moving King from bottom of column with no face-down cards
-              // (that would just be a pointless move)
+              // Only useful if moving King reveals a face-down card
+              // Moving King from one empty slot to another is POINTLESS
               const hasFaceDownBelow = cardIdx > 0 && !srcColumn[cardIdx - 1].faceUp;
-              const srcColumnHasFaceDownCards = srcColumn.some((c, i) => i < cardIdx && !c.faceUp);
-              if (hasFaceDownBelow || srcColumnHasFaceDownCards || srcColumn.length > 1) {
+              if (hasFaceDownBelow) {
                 set({ hint: { type: 'tableau', cardId: card.id, from: srcCol, to: dstCol } });
                 return;
               }
