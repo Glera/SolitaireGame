@@ -280,49 +280,36 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     clearAllDropTargetHighlights();
   };
 
-  // Count how many cards from the TOP are currently animating away from this column
-  // These cards should be considered "already gone" for playability calculation
-  const animatingCardsCount = (() => {
-    if (!animatingCard) return 0;
-    if (animatingCard.sourceTableauColumn !== columnIndex) return 0;
-    if (animatingCard.isReturnAnimation || animatingCard.isUndoAnimation) return 0;
-    
-    // Count the animating card and any stack cards
-    if (animatingCard.stackCards) {
-      return animatingCard.stackCards.length;
-    }
-    return 1;
-  })();
+  // Get movable cards from store (standard logic)
+  const movableCards = getMovableCardsFromTableau(columnIndex);
   
-  // Calculate movable cards EXCLUDING the animating card(s)
-  // This ensures the card below becomes playable immediately
-  const effectiveCards = animatingCardsCount > 0 
-    ? cards.slice(0, cards.length - animatingCardsCount)
-    : cards;
+  // Check if there's a card animating FROM this column
+  const isAnimatingFromThisColumn = animatingCard && 
+    animatingCard.sourceTableauColumn === columnIndex &&
+    !animatingCard.isReturnAnimation && 
+    !animatingCard.isUndoAnimation;
   
-  // For movable calculation, use effective cards (without animating ones)
-  const movableCardsEffective = (() => {
-    if (effectiveCards.length === 0) return [];
-    const result: typeof cards = [];
-    for (let i = effectiveCards.length - 1; i >= 0; i--) {
-      const card = effectiveCards[i];
-      if (!card.faceUp) break;
-      result.unshift(card);
-      if (i > 0) {
-        const nextCard = effectiveCards[i - 1];
-        if (!nextCard.faceUp) break;
-        // Check alternating colors and descending ranks
-        const isAlternatingColor = card.color !== nextCard.color;
-        const cardValue = card.rank === 'A' ? 1 : card.rank === 'J' ? 11 : card.rank === 'Q' ? 12 : card.rank === 'K' ? 13 : parseInt(card.rank);
-        const nextValue = nextCard.rank === 'A' ? 1 : nextCard.rank === 'J' ? 11 : nextCard.rank === 'Q' ? 12 : nextCard.rank === 'K' ? 13 : parseInt(nextCard.rank);
-        if (!isAlternatingColor || cardValue !== nextValue - 1) break;
+  // Count animating cards (1 or stack length)
+  const animatingCardsCount = isAnimatingFromThisColumn
+    ? (animatingCard.stackCards?.length || 1)
+    : 0;
+  
+  // Calculate movableStartIndex
+  // When a card is animating away, the card below it becomes immediately playable
+  const movableStartIndex = (() => {
+    if (animatingCardsCount > 0) {
+      // Card is flying - find the new top card (first faceUp from top, excluding animating)
+      for (let i = cards.length - animatingCardsCount - 1; i >= 0; i--) {
+        if (cards[i].faceUp) {
+          return i; // This card and all face-up cards below it in sequence are playable
+        }
+        break; // Hit a face-down card
       }
+      return cards.length; // No playable cards
     }
-    return result;
+    // Normal case - use standard movable cards calculation
+    return cards.length - movableCards.length;
   })();
-  
-  // Calculate movableStartIndex based on effective cards
-  const movableStartIndex = effectiveCards.length - movableCardsEffective.length;
 
   // Check if this card is being dragged from this column or animating
   const isCardBeingDragged = (cardIndex: number) => {
@@ -475,20 +462,32 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
               onDragStart={(e) => handleDragStart(e, index)}
               onDragEnd={handleDragEnd}
               onTouchStart={(e) => {
-                // Use movableStartIndex which accounts for animating cards
-                if (card.faceUp && index >= movableStartIndex) {
-                  // Store the touched card index for tap handling
-                  touchedCardIndexRef.current = index;
-                  // Get cards to move from this index, excluding any animating ones
-                  const cardsToMove = cards.slice(index).filter(c => {
+                // Always store the touched card index for tap handling
+                touchedCardIndexRef.current = index;
+                
+                // For face-up cards, always start touch handling (needed for tap to work)
+                if (card.faceUp) {
+                  // Get cards to move
+                  const cardPosition = cards.length - movableCards.length;
+                  let cardsToMove = index >= cardPosition 
+                    ? movableCards.slice(index - cardPosition)
+                    : [card]; // Single card
+                  
+                  // Filter out any animating cards
+                  cardsToMove = cardsToMove.filter(c => {
                     if (animatingCard?.card.id === c.id) return false;
                     if (animatingCard?.stackCards?.some(sc => sc.id === c.id)) return false;
                     return true;
                   });
+                  
+                  // Always call handleTouchStart for face-up cards (enables tap detection)
+                  // Even if no cards to move, tap will be detected and performCardAction will handle it
                   if (cardsToMove.length > 0) {
                     handleTouchStart(e, cardsToMove, 'tableau', columnIndex);
-                    setIsActuallyDragging(true);
+                  } else {
+                    handleTouchStart(e, [card], 'tableau', columnIndex);
                   }
+                  setIsActuallyDragging(true);
                 }
               }}
               onTouchMove={handleTouchMove}
