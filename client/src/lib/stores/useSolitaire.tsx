@@ -2328,8 +2328,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       }
     }
     
-    // Priority 6: ANY valid tableau-to-tableau move (even if it doesn't directly reveal a card)
-    // This catches cases where a move enables a chain of moves that eventually reveals a card
+    // Priority 6: Tableau-to-tableau moves that reveal a face-down card
+    // Only suggest moves where moving the card actually reveals something useful
     for (let srcCol = 0; srcCol < state.tableau.length; srcCol++) {
       const srcColumn = state.tableau[srcCol];
       if (srcColumn.length === 0) continue;
@@ -2339,6 +2339,11 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         const card = srcColumn[cardIdx];
         if (!card.faceUp) continue;
         
+        // Only useful if moving this card reveals a face-down card below it
+        // Moving cards that don't reveal anything is POINTLESS
+        const hasFaceDownBelow = cardIdx > 0 && !srcColumn[cardIdx - 1].faceUp;
+        if (!hasFaceDownBelow) continue;
+        
         for (let dstCol = 0; dstCol < state.tableau.length; dstCol++) {
           if (srcCol === dstCol) continue;
           
@@ -2346,18 +2351,13 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           if (dstColumn.length === 0) {
             // Can move King to empty column
             if (card.rank === 'K') {
-              // Only useful if moving King reveals a face-down card
-              // Moving King from one empty slot to another is POINTLESS
-              const hasFaceDownBelow = cardIdx > 0 && !srcColumn[cardIdx - 1].faceUp;
-              if (hasFaceDownBelow) {
-                set({ hint: { type: 'tableau', cardId: card.id, from: srcCol, to: dstCol } });
-                return;
-              }
+              set({ hint: { type: 'tableau', cardId: card.id, from: srcCol, to: dstCol } });
+              return;
             }
           } else {
             const dstTop = dstColumn[dstColumn.length - 1];
             if (dstTop.faceUp && canPlaceOnTableau(dstTop, card)) {
-              // Found a valid move!
+              // This move reveals a face-down card - it's useful!
               set({ hint: { type: 'tableau', cardId: card.id, from: srcCol, to: dstCol } });
               return;
             }
