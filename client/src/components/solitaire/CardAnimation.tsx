@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useGameScaleContext } from '../../contexts/GameScaleContext';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { getCardOffset, isMobileDevice } from '../../lib/solitaire/cardConstants';
+import { CARD_FLIGHT_DURATION } from '../../lib/constants/animations';
 
 interface CardAnimationProps {
   card: CardType;
@@ -20,7 +21,7 @@ export function CardAnimation({
   startPosition, 
   endPosition, 
   onComplete,
-  speed = 280, // Fixed duration in ms - matches auto-collect for consistency
+  speed = CARD_FLIGHT_DURATION, // Fixed duration in ms - from centralized constants
   stackCards // If provided, render the whole stack
 }: CardAnimationProps) {
   const [position, setPosition] = useState(startPosition);
@@ -39,12 +40,8 @@ export function CardAnimation({
     const dx = endPosition.x - startPosition.x;
     const dy = endPosition.y - startPosition.y;
     
-    // Fixed duration for all card movements (regardless of distance)
-    // Matches auto-collect animation (280ms) for consistent feel
-    const FIXED_DURATION = 280;
-    
-    // Use custom speed if provided, otherwise use fixed duration
-    const clampedDuration = speed !== 280 ? speed : FIXED_DURATION;
+    // Use speed from props (defaults to centralized CARD_FLIGHT_DURATION)
+    const clampedDuration = speed;
     
     // Start animation
     const animate = (timestamp: number) => {

@@ -5,6 +5,7 @@ import { Pile } from './Pile';
 import { Card as CardType } from '../../lib/solitaire/types';
 import { useSolitaire } from '../../lib/stores/useSolitaire';
 import { useGameScaleContext } from '../../contexts/GameScaleContext';
+import { STOCK_ANIMATION_SPEED } from '../../lib/constants/animations';
 
 interface StockPileProps {
   cards: CardType[];
@@ -73,9 +74,8 @@ export function StockPile({ cards }: StockPileProps) {
       // Adjust distance for scale (same as CardAnimation)
       const adjustedDistance = distance / scale;
       
-      // Speed for stock animation (slower than card moves)
-      const SPEED_PX_PER_SEC = 1200; // Slower: 1200 pixels per second
-      const duration = (adjustedDistance / SPEED_PX_PER_SEC) * 1000;
+      // Speed for stock animation (from centralized constants)
+      const duration = (adjustedDistance / STOCK_ANIMATION_SPEED) * 1000;
       
       // Clamp duration: minimum 50ms, no maximum limit for constant speed
       const clampedDuration = Math.max(50, duration);
