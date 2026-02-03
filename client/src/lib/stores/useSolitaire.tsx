@@ -2327,6 +2327,45 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       }
     }
     
+    // Priority 6: ANY valid tableau-to-tableau move (even if it doesn't directly reveal a card)
+    // This catches cases where a move enables a chain of moves that eventually reveals a card
+    for (let srcCol = 0; srcCol < state.tableau.length; srcCol++) {
+      const srcColumn = state.tableau[srcCol];
+      if (srcColumn.length === 0) continue;
+      
+      // Check each face-up card as potential move candidate
+      for (let cardIdx = 0; cardIdx < srcColumn.length; cardIdx++) {
+        const card = srcColumn[cardIdx];
+        if (!card.faceUp) continue;
+        
+        for (let dstCol = 0; dstCol < state.tableau.length; dstCol++) {
+          if (srcCol === dstCol) continue;
+          
+          const dstColumn = state.tableau[dstCol];
+          if (dstColumn.length === 0) {
+            // Can move King to empty column
+            if (card.rank === 'K') {
+              // Only useful if we're not moving King from bottom of column with no face-down cards
+              // (that would just be a pointless move)
+              const hasFaceDownBelow = cardIdx > 0 && !srcColumn[cardIdx - 1].faceUp;
+              const srcColumnHasFaceDownCards = srcColumn.some((c, i) => i < cardIdx && !c.faceUp);
+              if (hasFaceDownBelow || srcColumnHasFaceDownCards || srcColumn.length > 1) {
+                set({ hint: { type: 'tableau', cardId: card.id, from: srcCol, to: dstCol } });
+                return;
+              }
+            }
+          } else {
+            const dstTop = dstColumn[dstColumn.length - 1];
+            if (dstTop.faceUp && canPlaceOnTableau(dstTop, card)) {
+              // Found a valid move!
+              set({ hint: { type: 'tableau', cardId: card.id, from: srcCol, to: dstCol } });
+              return;
+            }
+          }
+        }
+      }
+    }
+    
     // Before showing "no moves", check if game is actually won
     // (all 52 cards in foundations - animation might still be in progress)
     const totalInFoundations = Object.values(state.foundations).reduce((sum, f) => sum + f.length, 0);
