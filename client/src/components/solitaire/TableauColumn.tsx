@@ -280,8 +280,6 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     clearAllDropTargetHighlights();
   };
 
-  const movableCards = getMovableCardsFromTableau(columnIndex);
-  
   // Count how many cards from the TOP are currently animating away from this column
   // These cards should be considered "already gone" for playability calculation
   const animatingCardsCount = (() => {
@@ -296,10 +294,35 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     return 1;
   })();
   
-  // Adjust movableStartIndex to account for animating cards
-  // If top card is animating, the card below it becomes playable immediately
-  const effectiveCardsLength = cards.length - animatingCardsCount;
-  const movableStartIndex = effectiveCardsLength - movableCards.length + animatingCardsCount;
+  // Calculate movable cards EXCLUDING the animating card(s)
+  // This ensures the card below becomes playable immediately
+  const effectiveCards = animatingCardsCount > 0 
+    ? cards.slice(0, cards.length - animatingCardsCount)
+    : cards;
+  
+  // For movable calculation, use effective cards (without animating ones)
+  const movableCardsEffective = (() => {
+    if (effectiveCards.length === 0) return [];
+    const result: typeof cards = [];
+    for (let i = effectiveCards.length - 1; i >= 0; i--) {
+      const card = effectiveCards[i];
+      if (!card.faceUp) break;
+      result.unshift(card);
+      if (i > 0) {
+        const nextCard = effectiveCards[i - 1];
+        if (!nextCard.faceUp) break;
+        // Check alternating colors and descending ranks
+        const isAlternatingColor = card.color !== nextCard.color;
+        const cardValue = card.rank === 'A' ? 1 : card.rank === 'J' ? 11 : card.rank === 'Q' ? 12 : card.rank === 'K' ? 13 : parseInt(card.rank);
+        const nextValue = nextCard.rank === 'A' ? 1 : nextCard.rank === 'J' ? 11 : nextCard.rank === 'Q' ? 12 : nextCard.rank === 'K' ? 13 : parseInt(nextCard.rank);
+        if (!isAlternatingColor || cardValue !== nextValue - 1) break;
+      }
+    }
+    return result;
+  })();
+  
+  // Calculate movableStartIndex based on effective cards
+  const movableStartIndex = effectiveCards.length - movableCardsEffective.length;
 
   // Check if this card is being dragged from this column or animating
   const isCardBeingDragged = (cardIndex: number) => {
@@ -452,14 +475,20 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
               onDragStart={(e) => handleDragStart(e, index)}
               onDragEnd={handleDragEnd}
               onTouchStart={(e) => {
-                const movableCards = getMovableCardsFromTableau(columnIndex);
-                const cardPosition = cards.length - movableCards.length;
-                if (index >= cardPosition) {
+                // Use movableStartIndex which accounts for animating cards
+                if (card.faceUp && index >= movableStartIndex) {
                   // Store the touched card index for tap handling
                   touchedCardIndexRef.current = index;
-                  const cardsToMove = movableCards.slice(index - cardPosition);
-                  handleTouchStart(e, cardsToMove, 'tableau', columnIndex);
-                  setIsActuallyDragging(true);
+                  // Get cards to move from this index, excluding any animating ones
+                  const cardsToMove = cards.slice(index).filter(c => {
+                    if (animatingCard?.card.id === c.id) return false;
+                    if (animatingCard?.stackCards?.some(sc => sc.id === c.id)) return false;
+                    return true;
+                  });
+                  if (cardsToMove.length > 0) {
+                    handleTouchStart(e, cardsToMove, 'tableau', columnIndex);
+                    setIsActuallyDragging(true);
+                  }
                 }
               }}
               onTouchMove={handleTouchMove}
