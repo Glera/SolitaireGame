@@ -2328,8 +2328,50 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
       }
     }
     
-    // Priority 6: Tableau-to-tableau moves that reveal a face-down card
-    // Only suggest moves where moving the card actually reveals something useful
+    // Priority 6: Tableau-to-tableau moves that are USEFUL
+    // A move is useful if:
+    // 1. It directly reveals a face-down card, OR
+    // 2. It enables another move that will reveal a face-down card (one step lookahead)
+    
+    // Helper: check if there's a card that can be placed on targetCard and would reveal a face-down
+    const canEnableUsefulMove = (targetCard: Card, excludeCol: number): boolean => {
+      // Check what card can be placed on targetCard
+      const neededRank = rankOrder[rankOrder.indexOf(targetCard.rank) - 1];
+      if (!neededRank) return false; // Ace can't have cards placed on it
+      
+      const targetIsRed = targetCard.suit === 'hearts' || targetCard.suit === 'diamonds';
+      const neededColors = targetIsRed ? ['clubs', 'spades'] : ['hearts', 'diamonds'];
+      
+      // Check waste
+      if (state.waste.length > 0) {
+        const wasteTop = state.waste[state.waste.length - 1];
+        if (wasteTop.rank === neededRank && neededColors.includes(wasteTop.suit)) {
+          return true; // Waste card can be played - always useful
+        }
+      }
+      
+      // Check tableau columns for a card that would reveal face-down when moved
+      for (let col = 0; col < state.tableau.length; col++) {
+        if (col === excludeCol) continue;
+        const column = state.tableau[col];
+        if (column.length === 0) continue;
+        
+        // Find the matching card in this column
+        for (let idx = 0; idx < column.length; idx++) {
+          const c = column[idx];
+          if (!c.faceUp) continue;
+          if (c.rank === neededRank && neededColors.includes(c.suit)) {
+            // Found a card that can be placed - check if moving it reveals face-down
+            const wouldRevealFaceDown = idx > 0 && !column[idx - 1].faceUp;
+            if (wouldRevealFaceDown) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    };
+    
     for (let srcCol = 0; srcCol < state.tableau.length; srcCol++) {
       const srcColumn = state.tableau[srcCol];
       if (srcColumn.length === 0) continue;
@@ -2339,25 +2381,38 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         const card = srcColumn[cardIdx];
         if (!card.faceUp) continue;
         
-        // Only useful if moving this card reveals a face-down card below it
-        // Moving cards that don't reveal anything is POINTLESS
-        const hasFaceDownBelow = cardIdx > 0 && !srcColumn[cardIdx - 1].faceUp;
-        if (!hasFaceDownBelow) continue;
+        // Check if this move directly reveals a face-down card
+        const directlyRevealsFaceDown = cardIdx > 0 && !srcColumn[cardIdx - 1].faceUp;
         
         for (let dstCol = 0; dstCol < state.tableau.length; dstCol++) {
           if (srcCol === dstCol) continue;
           
           const dstColumn = state.tableau[dstCol];
+          let canMove = false;
+          
           if (dstColumn.length === 0) {
-            // Can move King to empty column
-            if (card.rank === 'K') {
-              set({ hint: { type: 'tableau', cardId: card.id, from: srcCol, to: dstCol } });
-              return;
-            }
+            canMove = card.rank === 'K';
           } else {
             const dstTop = dstColumn[dstColumn.length - 1];
-            if (dstTop.faceUp && canPlaceOnTableau(dstTop, card)) {
-              // This move reveals a face-down card - it's useful!
+            canMove = dstTop.faceUp && canPlaceOnTableau(dstTop, card);
+          }
+          
+          if (!canMove) continue;
+          
+          // Move is valid - check if it's USEFUL
+          if (directlyRevealsFaceDown) {
+            // Direct benefit - reveals a face-down card
+            set({ hint: { type: 'tableau', cardId: card.id, from: srcCol, to: dstCol } });
+            return;
+          }
+          
+          // Check one step lookahead: after moving, is there a card that can use the exposed spot?
+          // The card that will be exposed after move
+          const cardBelowIdx = cardIdx - 1;
+          if (cardBelowIdx >= 0) {
+            const cardBelow = srcColumn[cardBelowIdx];
+            if (cardBelow.faceUp && canEnableUsefulMove(cardBelow, srcCol)) {
+              // This move enables a useful follow-up move!
               set({ hint: { type: 'tableau', cardId: card.id, from: srcCol, to: dstCol } });
               return;
             }
