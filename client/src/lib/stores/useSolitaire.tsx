@@ -34,6 +34,95 @@ interface HistoryState {
 let moveHistory: HistoryState[] = [];
 const MAX_HISTORY = 50;
 
+// ============ GAME STATE PERSISTENCE ============
+const GAME_STATE_STORAGE_KEY = 'solitaire_saved_game';
+
+interface SavedGameState {
+  tableau: Card[][];
+  foundations: { hearts: Card[]; diamonds: Card[]; clubs: Card[]; spades: Card[] };
+  stock: Card[];
+  waste: Card[];
+  foundationSlotOrder: Suit[];
+  isWon: boolean;
+  savedAt: number;
+}
+
+// Save current game state to localStorage
+function saveGameStateToStorage(state: {
+  tableau: Card[][];
+  foundations: { hearts: Card[]; diamonds: Card[]; clubs: Card[]; spades: Card[] };
+  stock: Card[];
+  waste: Card[];
+  foundationSlotOrder: Suit[];
+  isWon: boolean;
+}) {
+  // Don't save if game is won
+  if (state.isWon) {
+    localStorage.removeItem(GAME_STATE_STORAGE_KEY);
+    return;
+  }
+  
+  const savedState: SavedGameState = {
+    tableau: state.tableau,
+    foundations: state.foundations,
+    stock: state.stock,
+    waste: state.waste,
+    foundationSlotOrder: state.foundationSlotOrder,
+    isWon: state.isWon,
+    savedAt: Date.now(),
+  };
+  
+  try {
+    localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(savedState));
+  } catch (e) {
+    console.warn('Failed to save game state:', e);
+  }
+}
+
+// Load game state from localStorage
+function loadGameStateFromStorage(): SavedGameState | null {
+  try {
+    const saved = localStorage.getItem(GAME_STATE_STORAGE_KEY);
+    if (!saved) return null;
+    
+    const state = JSON.parse(saved) as SavedGameState;
+    
+    // Validate basic structure
+    if (!state.tableau || !state.foundations || !state.stock || !state.waste) {
+      console.warn('Invalid saved game state');
+      localStorage.removeItem(GAME_STATE_STORAGE_KEY);
+      return null;
+    }
+    
+    // Check if game is too old (more than 7 days)
+    if (state.savedAt && Date.now() - state.savedAt > 7 * 24 * 60 * 60 * 1000) {
+      console.log('Saved game is too old, starting fresh');
+      localStorage.removeItem(GAME_STATE_STORAGE_KEY);
+      return null;
+    }
+    
+    // Don't restore won games
+    if (state.isWon) {
+      localStorage.removeItem(GAME_STATE_STORAGE_KEY);
+      return null;
+    }
+    
+    console.log('🔄 Restoring saved game from', new Date(state.savedAt).toLocaleString());
+    return state;
+  } catch (e) {
+    console.warn('Failed to load saved game:', e);
+    localStorage.removeItem(GAME_STATE_STORAGE_KEY);
+    return null;
+  }
+}
+
+// Clear saved game state
+function clearSavedGameState() {
+  localStorage.removeItem(GAME_STATE_STORAGE_KEY);
+}
+
+export { GAME_STATE_STORAGE_KEY };
+
 function saveStateToHistory(state: HistoryState) {
   // Deep clone the state
   const clonedState: HistoryState = {
@@ -140,6 +229,9 @@ interface SolitaireStore extends GameState, DragState {
   checkForAvailableMoves: () => boolean;
   clearNoMoves: () => void;
   
+  // Joker placement
+  placeJoker: (columnIndex: number) => void; // Place joker card at end of column
+  
   // Undo functionality
   canUndo: boolean;
   undo: () => void;
@@ -164,8 +256,49 @@ interface SolitaireStore extends GameState, DragState {
   getCurrentResults: () => { score: number; giftsEarned: number };
 }
 
-// Initialize game state once for reuse
-const initialGameState = initializeGame();
+// Initialize game state - try to restore from localStorage
+let initialGameState: GameState;
+let initialFoundationSlotOrder: Suit[] = [];
+let restoredFromSave = false;
+
+try {
+  const savedGameState = loadGameStateFromStorage();
+  
+  if (savedGameState && 
+      savedGameState.tableau && 
+      Array.isArray(savedGameState.tableau) &&
+      savedGameState.tableau.length === 7 &&
+      savedGameState.foundations) {
+    
+    // Validate tableau structure
+    const isValidTableau = savedGameState.tableau.every((col: unknown) => Array.isArray(col));
+    
+    if (isValidTableau) {
+      // Restore saved game - merge with fresh game defaults for missing fields
+      const freshGame = initializeGame();
+      initialGameState = {
+        ...freshGame,
+        tableau: savedGameState.tableau,
+        foundations: savedGameState.foundations,
+        stock: savedGameState.stock || [],
+        waste: savedGameState.waste || [],
+        isWon: savedGameState.isWon || false,
+      };
+      initialFoundationSlotOrder = savedGameState.foundationSlotOrder || [];
+      restoredFromSave = true;
+      console.log('🔄 Game state restored from localStorage');
+    } else {
+      throw new Error('Invalid tableau structure');
+    }
+  } else {
+    initialGameState = initializeGame();
+    console.log('🎮 Starting fresh game');
+  }
+} catch (e) {
+  console.warn('Failed to restore game, starting fresh:', e);
+  clearSavedGameState();
+  initialGameState = initializeGame();
+}
 
 // Reset all tracking on store initialization (fresh start)
 resetScoredCards();
@@ -197,7 +330,8 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   collisionHighlightEnabled: false,
   
   // Foundation slot order (empty at start, fills left to right as suits are added)
-  foundationSlotOrder: [],
+  // Restore from saved state if available
+  foundationSlotOrder: initialFoundationSlotOrder,
   
   // Auto-collect state
   isAutoCollecting: false,
@@ -211,9 +345,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   // Hint state
   hint: null,
   
-  // Dealing animation state - populate with initial cards
-  isDealing: true,
-  dealingCardIds: new Set(initialGameState.tableau.flat().map(c => c.id)),
+  // Dealing animation state - skip if restoring saved game
+  isDealing: !restoredFromSave,
+  dealingCardIds: restoredFromSave ? new Set() : new Set(initialGameState.tableau.flat().map(c => c.id)),
   
   setCollisionHighlight: (enabled) => {
     set({ collisionHighlightEnabled: enabled });
@@ -231,6 +365,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     clearAutoCollectingCards(); // Reset auto-collecting cards tracker
     resetCardsMovedForCollection(); // Reset cards counter for collection drops
     clearMoveHistory(); // Clear undo history for new game
+    clearSavedGameState(); // Clear saved game on new game
     
     console.log('🎮 Starting new game, all tracking reset');
     
@@ -314,6 +449,16 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     
     const newState = drawFromStock(currentState);
     set({ ...newState, canUndo: true });
+    
+    // Save game state after drawing
+    saveGameStateToStorage({
+      tableau: newState.tableau,
+      foundations: newState.foundations,
+      stock: newState.stock,
+      waste: newState.waste,
+      foundationSlotOrder: currentState.foundationSlotOrder,
+      isWon: newState.isWon,
+    });
     
     // Trigger auto-collect after drawing from stock
     setTimeout(() => {
@@ -504,6 +649,17 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
           get().triggerAutoCollect();
         }, 50); // Small delay to let state update
       }
+      
+      // Save game state after successful move
+      const currentState = get();
+      saveGameStateToStorage({
+        tableau: currentState.tableau,
+        foundations: currentState.foundations,
+        stock: currentState.stock,
+        waste: currentState.waste,
+        foundationSlotOrder: currentState.foundationSlotOrder,
+        isWon: currentState.isWon,
+      });
     } else {
       // Find source element for return animation
       const dragPreview = document.querySelector('[data-drag-preview]') as HTMLElement;
@@ -1397,6 +1553,50 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   
   clearNoMoves: () => {
     set({ hasNoMoves: false });
+  },
+  
+  // Place a Joker wild card at the end of a tableau column
+  placeJoker: (columnIndex: number) => {
+    const state = get();
+    
+    // Create a joker card
+    const jokerId = `joker-${Date.now()}`;
+    const jokerCard: Card = {
+      id: jokerId,
+      suit: 'spades', // Arbitrary suit for joker
+      rank: 'K', // Arbitrary rank for joker
+      color: 'black',
+      faceUp: true,
+      isJoker: true,
+    };
+    
+    // Add joker to the specified column
+    const newTableau = state.tableau.map((col, idx) => {
+      if (idx === columnIndex) {
+        return [...col, jokerCard];
+      }
+      return col;
+    });
+    
+    // Save state for undo
+    saveStateToHistory({
+      tableau: state.tableau,
+      foundations: state.foundations,
+      stock: state.stock,
+      waste: state.waste,
+      foundationSlotOrder: state.foundationSlotOrder,
+    });
+    
+    set({
+      tableau: newTableau,
+      hasNoMoves: false, // Clear no moves state
+      canUndo: true,
+    });
+    
+    // Check for available moves again after joker placement
+    setTimeout(() => {
+      get().checkForAvailableMoves();
+    }, 100);
   },
   
   undo: () => {
@@ -2610,7 +2810,7 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     const cardsToMove: { card: Card; source: 'tableau' | 'waste'; columnIndex?: number }[] = [];
     
     let safetyCounter = 0;
-    while (safetyCounter < 30) {
+    while (safetyCounter < 60) {
       safetyCounter++;
       let foundCard = false;
       
@@ -2619,6 +2819,12 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
         const column = simTableau[i];
         if (column.length > 0) {
           const topCard = column[column.length - 1];
+          
+          // Skip jokers - they stay on the table for player to use
+          if (topCard.isJoker) {
+            continue;
+          }
+          
           if (topCard.faceUp && canMoveInSim(topCard)) {
             cardsToMove.push({ card: topCard, source: 'tableau', columnIndex: i });
             // Remove card and flip the one underneath in simulation
@@ -2827,3 +3033,28 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     }, 20);
   }
 }));
+
+// Subscribe to state changes and auto-save (debounced)
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+useSolitaire.subscribe((state) => {
+  // Don't save during animations or dealing
+  if (state.animatingCard || state.isDealing || state.isAutoCollecting) {
+    return;
+  }
+  
+  // Debounce saves to avoid too many writes
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+  }
+  
+  saveTimeout = setTimeout(() => {
+    saveGameStateToStorage({
+      tableau: state.tableau,
+      foundations: state.foundations,
+      stock: state.stock,
+      waste: state.waste,
+      foundationSlotOrder: state.foundationSlotOrder,
+      isWon: state.isWon,
+    });
+  }, 500);
+});

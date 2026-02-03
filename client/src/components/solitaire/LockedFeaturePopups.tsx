@@ -5,6 +5,7 @@
  * Все popup'ы управляются через onDemand queue в usePopupQueue.
  */
 
+import React from 'react';
 import { LockedFeaturePopupByKey } from './LockedFeaturePopup';
 import { usePopupQueue } from '../../lib/stores/usePopupQueue';
 import { COLLECTIONS_REQUIRED_LEVEL, LEADERBOARD_REQUIRED_LEVEL } from '../../hooks/useGameProgress';

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 // Import debugLogger early to capture all logs
 import '../../lib/debugLogger';
@@ -12,7 +12,7 @@ import { FoundationPile } from './FoundationPile';
 import { StockPile } from './StockPile';
 import { WastePile } from './WastePile';
 import { DonationProgress } from './DonationProgress';
-import { WinScreen } from './WinScreen';
+import { WinCelebration } from './WinCelebration';
 import { DailyQuests } from './DailyQuests';
 import { Collections, defaultCollections, type Collection } from './Collections';
 import { NoMovesModal } from './NoMovesModal';
@@ -75,6 +75,7 @@ import { useDailyRewards } from '../../hooks/useDailyRewards';
 import { usePointsEvent } from '../../hooks/usePointsEvent';
 import { useTreasureFlyingStars, TreasureFlyingStar } from '../../hooks/useTreasureFlyingStars';
 import { useCollisionParticles } from '../../hooks/useCollisionParticles';
+import { useBoosters } from '../../hooks/useBoosters';
 import { CollisionParticles } from './CollisionParticle';
 import { useDebugActions } from '../../hooks/useDebugActions';
 import { DungeonDigPromo } from './DungeonDigPromo';
@@ -132,6 +133,8 @@ import { FlyingRewardToMiniature } from './FlyingRewardToMiniature';
 import { useWinFlow } from '../../hooks/useWinFlow';
 import { useGameProgress, COLLECTIONS_REQUIRED_LEVEL, LEADERBOARD_REQUIRED_LEVEL, STARS_PER_WIN, STARS_PER_LEVELUP } from '../../hooks/useGameProgress';
 import { usePopupQueue, WinFlowPopup } from '../../lib/stores/usePopupQueue';
+import { useWinStreak } from '../../hooks/useWinStreak';
+// MultiplierCelebration now integrated into WinCelebration
 
 // Constants imported from useGameProgress hook:
 // STARS_PER_LEVELUP, COLLECTIONS_REQUIRED_LEVEL, LEADERBOARD_REQUIRED_LEVEL, STARS_PER_WIN
@@ -157,6 +160,7 @@ export function GameBoard() {
     hasNoMoves,
     checkForAvailableMoves,
     clearNoMoves,
+    placeJoker,
     hint,
     getHint,
     clearHint,
@@ -284,6 +288,7 @@ export function GameBoard() {
   // No moves state - show popup first, then button if closed
   const [showNewGameButton, setShowNewGameButton] = useState(false);
   const [noMovesShownOnce, setNoMovesShownOnce] = useState(false);
+  
   
   // Daily rewards hook - manages daily streak, login rewards, mount/visibility checks
   const {
@@ -709,6 +714,36 @@ export function GameBoard() {
   // Collision particles hook - manages burst particles on icon arrival
   const { particles: collisionParticles, createBurst: createCollisionParticles } = useCollisionParticles();
   
+  // Boosters hook - manages consumable undo and hint boosters
+  const {
+    undoCount,
+    hintCount,
+    hintActive,
+    useUndo: useUndoBooster,
+    useHint: useHintBooster,
+    deactivateHint,
+    addUndo: addUndoBooster,
+    addHint: addHintBooster,
+    jokerCount,
+    useJoker: useJokerBooster,
+    addJoker: addJokerBooster,
+    resetBoosters,
+  } = useBoosters();
+  
+  // Win streak hook - manages consecutive wins multiplier
+  const {
+    streak: winStreak,
+    multiplier: winMultiplier,
+    incrementStreak,
+    resetStreak,
+  } = useWinStreak();
+  
+  // Multiplier celebration hook - shows x2, x3, etc. with confetti
+  // Win celebration state is now handled by WinCelebration component directly
+  
+  // Track if current game was won (to know if new game is a "loss")
+  const [currentGameWon, setCurrentGameWon] = useState(false);
+  
   // Update collections button position for flying icons
   useEffect(() => {
     const updateButtonPosition = () => {
@@ -803,6 +838,9 @@ export function GameBoard() {
   // Register callback for card to foundation events - add points for points event
   useEffect(() => {
     setOnCardToFoundationCallback((cardX: number, cardY: number, points: number) => {
+      // Deactivate hint booster mode when card leaves the field
+      deactivateHint();
+      
       // Only add points if collections are unlocked (level >= 2)
       const currentLevel = parseInt(localStorage.getItem('solitaire_player_level') || '1', 10);
       if (currentLevel < COLLECTIONS_REQUIRED_LEVEL) {
@@ -882,7 +920,7 @@ export function GameBoard() {
       // Collection items are now obtained only through packs
     });
     return () => setOnCardToFoundationCallback(() => {});
-  }, []);
+  }, [deactivateHint]);
   
   // Game scale for responsive layout
   const { scale, containerHeight, availableHeight, containerWidth } = useGameScaleContext();
@@ -978,35 +1016,43 @@ export function GameBoard() {
   // Track if we're waiting for flying icons before showing win screen
   const [pendingWinScreen, setPendingWinScreen] = useState(false);
   
+  // Store the multiplier when win happens (to pass to WinCelebration)
+  const [winMultiplierForCelebration, setWinMultiplierForCelebration] = useState(1);
+  
   // Handle win condition - wait for flying icons AND card animations to finish
   useEffect(() => {
     if (isWon && !winHandled) {
       playSuccess();
       setWinHandled(true);
-      // Add stars for winning immediately (persisted via localStorage effect)
-      addStars(STARS_PER_WIN);
+      setCurrentGameWon(true);
+      
+      // Increment win streak and get new multiplier
+      const newMultiplier = incrementStreak();
+      setWinMultiplierForCelebration(newMultiplier);
+      
+      // NOTE: Stars are NOT added here anymore!
+      // They are added wave by wave via onStarArrived in WinCelebration
       
       // Check if there are flying icons or card animations
       if (flyingIcons.length > 0 || animatingCard) {
         // Wait for animations to finish
         setPendingWinScreen(true);
       } else {
-        // No animations, show win screen with small delay for visual polish
+        // No animations - show win celebration
         setTimeout(() => {
           setShowWinScreen(true);
         }, 300);
       }
     }
-  }, [isWon, winHandled, playSuccess, flyingIcons.length, animatingCard]);
+  }, [isWon, winHandled, playSuccess, flyingIcons.length, animatingCard, incrementStreak]);
   
   // Show win screen when all flying icons have landed AND card animations finished (if pending)
   useEffect(() => {
     if (pendingWinScreen && flyingIcons.length === 0 && !animatingCard) {
       setPendingWinScreen(false);
-      // Add 0.5s delay before showing win screen
       setTimeout(() => {
         setShowWinScreen(true);
-      }, 500);
+      }, 300);
     }
   }, [pendingWinScreen, flyingIcons.length, animatingCard]);
   
@@ -1161,9 +1207,17 @@ export function GameBoard() {
     setHasNewCollectionItem(false);
   };
   
+  // Trigger no moves for debug
+  const triggerNoMoves = useCallback(() => {
+    // Set hasNoMoves to true and reset noMovesShownOnce to show the modal
+    useSolitaire.setState({ hasNoMoves: true });
+    setNoMovesShownOnce(false);
+  }, []);
+  
   // Debug actions hook - test win, level up, next day, start dungeon, reset all, drop collection item
   const {
     handleTestWin,
+    handleTestLose,
     handleTestLevelUp,
     handleNextDay,
     handleStartDungeonDig,
@@ -1176,6 +1230,10 @@ export function GameBoard() {
     setShowWinScreen,
     setPendingWinScreen,
     flyingIconsLength: flyingIcons.length,
+    incrementStreak,
+    setWinMultiplierForCelebration,
+    setCurrentGameWon,
+    triggerNoMoves,
     setPendingLevelUp,
     showPopupViaQueue,
     starsPerLevelUp: STARS_PER_LEVELUP,
@@ -1244,6 +1302,17 @@ export function GameBoard() {
   // Real stars are already saved to localStorage, this updates the visual display
   const handleStarArrived = (count: number = 1) => {
     // Increment displayed stars by count (visual update)
+    setDisplayedStars(prev => prev + count);
+    // Trigger pulse animation
+    triggerStarPulse();
+  };
+  
+  // Handle star arriving from win celebration - adds to BOTH displayed AND total
+  // (Since win stars are now earned wave by wave, not all at once)
+  const handleWinStarArrived = (count: number = 1) => {
+    // Add to total stars (persisted)
+    addStars(count);
+    // Update displayed stars (visual)
     setDisplayedStars(prev => prev + count);
     // Trigger pulse animation
     triggerStarPulse();
@@ -1467,9 +1536,9 @@ export function GameBoard() {
             
             {/* Bottom row: Tableau columns */}
             {/* keyUpdateCounter triggers re-render when keys change, without remounting */}
-            <div className="flex gap-1" style={{ minHeight: '400px', paddingBottom: '20px' }} data-key-update={keyUpdateCounter}>
+            <div className="flex gap-1 relative" style={{ minHeight: '400px', paddingBottom: '20px' }} data-key-update={keyUpdateCounter}>
               {tableau.map((column, index) => (
-                <div key={index} className="min-h-32">
+                <div key={index} className="min-h-32 relative">
                   <TableauColumn cards={column} columnIndex={index} />
                 </div>
               ))}
@@ -1527,33 +1596,51 @@ export function GameBoard() {
           onResetXP={resetAllXP}
           onResetAll={handleResetAll}
           onNewGame={newGame}
+          onAddUndoBooster={() => addUndoBooster(5)}
+          onAddHintBooster={() => addHintBooster(5)}
+          onAddJokerBooster={() => addJokerBooster(1)}
+          undoCount={undoCount}
+          hintCount={hintCount}
+          jokerCount={jokerCount}
         />
         </div>
       )}
       
-      {/* Win Screen */}
-      <WinScreen
+      {/* Win Celebration - shows multiplier waves with stars */}
+      <WinCelebration
         isVisible={showWinScreen}
-        starsEarned={STARS_PER_WIN}
-        onComplete={handleWinComplete}
+        multiplier={winMultiplierForCelebration}
+        baseStars={STARS_PER_WIN}
         progressBarRef={progressBarRef}
-        onStarArrived={handleStarArrived}
+        onStarArrived={handleWinStarArrived}
+        onComplete={handleWinComplete}
       />
-      
       
       {/* No Moves Modal - show once, then button appears */}
       <NoMovesModal
         isVisible={hasNoMoves && !noMovesShownOnce}
+        jokerCount={jokerCount}
+        winStreak={winStreak}
+        winMultiplier={winMultiplier}
         onNewGame={() => {
           clearNoMoves();
           setShowNewGameButton(false);
           setNoMovesShownOnce(false);
+          deactivateHint(); // Reset hint booster mode
+          // This counts as a loss - reset streak
+          if (!currentGameWon) {
+            resetStreak();
+          }
+          setCurrentGameWon(false);
           newGame('solvable');
         }}
-        onClose={() => {
+        onUseJoker={() => {
+          // Use joker booster if available, otherwise just give one for free (for now)
+          useJokerBooster(); // Try to use, but don't block if none available
+          // Place joker in random column
+          const randomColumnIndex = Math.floor(Math.random() * 7);
+          placeJoker(randomColumnIndex);
           clearNoMoves();
-          setNoMovesShownOnce(true);
-          setShowNewGameButton(true);
         }}
       />
       
@@ -1920,8 +2007,8 @@ export function GameBoard() {
                     )
                   };
                   // Track new items
-                  setNewItemsInCollections(prev => new Set([...prev, item.collectionId]));
-                  setNewItemIds(prev => new Set([...prev, item.itemId]));
+                  setNewItemsInCollections(prev => new Set(Array.from(prev).concat(item.collectionId)));
+                  setNewItemIds(prev => new Set(Array.from(prev).concat(item.itemId)));
                 }
               }
             });
@@ -2018,7 +2105,9 @@ export function GameBoard() {
                 clearNoMoves();
                 setShowNewGameButton(false);
                 setNoMovesShownOnce(false);
-              newGame('solvable');
+                deactivateHint(); // Reset hint booster mode
+                setCurrentGameWon(false); // Reset for new game
+                newGame('solvable');
               };
               if (!tryShowLeaderboard(startNewGameFn)) {
                 startNewGameFn();
@@ -2034,6 +2123,8 @@ export function GameBoard() {
               clearNoMoves();
               setShowNewGameButton(false);
               setNoMovesShownOnce(false);
+              deactivateHint(); // Reset hint booster mode
+              setCurrentGameWon(false); // Reset for new game
               newGame('solvable');
             };
             if (!tryShowLeaderboard(startNewGameFn)) {
@@ -2139,10 +2230,12 @@ export function GameBoard() {
             ref={progressBarRef}
             currentStars={displayedStars}
             targetStars={3500}
+            winMultiplier={winMultiplier}
             petStory="Бусинка была найдена на улице с травмой лапки. Ей нужна операция и курс реабилитации, чтобы снова бегать и радоваться жизни. После лечения она отправится в приют, где будет ждать свою семью. Собирая звёзды в игре, ты помогаешь оплатить её лечение!"
             donationAmount="50 000 ₽"
             endTime={new Date(Date.now() + 15 * 24 * 60 * 60 * 1000 + 15 * 60 * 60 * 1000 + 24 * 60 * 1000 + 13 * 1000)}
             onTestWin={handleTestWin}
+            onTestLose={handleTestLose}
             onDropCollectionItem={handleDropCollectionItem}
             onTestLevelUp={handleTestLevelUp}
             onNextDay={handleNextDay}
@@ -2166,6 +2259,11 @@ export function GameBoard() {
         showSecondaryCollectionsButton={showTreasureHunt || showDungeonDig}
         showNewGameButton={showNewGameButton}
         canUndo={canUndo}
+        undoCount={undoCount}
+        hintCount={hintCount}
+        hintActive={hintActive}
+        winStreak={winStreak}
+        winMultiplier={winMultiplier}
         dailyQuests={dailyQuests}
         collectionsUnlocked={collectionsUnlocked}
         leaderboardUnlocked={leaderboardUnlocked}
@@ -2183,12 +2281,24 @@ export function GameBoard() {
           clearNoMoves();
           setShowNewGameButton(false);
           setNoMovesShownOnce(false);
+          deactivateHint(); // Reset hint booster mode
+          // Reset win streak if current game was not won (gave up)
+          if (!currentGameWon) {
+            resetStreak();
+          }
+          setCurrentGameWon(false); // Reset for new game
           newGame('solvable');
         }}
-        onUndo={() => { if (canUndo) undo(); }}
+        onUndo={() => {
+          if (canUndo && useUndoBooster()) {
+            undo();
+          }
+        }}
         onHint={() => {
-          getHint();
-          setTimeout(() => clearHint(), 350);
+          if (useHintBooster()) {
+            getHint();
+            setTimeout(() => clearHint(), 350);
+          }
         }}
         onShowDailyQuests={() => {
           const actualTotal = parseInt(localStorage.getItem('solitaire_total_stars') || '0', 10);

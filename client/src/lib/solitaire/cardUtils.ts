@@ -42,6 +42,11 @@ export function getRankValue(rank: Rank): number {
 }
 
 export function canPlaceOnTableau(bottomCard: Card, topCard: Card): boolean {
+  // Joker accepts any card on top!
+  if (bottomCard.isJoker) {
+    return true;
+  }
+  
   // Can place if colors are different and topCard rank is one less than bottomCard
   const colorsDifferent = bottomCard.color !== topCard.color;
   const bottomValue = getRankValue(bottomCard.rank);

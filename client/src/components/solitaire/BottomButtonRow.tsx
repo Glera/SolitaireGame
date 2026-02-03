@@ -14,6 +14,15 @@ export interface BottomButtonRowProps {
   showNewGameButton: boolean;
   canUndo: boolean;
   
+  // Boosters
+  undoCount: number;
+  hintCount: number;
+  hintActive: boolean; // true = unlimited hints mode (show ∞)
+  
+  // Win streak
+  winStreak: number;  // Current win streak (0 = no streak)
+  winMultiplier: number; // Star multiplier (1-5)
+  
   // Daily quests
   dailyQuests: Quest[];
   
@@ -96,6 +105,11 @@ export const BottomButtonRow: React.FC<BottomButtonRowProps> = ({
   showSecondaryCollectionsButton,
   showNewGameButton,
   canUndo,
+  undoCount,
+  hintCount,
+  hintActive,
+  winStreak,
+  winMultiplier,
   dailyQuests,
   collectionsUnlocked,
   leaderboardUnlocked,
@@ -123,6 +137,10 @@ export const BottomButtonRow: React.FC<BottomButtonRowProps> = ({
   const totalQuests = dailyQuests.length;
   const allQuestsCompleted = completedQuests === totalQuests;
   const allCollectionsCompleted = completedCollectionsCount === collections.length;
+  
+  // Booster availability
+  const canUseUndo = canUndo && undoCount > 0;
+  const canUseHint = hintCount > 0 || hintActive; // Active when has boosters OR in unlimited mode
 
   return (
     <>
@@ -140,27 +158,43 @@ export const BottomButtonRow: React.FC<BottomButtonRowProps> = ({
             </button>
           )}
           
-          {/* Undo Button */}
+          {/* Undo Button - Booster */}
           <button
             onClick={onUndo}
-            disabled={!canUndo}
+            disabled={!canUseUndo}
             className={`relative w-14 h-8 flex items-center justify-center rounded-xl shadow-lg border-b-4 transition-all pointer-events-auto ${
-              canUndo
+              canUseUndo
                 ? 'bg-gradient-to-b from-slate-400 to-slate-500 hover:from-slate-300 hover:to-slate-400 border-slate-600 hover:scale-105'
-                : 'bg-gradient-to-b from-gray-400 to-gray-500 border-gray-600 opacity-40 cursor-not-allowed'
+                : 'bg-gradient-to-b from-gray-400/50 to-gray-500/50 border-gray-600/50 cursor-not-allowed'
             }`}
-            title="Отменить ход"
+            title={undoCount > 0 ? `Отменить ход (${undoCount})` : 'Нет бустеров отмены'}
           >
-            <span className={`absolute -top-9 text-[2.75rem] ${!canUndo ? 'opacity-40' : ''}`} style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>↩️</span>
+            <span className={`absolute -top-9 text-[2.75rem] ${!canUseUndo ? 'opacity-50' : ''}`} style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>↩️</span>
+            <span className={`absolute top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${
+              undoCount > 0 ? 'bg-white text-gray-800' : 'bg-red-500 text-white'
+            }`}>
+              {undoCount}
+            </span>
           </button>
           
-          {/* Hint Button */}
+          {/* Hint Button - Booster */}
           <button
             onClick={onHint}
-            className="relative w-14 h-8 flex items-center justify-center bg-gradient-to-b from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 rounded-xl shadow-lg border-b-4 border-amber-600 transition-all hover:scale-105 pointer-events-auto"
-            title="Подсказка"
+            disabled={!canUseHint}
+            className={`relative w-14 h-8 flex items-center justify-center rounded-xl shadow-lg border-b-4 transition-all pointer-events-auto ${
+              canUseHint
+                ? 'bg-gradient-to-b from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 border-amber-600 hover:scale-105'
+                : 'bg-gradient-to-b from-gray-400/50 to-gray-500/50 border-gray-600/50 cursor-not-allowed'
+            }`}
+            title={hintActive ? 'Бесплатные подсказки до следующего хода' : hintCount > 0 ? `Подсказка (${hintCount})` : 'Нет бустеров подсказки'}
           >
-            <span className="absolute -top-9 text-[2.75rem]" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>💡</span>
+            <span className={`absolute -top-9 text-[2.75rem] ${!canUseHint ? 'opacity-50' : ''}`} style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))' }}>💡</span>
+            <span className={`absolute top-1 -right-1 text-[10px] min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full font-bold shadow-md ${
+              hintActive ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white animate-pulse' :
+              hintCount > 0 ? 'bg-white text-gray-800' : 'bg-red-500 text-white'
+            }`}>
+              {hintActive ? '∞' : hintCount}
+            </span>
           </button>
           
           {/* Daily Quests Button */}

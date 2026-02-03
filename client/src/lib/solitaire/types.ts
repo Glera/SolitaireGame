@@ -12,6 +12,7 @@ export interface Card {
   faceUp: boolean;
   isPremium?: boolean; // Premium cards give 10x points
   hasKey?: boolean; // Key for Treasure Hunt event
+  isJoker?: boolean; // Joker wild card - accepts any card on top
 }
 
 export interface GameState {

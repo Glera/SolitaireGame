@@ -56,6 +56,11 @@ const STORAGE_KEYS = [
   'solitaire_promo_unlocked',
   'solitaire_first_win',
   'solitaire_next_event_type',
+  'solitaire_booster_undo',
+  'solitaire_booster_hint',
+  'solitaire_booster_joker',
+  'solitaire_win_streak',
+  'solitaire_saved_game',
 ] as const;
 
 export interface DebugActionsCallbacks {
@@ -70,6 +75,14 @@ export interface DebugActionsCallbacks {
   setShowWinScreen: (show: boolean) => void;
   setPendingWinScreen: (pending: boolean) => void;
   flyingIconsLength: number;
+  
+  // Win streak (for test win with multiplier)
+  incrementStreak: () => number;
+  setWinMultiplierForCelebration: (mult: number) => void;
+  setCurrentGameWon: (won: boolean) => void;
+  
+  // No moves (for test lose)
+  triggerNoMoves: () => void;
   
   // Level up
   setPendingLevelUp: (level: number | null) => void;
@@ -147,6 +160,7 @@ export interface DebugActionsCallbacks {
 
 export interface DebugActions {
   handleTestWin: () => void;
+  handleTestLose: () => void;
   handleTestLevelUp: () => void;
   handleNextDay: () => void;
   handleStartDungeonDig: () => void;
@@ -162,6 +176,10 @@ export function useDebugActions(callbacks: DebugActionsCallbacks): DebugActions 
     setShowWinScreen,
     setPendingWinScreen,
     flyingIconsLength,
+    incrementStreak,
+    setWinMultiplierForCelebration,
+    setCurrentGameWon,
+    triggerNoMoves,
     setPendingLevelUp,
     showPopupViaQueue,
     starsPerLevelUp,
@@ -211,17 +229,29 @@ export function useDebugActions(callbacks: DebugActionsCallbacks): DebugActions 
     newGame,
   } = callbacks;
   
-  // Test win function
+  // Test win function - now with proper streak multiplier flow
   const handleTestWin = useCallback(() => {
     playSuccess();
-    addStars(50); // STARS_PER_WIN
+    setCurrentGameWon(true);
+    
+    // Increment streak and get multiplier
+    const newMultiplier = incrementStreak();
+    setWinMultiplierForCelebration(newMultiplier);
+    
+    // NOTE: Stars are NOT added here - they're added wave by wave in WinCelebration
     
     if (flyingIconsLength > 0) {
       setPendingWinScreen(true);
     } else {
       setShowWinScreen(true);
     }
-  }, [playSuccess, addStars, flyingIconsLength, setPendingWinScreen, setShowWinScreen]);
+  }, [playSuccess, flyingIconsLength, setPendingWinScreen, setShowWinScreen, 
+      incrementStreak, setWinMultiplierForCelebration, setCurrentGameWon]);
+  
+  // Test lose function - triggers NoMovesModal with Joker option
+  const handleTestLose = useCallback(() => {
+    triggerNoMoves();
+  }, [triggerNoMoves]);
   
   // Test level up function
   const handleTestLevelUp = useCallback(() => {
@@ -454,6 +484,7 @@ export function useDebugActions(callbacks: DebugActionsCallbacks): DebugActions 
   
   return {
     handleTestWin,
+    handleTestLose,
     handleTestLevelUp,
     handleNextDay,
     handleStartDungeonDig,

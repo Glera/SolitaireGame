@@ -18,8 +18,10 @@ interface DonationProgressProps {
   petStory: string;
   donationAmount: string;
   endTime: Date;
+  winMultiplier?: number; // Current win streak multiplier (1-5)
   onDebugClick?: () => void;
   onTestWin?: () => void;
+  onTestLose?: () => void;
   onDropCollectionItem?: () => void;
   onTestLevelUp?: () => void;
   onNextDay?: () => void;
@@ -106,8 +108,10 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
   petStory,
   donationAmount,
   endTime,
+  winMultiplier = 1,
   onDebugClick,
   onTestWin,
+  onTestLose,
   onDropCollectionItem,
   onTestLevelUp,
   onNextDay,
@@ -349,6 +353,26 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
               </span>
             </div>
             
+            {/* Win streak multiplier - shown next to star icon, aligned to bottom */}
+            {winMultiplier > 1 && (
+              <div 
+                className="absolute z-10 flex items-end"
+                style={{
+                  left: '44px',
+                  bottom: '2px',
+                }}
+              >
+                <span 
+                  className="text-sm font-black"
+                  style={{
+                    color: '#fbbf24', // amber-400
+                  }}
+                >
+                  x{winMultiplier}
+                </span>
+              </div>
+            )}
+            
             {/* Other player notification - slides out from under progress bar */}
             {onOtherPlayerStars && !disableOtherPlayerNotifications && (
               <OtherPlayerNotification 
@@ -438,9 +462,21 @@ export const DonationProgress = forwardRef<HTMLDivElement, DonationProgressProps
                   onClick={() => onTestWin()}
                   className="w-7 h-7 flex items-center justify-center rounded-full bg-green-500/50 hover:bg-green-500/70 transition-colors border border-green-400/60 shadow-md backdrop-blur-sm"
                   aria-label="Тест победы"
-                  title="Тест победы"
+                  title="Тест победы (с множителем стрика)"
                 >
                   <span className="text-white text-sm">✓</span>
+                </button>
+              )}
+              
+              {/* Test lose button - triggers NoMovesModal with Joker */}
+              {onTestLose && (
+                <button
+                  onClick={() => onTestLose()}
+                  className="w-7 h-7 flex items-center justify-center rounded-full bg-red-500/50 hover:bg-red-500/70 transition-colors border border-red-400/60 shadow-md backdrop-blur-sm"
+                  aria-label="Тест поражения"
+                  title="Тест поражения (Джокер)"
+                >
+                  <span className="text-white text-sm">✗</span>
                 </button>
               )}
               

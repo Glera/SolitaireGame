@@ -21,6 +21,11 @@ export function StockPile({ cards }: StockPileProps) {
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
   
   const handleClick = () => {
+    // Block clicks during dealing animation
+    if (isDealing) {
+      return;
+    }
+    
     // Block clicks during auto-collect
     if (isAutoCollecting) {
       return;

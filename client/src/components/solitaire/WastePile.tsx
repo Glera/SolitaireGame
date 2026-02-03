@@ -26,7 +26,8 @@ export function WastePile({ cards }: WastePileProps) {
     animatingCard,
     setShowDragPreview,
     isStockAnimating,
-    isAutoCollecting
+    isAutoCollecting,
+    isDealing
   } = useSolitaire();
   
   const cardRef = useRef<HTMLDivElement>(null);
@@ -165,6 +166,11 @@ export function WastePile({ cards }: WastePileProps) {
   const performCardAction = () => {
     if (!topCard) return;
     
+    // Block during dealing animation
+    if (isDealing) {
+      return;
+    }
+    
     // Block during auto-collect
     if (isAutoCollecting) {
       return;
@@ -230,6 +236,12 @@ export function WastePile({ cards }: WastePileProps) {
 
   const handleDragStart = (e: React.DragEvent) => {
     if (!topCard) return;
+    
+    // Block drag during dealing animation
+    if (isDealing) {
+      e.preventDefault();
+      return;
+    }
     
     // Block drag during auto-collect
     if (isAutoCollecting) {

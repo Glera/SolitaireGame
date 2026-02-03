@@ -104,8 +104,36 @@ export function Card({
     </div>
   );
 
+  // Joker card (special wild card)
+  const jokerFront = (
+    <div
+      className={cn(
+        "absolute inset-0 w-full h-full p-1",
+        "shadow-md outline-none focus:outline-none",
+        "rounded-lg border-2",
+        "backface-hidden"
+      )}
+      style={{ 
+        borderRadius: '0.5rem',
+        backfaceVisibility: 'hidden',
+        borderColor: '#1c1917', // stone-900, same as regular cards
+        background: 'linear-gradient(135deg, #c084fc 0%, #a855f7 50%, #9333ea 100%)', // purple gradient
+      }}
+    >
+      <div className="w-full h-full flex flex-col items-center justify-center relative">
+        <div className="text-5xl mb-1">🃏</div>
+        <div className="text-white font-bold text-sm tracking-wide" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+          JOKER
+        </div>
+        {/* Corner decorations */}
+        <div className="absolute top-0 left-1 text-lg">✦</div>
+        <div className="absolute bottom-0 right-1 text-lg rotate-180">✦</div>
+      </div>
+    </div>
+  );
+
   // Card front (face up)
-  const cardFront = (
+  const cardFront = card.isJoker ? jokerFront : (
     <div
       className={cn(
         "absolute inset-0 w-full h-full bg-amber-50 p-1",

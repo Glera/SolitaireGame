@@ -107,6 +107,11 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       return;
     }
     
+    // Block during dealing animation
+    if (isDealing) {
+      return;
+    }
+    
     // Block during auto-collect
     if (isAutoCollecting) {
       return;
@@ -181,6 +186,12 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   };
 
   const handleDragStart = (e: React.DragEvent, cardIndex: number) => {
+    // Block drag during dealing animation
+    if (isDealing) {
+      e.preventDefault();
+      return;
+    }
+    
     // Block drag during auto-collect
     if (isAutoCollecting) {
       e.preventDefault();

@@ -10,7 +10,7 @@ export const LEADERBOARD_REQUIRED_LEVEL = 4;
 export const STARS_PER_LEVELUP = 50;
 
 // Stars per win
-export const STARS_PER_WIN = 3;
+export const STARS_PER_WIN = 5;
 
 export interface GameProgressState {
   // Stars

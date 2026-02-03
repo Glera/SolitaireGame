@@ -215,7 +215,7 @@ html, body {
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: inherit;
   }
   
   /* Remove all focus outlines */
@@ -238,7 +238,9 @@ html, body {
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    @apply font-sans antialiased;
+    background-color: #0f172a;
+    color: #f8fafc;
     margin: 0;
     padding: 0;
     overflow: hidden;

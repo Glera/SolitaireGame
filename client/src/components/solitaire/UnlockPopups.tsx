@@ -5,6 +5,7 @@
  * Управляются через win flow queue в usePopupQueue.
  */
 
+import React from 'react';
 import { UnlockPopup, UNLOCK_CONFIGS } from './UnlockPopup';
 import { usePopupQueue } from '../../lib/stores/usePopupQueue';
 import { LEADERBOARD_REQUIRED_LEVEL } from '../../hooks/useGameProgress';
