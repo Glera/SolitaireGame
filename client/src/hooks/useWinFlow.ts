@@ -180,57 +180,57 @@ export function useWinFlow(callbacks: WinFlowCallbacks): WinFlowActions {
   }, [showPopupViaQueue]);
   
   // Update daily quest progress on win
-  // Uses functional update to ensure we have the latest quest state (avoid stale closure)
+  // IMPORTANT: Updates localStorage SYNCHRONOUSLY before React state
+  // This ensures DailyQuests window reads fresh data when it opens
   const updateDailyQuestsOnWin = useCallback(() => {
     console.log('🎯 updateDailyQuestsOnWin CALLED');
     const { setDailyQuests, setAcesCollected, addStars } = callbacks;
     
     const acesInGame = 4;
     
-    // Use functional update for aces to get current value
-    let newAcesTotal = 0;
-    setAcesCollected(prev => {
-      newAcesTotal = prev + acesInGame;
-      // Save to localStorage immediately for proceedToDailyQuests to read
-      localStorage.setItem('solitaire_aces_collected', newAcesTotal.toString());
-      console.log('🎯 updateDailyQuestsOnWin - aces updated:', { prev, newAcesTotal });
-      return newAcesTotal;
+    // Read current values from localStorage (source of truth)
+    const currentAces = parseInt(localStorage.getItem('solitaire_aces_collected') || '0', 10);
+    const newAcesTotal = currentAces + acesInGame;
+    
+    // Save aces to localStorage SYNCHRONOUSLY
+    localStorage.setItem('solitaire_aces_collected', newAcesTotal.toString());
+    console.log('🎯 updateDailyQuestsOnWin - aces updated:', { prev: currentAces, newAcesTotal });
+    
+    // Read current quests from localStorage
+    const savedQuests = localStorage.getItem('solitaire_daily_quests');
+    const currentQuests = savedQuests ? JSON.parse(savedQuests) : [];
+    console.log('🎯 updateDailyQuestsOnWin - prevQuests:', JSON.stringify(currentQuests.map((q: any) => ({ id: q.id, current: q.current }))));
+    
+    // Update quests
+    let starsToAdd = 0;
+    const updatedQuests = currentQuests.map((quest: any) => {
+      if ((quest.id === 'daily-games' || quest.id === 'daily-wins') && !quest.completed) {
+        const newCurrent = quest.current + 1;
+        const completed = newCurrent >= quest.target;
+        if (completed) starsToAdd += quest.reward;
+        return { ...quest, current: newCurrent, completed };
+      }
+      if (quest.id === 'daily-aces' && !quest.completed) {
+        const newCurrent = Math.min(newAcesTotal, quest.target);
+        const completed = newCurrent >= quest.target;
+        if (completed) starsToAdd += quest.reward;
+        return { ...quest, current: newCurrent, completed };
+      }
+      return quest;
     });
     
-    // Use functional update for quests to avoid stale closure issue
-    let starsToAdd = 0;
-    setDailyQuests(prevQuests => {
-      console.log('🎯 updateDailyQuestsOnWin - prevQuests:', JSON.stringify(prevQuests.map(q => ({ id: q.id, current: q.current }))));
-      const updatedQuests = prevQuests.map(quest => {
-        if ((quest.id === 'daily-games' || quest.id === 'daily-wins') && !quest.completed) {
-          const newCurrent = quest.current + 1;
-          const completed = newCurrent >= quest.target;
-          if (completed) starsToAdd += quest.reward;
-          return { ...quest, current: newCurrent, completed };
-        }
-        if (quest.id === 'daily-aces' && !quest.completed) {
-          // Read aces from localStorage to get the latest value
-          const currentAces = parseInt(localStorage.getItem('solitaire_aces_collected') || '0', 10);
-          const newCurrent = Math.min(currentAces, quest.target);
-          const completed = newCurrent >= quest.target;
-          if (completed) starsToAdd += quest.reward;
-          return { ...quest, current: newCurrent, completed };
-        }
-        return quest;
-      });
-      
-      // Save to localStorage immediately for proceedToDailyQuests to read
-      console.log('🎯 updateDailyQuestsOnWin - saving to localStorage:', JSON.stringify(updatedQuests.map(q => ({ id: q.id, current: q.current }))));
-      localStorage.setItem('solitaire_daily_quests', JSON.stringify(updatedQuests));
-      
-      // Award stars after updating quests
-      if (starsToAdd > 0) {
-        // Use setTimeout to ensure state is updated before adding stars
-        setTimeout(() => addStars(starsToAdd), 0);
-      }
-      
-      return updatedQuests;
-    });
+    // Save to localStorage SYNCHRONOUSLY (before React state update)
+    console.log('🎯 updateDailyQuestsOnWin - saving to localStorage:', JSON.stringify(updatedQuests.map((q: any) => ({ id: q.id, current: q.current }))));
+    localStorage.setItem('solitaire_daily_quests', JSON.stringify(updatedQuests));
+    
+    // Now update React state (will eventually sync, but localStorage is already updated)
+    setAcesCollected(newAcesTotal);
+    setDailyQuests(updatedQuests);
+    
+    // Award stars
+    if (starsToAdd > 0) {
+      setTimeout(() => addStars(starsToAdd), 0);
+    }
   }, [callbacks]);
   
   // Proceed to collections or new game
