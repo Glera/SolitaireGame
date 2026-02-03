@@ -37,7 +37,15 @@ export function useGameScale(): GameDimensions {
       const BOTTOM_BUTTONS = 100;   // Bottom control buttons with margins
       const PADDING = 50;           // Padding and spacing between elements
       
-      const reservedHeight = AD_SPACE + PROGRESS_BAR + EVENTS_ROW + BOTTOM_BUTTONS + PADDING;
+      // Detect wide desktop screens (like Telegram Desktop WebView)
+      // These have aspect ratio > 0.55 (width/height) and width > 400
+      const aspectRatio = containerWidth / containerHeight;
+      const isWideDesktop = containerWidth > 400 && aspectRatio > 0.55 && aspectRatio < 0.85;
+      
+      // On wide desktop, UI takes less relative space
+      const reservedHeight = isWideDesktop 
+        ? AD_SPACE + 60 + 40 + 60 + 20  // 250px total for desktop
+        : AD_SPACE + PROGRESS_BAR + EVENTS_ROW + BOTTOM_BUTTONS + PADDING; // 360px for mobile
       const availableHeight = containerHeight - reservedHeight;
 
       // Base game dimensions (at scale 1)
@@ -59,7 +67,8 @@ export function useGameScale(): GameDimensions {
       const MIN_FACE_UP_OFFSET = isMobile ? 23 : 21;
       const MIN_FACE_DOWN_OFFSET = isMobile ? 6 : 5;  // 10px/8px * 0.65
       const MAX_FACE_DOWN = 6;  // Maximum face-down cards in a column
-      const MAX_FACE_UP = 13;   // Maximum face-up cards (full suit)
+      // On wide desktop, assume average stack size (not worst case) for better card size
+      const MAX_FACE_UP = isWideDesktop ? 10 : 13;
       const TOP_ROW_HEIGHT = CARD_HEIGHT + 12; // Top row + gap = 124px
       const TABLEAU_HEIGHT = CARD_HEIGHT + 
         (MAX_FACE_DOWN * MIN_FACE_DOWN_OFFSET) + 
@@ -83,6 +92,8 @@ export function useGameScale(): GameDimensions {
 
       console.log('🎮 Game Scale:', {
         containerSize: `${containerWidth}x${containerHeight}`,
+        aspectRatio: aspectRatio.toFixed(2),
+        isWideDesktop,
         availableHeight,
         baseSize: `${BASE_WIDTH}x${BASE_HEIGHT}`,
         scaleX: scaleX.toFixed(2),
