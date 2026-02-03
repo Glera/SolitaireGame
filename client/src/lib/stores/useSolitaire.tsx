@@ -491,6 +491,24 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
   endDrag: () => {
     const state = get();
     
+    // If this is a tap (not a drag), skip return animation - just clear state
+    const isTapNotDrag = (window as any).__isTapNotDrag;
+    if (isTapNotDrag) {
+      // Clear all visual feedback and state immediately without animation
+      clearAllDropTargetHighlights();
+      set({
+        isDragging: false,
+        draggedCards: [],
+        sourceType: 'tableau',
+        sourceIndex: undefined,
+        sourceFoundation: undefined,
+        showDragPreview: false,
+        dragPreviewPosition: null,
+        dragOffset: null
+      });
+      return;
+    }
+    
     // If we were dragging cards, animate them back to their source
     if (state.isDragging && state.draggedCards.length > 0) {
       const dragPreview = document.querySelector('[data-drag-preview]') as HTMLElement;

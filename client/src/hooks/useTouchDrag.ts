@@ -83,14 +83,17 @@ export function useTouchDrag(
       // Clean up
       delete (window as any).__currentTouchDropTarget;
       
-      // End drag
-      onDragEnd();
-      
       // Hide drag preview
       setShowDragPreview(false);
       
       // If it was just a tap (no movement), call onTap callback
+      // DON'T call onDragEnd for tap - it creates return animation which blocks the card
       if (!wasMoved) {
+        // For tap: set a flag to skip return animation in onDragEnd
+        (window as any).__isTapNotDrag = true;
+        onDragEnd();
+        delete (window as any).__isTapNotDrag;
+        
         (window as any).__preventNextClick = true;
         setTimeout(() => {
           delete (window as any).__preventNextClick;
@@ -101,6 +104,9 @@ export function useTouchDrag(
             onTap();
           }, 10);
         }
+      } else {
+        // For actual drag: call full onDragEnd which may create return animation
+        onDragEnd();
       }
     };
     
