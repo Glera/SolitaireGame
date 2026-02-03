@@ -102,30 +102,38 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
 
   // Core card action logic (used by both click and tap handlers)
   const performCardAction = (cardIndex: number) => {
+    console.log('🎯 performCardAction START:', { cardIndex, columnIndex, cardsLength: cards.length });
     const card = cards[cardIndex];
     if (!card || !card.faceUp) {
+      console.log('🎯 performCardAction BLOCKED: card not found or face down', { card: card?.id, faceUp: card?.faceUp });
       return;
     }
     
     // Block during dealing animation
     if (isDealing) {
+      console.log('🎯 performCardAction BLOCKED: isDealing');
       return;
     }
     
     // Block during auto-collect
     if (isAutoCollecting) {
+      console.log('🎯 performCardAction BLOCKED: isAutoCollecting');
       return;
     }
     
     // Ignore clicks on cards that are currently animating (prevents duplication)
     if (animatingCard && animatingCard.card.id === card.id) {
+      console.log('🎯 performCardAction BLOCKED: card is animating');
       return;
     }
     
     // Also ignore if this card is part of an animating stack
     if (animatingCard?.stackCards?.some(sc => sc.id === card.id)) {
+      console.log('🎯 performCardAction BLOCKED: card is part of animating stack');
       return;
     }
+    
+    console.log('🎯 performCardAction PASSED all checks, card:', card.id);
 
     // Get cards to move, excluding any that are currently animating
     const cardsToMove = cards.slice(cardIndex).filter(c => {
@@ -134,28 +142,35 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
       return true;
     });
 
+    console.log('🎯 cardsToMove:', cardsToMove.length, cardsToMove.map(c => c.id));
+    
     // Only allow moving if it's a single card (for now, stacks to tableau need special logic)
     if (cardsToMove.length === 1) {
       // Priority 1: Try auto-move to foundation first
       const foundationSuit = canAutoMoveToFoundation(card);
+      console.log('🎯 canAutoMoveToFoundation:', foundationSuit);
       if (foundationSuit) {
         const startElement = cardRefs.current[cardIndex];
         const endElement = document.querySelector(`[data-foundation-pile="${foundationSuit}"]`) as HTMLElement;
+        console.log('🎯 Moving to foundation:', foundationSuit);
         autoMoveToFoundation(card, foundationSuit, startElement || undefined, endElement || undefined);
         return;
       }
 
       // Priority 2: Try to find a place in tableau (excluding current column)
       const tableauColumnIndex = findTableauPlacementForCard(card);
+      console.log('🎯 findTableauPlacementForCard:', tableauColumnIndex);
       
       // Make sure we don't move to the same column
       if (tableauColumnIndex !== null && tableauColumnIndex !== columnIndex) {
         const startElement = cardRefs.current[cardIndex];
+        console.log('🎯 Moving to tableau column:', tableauColumnIndex);
         autoMoveToTableau(card, tableauColumnIndex, startElement || undefined);
         return;
       }
       
       // No valid moves found - shake the card and all cards above it
+      console.log('🎯 No valid moves - SHAKING card');
       const cardsToShake = cards.slice(cardIndex).map(c => c.id);
       setShakingCardIds(cardsToShake);
       setTimeout(() => setShakingCardIds([]), 300);
@@ -164,12 +179,15 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     } else {
       // For stacks, only try to move to tableau (foundation doesn't accept stacks)
       const tableauColumnIndex = findTableauPlacementForCard(card);
+      console.log('🎯 Stack - findTableauPlacementForCard:', tableauColumnIndex);
       
       if (tableauColumnIndex !== null && tableauColumnIndex !== columnIndex) {
         const startElement = cardRefs.current[cardIndex];
+        console.log('🎯 Moving stack to tableau column:', tableauColumnIndex);
         autoMoveStackToTableau(cardsToMove, columnIndex, tableauColumnIndex, startElement || undefined);
       } else {
         // No valid moves - shake the whole stack
+        console.log('🎯 No valid moves for stack - SHAKING');
         const cardsToShake = cards.slice(cardIndex).map(c => c.id);
         setShakingCardIds(cardsToShake);
         setTimeout(() => setShakingCardIds([]), 300);
