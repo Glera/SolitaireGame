@@ -99,6 +99,8 @@ export function DailyQuests({
   const [animatedProgress, setAnimatedProgress] = useState<Record<string, number>>({});
   const [displayedCount, setDisplayedCount] = useState<Record<string, number>>({});
   const [textPulseKey, setTextPulseKey] = useState<Record<string, number>>({});
+  // Display quests - updated from localStorage when window opens (avoid stale props)
+  const [displayQuests, setDisplayQuests] = useState<Quest[]>(quests);
   const [flyingStars, setFlyingStars] = useState<FlyingStar[]>([]);
   const [flyingChips, setFlyingChips] = useState<FlyingChip[]>([]);
   const [hiddenRewardIcons, setHiddenRewardIcons] = useState<Record<string, boolean>>({});
@@ -205,7 +207,11 @@ export function DailyQuests({
     }
     
     // Capture quests snapshot at window open time
-    questsSnapshotRef.current = [...quests];
+    // Read from localStorage to get the latest data (avoid stale props issue)
+    const savedQuests = localStorage.getItem('solitaire_daily_quests');
+    const freshQuests = savedQuests ? JSON.parse(savedQuests) : quests;
+    questsSnapshotRef.current = [...freshQuests];
+    setDisplayQuests(freshQuests); // Update display quests for rendering
     const currentQuests = questsSnapshotRef.current;
     
     // Reset everything first
@@ -492,7 +498,7 @@ export function DailyQuests({
           
           {/* Quests list */}
           <div className={isCompact ? 'space-y-1.5' : 'space-y-2'}>
-            {quests.map((quest, index) => (
+            {displayQuests.map((quest, index) => (
               <div 
                 key={quest.id}
                 ref={el => questCardRefs.current[quest.id] = el}
@@ -562,7 +568,7 @@ export function DailyQuests({
             ))}
             
             {/* Empty slots - hide in compact mode */}
-            {!isCompact && Array.from({ length: Math.max(0, 3 - quests.length) }).map((_, index) => (
+            {!isCompact && Array.from({ length: Math.max(0, 3 - displayQuests.length) }).map((_, index) => (
               <div 
                 key={`empty-${index}`}
                 className="rounded-xl p-3 bg-slate-800/30 border border-slate-700/30 border-dashed"
