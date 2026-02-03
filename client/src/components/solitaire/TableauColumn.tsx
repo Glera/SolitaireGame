@@ -122,8 +122,16 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
     }
     
     // Ignore clicks on cards that are currently animating (prevents duplication)
+    console.log('🎯 performCardAction animatingCard check:', { 
+      hasAnimatingCard: !!animatingCard, 
+      animatingCardId: animatingCard?.card?.id,
+      currentCardId: card.id,
+      animatingSourceColumn: animatingCard?.sourceTableauColumn,
+      isReturnAnimation: animatingCard?.isReturnAnimation,
+      isUndoAnimation: animatingCard?.isUndoAnimation
+    });
     if (animatingCard && animatingCard.card.id === card.id) {
-      console.log('🎯 performCardAction BLOCKED: card is animating');
+      console.log('🎯 performCardAction BLOCKED: card is animating (same id)');
       return;
     }
     
