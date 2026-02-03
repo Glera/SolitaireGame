@@ -65,21 +65,21 @@ function FlyingCardItem({ data }: { data: FlyingCardData }) {
     requestAnimationFrame(animate);
   }, [data.startTime, data.duration]);
   
-  // Easing function for smooth animation
-  const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-  // Stop position interpolation at 90% to not overshoot
-  const clampedProgress = Math.min(progress, 0.9);
-  const easedProgress = easeOutCubic(clampedProgress / 0.9);
+  // Easing function for smooth animation - ease out quad for natural deceleration
+  const easeOutQuad = (t: number) => 1 - (1 - t) * (1 - t);
   
-  // Interpolate position
+  // Apply easing to progress
+  const easedProgress = easeOutQuad(progress);
+  
+  // Interpolate position smoothly all the way to end
   const x = data.startRect.left + (data.endRect.left - data.startRect.left) * easedProgress;
   const y = data.startRect.top + (data.endRect.top - data.startRect.top) * easedProgress;
   
   // Apply game scale to match board cards - no shrinking during flight
   const scale = gameScale;
   
-  // Fade out starting at 80% progress
-  const opacity = progress < 0.8 ? 1 : Math.max(0, 1 - (progress - 0.8) / 0.2);
+  // Fade out smoothly in last 25% of animation
+  const opacity = progress < 0.75 ? 1 : Math.max(0, 1 - (progress - 0.75) / 0.25);
   
   return (
     <div

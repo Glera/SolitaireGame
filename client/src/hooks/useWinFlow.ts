@@ -180,32 +180,48 @@ export function useWinFlow(callbacks: WinFlowCallbacks): WinFlowActions {
   }, [showPopupViaQueue]);
   
   // Update daily quest progress on win
+  // Uses functional update to ensure we have the latest quest state (avoid stale closure)
   const updateDailyQuestsOnWin = useCallback(() => {
-    const { dailyQuests, setDailyQuests, acesCollected, setAcesCollected, addStars } = callbacks;
+    const { setDailyQuests, setAcesCollected, addStars } = callbacks;
     
     const acesInGame = 4;
-    const newAcesTotal = acesCollected + acesInGame;
-    setAcesCollected(newAcesTotal);
     
-    let starsToAdd = 0;
-    const updatedQuests = dailyQuests.map(quest => {
-      if ((quest.id === 'daily-games' || quest.id === 'daily-wins') && !quest.completed) {
-        const newCurrent = quest.current + 1;
-        const completed = newCurrent >= quest.target;
-        if (completed) starsToAdd += quest.reward;
-        return { ...quest, current: newCurrent, completed };
-      }
-      if (quest.id === 'daily-aces' && !quest.completed) {
-        const newCurrent = Math.min(newAcesTotal, quest.target);
-        const completed = newCurrent >= quest.target;
-        if (completed) starsToAdd += quest.reward;
-        return { ...quest, current: newCurrent, completed };
-      }
-      return quest;
+    // Use functional update for aces to get current value
+    let newAcesTotal = 0;
+    setAcesCollected(prev => {
+      newAcesTotal = prev + acesInGame;
+      return newAcesTotal;
     });
     
-    setDailyQuests(updatedQuests);
-    if (starsToAdd > 0) addStars(starsToAdd);
+    // Use functional update for quests to avoid stale closure issue
+    let starsToAdd = 0;
+    setDailyQuests(prevQuests => {
+      const updatedQuests = prevQuests.map(quest => {
+        if ((quest.id === 'daily-games' || quest.id === 'daily-wins') && !quest.completed) {
+          const newCurrent = quest.current + 1;
+          const completed = newCurrent >= quest.target;
+          if (completed) starsToAdd += quest.reward;
+          return { ...quest, current: newCurrent, completed };
+        }
+        if (quest.id === 'daily-aces' && !quest.completed) {
+          // Read aces from localStorage to get the latest value
+          const currentAces = parseInt(localStorage.getItem('solitaire_aces_collected') || '0', 10) + acesInGame;
+          const newCurrent = Math.min(currentAces, quest.target);
+          const completed = newCurrent >= quest.target;
+          if (completed) starsToAdd += quest.reward;
+          return { ...quest, current: newCurrent, completed };
+        }
+        return quest;
+      });
+      
+      // Award stars after updating quests
+      if (starsToAdd > 0) {
+        // Use setTimeout to ensure state is updated before adding stars
+        setTimeout(() => addStars(starsToAdd), 0);
+      }
+      
+      return updatedQuests;
+    });
   }, [callbacks]);
   
   // Proceed to collections or new game

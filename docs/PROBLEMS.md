@@ -169,6 +169,53 @@ Race condition: карта добавлялась в foundation до завер�
 
 ---
 
+## [2025-01] Daily Quests не обновляются после первой победы
+
+**Симптомы**: 
+После первой победы счётчики daily quests обновлялись, но при второй и последующих победах оставались на месте.
+
+**Причина**: 
+**Stale Closure** в функции `updateDailyQuestsOnWin` в `useWinFlow.ts`.
+
+Функция использовала `callbacks.dailyQuests` напрямую:
+```typescript
+const updateDailyQuestsOnWin = useCallback(() => {
+  const { dailyQuests, setDailyQuests, ... } = callbacks;
+  // dailyQuests здесь — "замороженное" значение на момент создания callback
+  const updatedQuests = dailyQuests.map(quest => { ... });
+  setDailyQuests(updatedQuests);
+}, [callbacks]);
+```
+
+Проблема: `callbacks` — объект, передаваемый из GameBoard. Хотя объект пересоздаётся при каждом рендере, внутренние значения (например, `dailyQuests`) захватываются в closure и могут быть устаревшими к моменту вызова callback.
+
+**Решение**: 
+Использовать **functional update** вместо прямого чтения значения:
+```typescript
+const updateDailyQuestsOnWin = useCallback(() => {
+  const { setDailyQuests, setAcesCollected, addStars } = callbacks;
+  
+  // Functional update гарантирует актуальное значение
+  setDailyQuests(prevQuests => {
+    const updatedQuests = prevQuests.map(quest => {
+      // ... логика обновления
+    });
+    return updatedQuests;
+  });
+}, [callbacks]);
+```
+
+**Файлы**: `client/src/hooks/useWinFlow.ts`
+**Версия**: 4.99.27
+
+**Похожие риски в коде**:
+- `proceedToDailyQuests`: читает `callbacks.dailyQuests` для проверки `allCompleted` — менее критично, т.к. только читает
+- `proceedToCollectionsOrNewGame`: читает `callbacks.collections` — аналогично, только читает
+
+**Правило**: При обновлении state из useCallback, всегда использовать functional update (`setState(prev => ...)`) вместо прямого чтения из props/callbacks.
+
+---
+
 ## Шаблон для новых проблем
 
 ```

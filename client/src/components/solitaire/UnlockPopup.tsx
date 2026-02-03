@@ -49,7 +49,6 @@ export interface FeatureIcon {
 }
 
 export interface UnlockPopupProps {
-  isVisible: boolean;
   onClose: () => void;
   colorScheme: ColorScheme;
   headerEmoji: string;
@@ -60,8 +59,13 @@ export interface UnlockPopupProps {
   buttonText: string;
 }
 
+/**
+ * Unlock Popup Component
+ * 
+ * SIMPLIFIED: No isVisible prop - parent controls rendering via conditional.
+ * This prevents issues with first-click being ignored.
+ */
 export function UnlockPopup({
-  isVisible,
   onClose,
   colorScheme,
   headerEmoji,
@@ -71,8 +75,6 @@ export function UnlockPopup({
   featureIcons,
   buttonText,
 }: UnlockPopupProps) {
-  if (!isVisible) return null;
-
   const colors = colorSchemes[colorScheme];
 
   return ReactDOM.createPortal(
@@ -80,12 +82,6 @@ export function UnlockPopup({
       className="fixed inset-0 z-[10005] flex items-center justify-center"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-      onTouchEnd={(e) => {
-        if (e.target === e.currentTarget) {
-          e.preventDefault();
           onClose();
         }
       }}
@@ -146,11 +142,6 @@ export function UnlockPopup({
             e.stopPropagation();
             onClose();
           }}
-          onTouchEnd={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onClose();
-          }}
           className={`w-full py-2.5 bg-gradient-to-r ${colors.buttonGradient} ${colors.buttonHover} text-white font-bold rounded-xl transition-all shadow-lg`}
         >
           {buttonText}
@@ -163,9 +154,9 @@ export function UnlockPopup({
 
 // Pre-configured unlock popup configurations
 export const UNLOCK_CONFIGS: {
-  collections: Omit<UnlockPopupProps, 'isVisible' | 'onClose'>;
-  leaderboard: Omit<UnlockPopupProps, 'isVisible' | 'onClose' | 'headerSubtitle'>;
-  promo: Omit<UnlockPopupProps, 'isVisible' | 'onClose'>;
+  collections: Omit<UnlockPopupProps, 'onClose'>;
+  leaderboard: Omit<UnlockPopupProps, 'onClose' | 'headerSubtitle'>;
+  promo: Omit<UnlockPopupProps, 'onClose'>;
 } = {
   collections: {
     colorScheme: 'amber',

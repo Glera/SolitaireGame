@@ -2378,9 +2378,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     // Set auto-collecting state to block user input
     set({ isAutoCollecting: true });
     
-    // Animation settings - smooth and consistent pace
-    const FLIGHT_DURATION = 180;
-    const STAGGER_DELAY = 85;
+    // Animation settings - smooth and uniform (same as collectAllAvailable)
+    const FLIGHT_DURATION = 280;
+    const STAGGER_DELAY = 180;
     
     // Collect ALL cards that need to move to foundations (including stock!)
     const cardsToMove: Array<{
@@ -2858,9 +2858,9 @@ export const useSolitaire = create<SolitaireStore>((set, get) => ({
     // Note: We save history BEFORE EACH card move (inside animation callback)
     // This allows undo to return cards one by one, not all at once
     
-    // Animation settings
-    const FLIGHT_DURATION = 150;
-    const STAGGER_DELAY = 80;
+    // Animation settings - smooth and uniform
+    const FLIGHT_DURATION = 280;  // Smooth flight time
+    const STAGGER_DELAY = 180;    // Even delay between cards for uniform feel
     
     // Pre-collect all card elements and positions BEFORE any changes
     const cardData: Map<string, { element: HTMLElement; rect: DOMRect }> = new Map();

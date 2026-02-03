@@ -37,16 +37,21 @@ export function useWinStreak(): WinStreakState {
   }, [streak]);
 
   // Calculate multiplier from streak (1-5)
-  const multiplier = Math.min(streak + 1, MAX_MULTIPLIER);
+  // 0 wins = x1 (minimum), 1 win = x1, 2 wins = x2, etc.
+  const multiplier = Math.max(1, Math.min(streak, MAX_MULTIPLIER));
 
   // Increment streak on win, return new multiplier
+  // multiplier = streak (1 win = x1, 2 wins = x2, etc.)
   const incrementStreak = useCallback((): number => {
-    let newMultiplier = 1;
-    setStreak(prev => {
-      const newStreak = prev + 1;
-      newMultiplier = Math.min(newStreak + 1, MAX_MULTIPLIER);
-      return newStreak;
-    });
+    // Read current streak from localStorage for accurate value
+    const currentStreak = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
+    const newStreak = currentStreak + 1;
+    const newMultiplier = Math.min(newStreak, MAX_MULTIPLIER); // multiplier equals streak count
+    
+    // Update state and localStorage
+    setStreak(newStreak);
+    localStorage.setItem(STORAGE_KEY, newStreak.toString());
+    
     return newMultiplier;
   }, []);
 

@@ -301,23 +301,18 @@ canvas {
 }
 */
 
-/* Card shake animation for invalid moves - sharp and dynamic */
+/* Card shake animation for invalid moves - smooth and gentle */
 /* Using margin-left to avoid transform conflicts with parent transforms */
 @keyframes cardShake {
   0%, 100% { margin-left: 0; }
-  10% { margin-left: -5px; }
-  20% { margin-left: 5px; }
-  30% { margin-left: -5px; }
-  40% { margin-left: 5px; }
-  50% { margin-left: -4px; }
-  60% { margin-left: 4px; }
-  70% { margin-left: -3px; }
-  80% { margin-left: 3px; }
-  90% { margin-left: -2px; }
+  20% { margin-left: -4px; }
+  40% { margin-left: 4px; }
+  60% { margin-left: -3px; }
+  80% { margin-left: 2px; }
 }
 
 .animate-shake {
-  animation: cardShake 280ms linear;
+  animation: cardShake 350ms ease-in-out;
 }
 
 /* Key impact animation - quick pulse/scale effect */

@@ -20,7 +20,7 @@ export function CardAnimation({
   startPosition, 
   endPosition, 
   onComplete,
-  speed = 200, // Fixed duration in milliseconds (not speed anymore)
+  speed = 280, // Fixed duration in ms - matches auto-collect for consistency
   stackCards // If provided, render the whole stack
 }: CardAnimationProps) {
   const [position, setPosition] = useState(startPosition);
@@ -40,10 +40,11 @@ export function CardAnimation({
     const dy = endPosition.y - startPosition.y;
     
     // Fixed duration for all card movements (regardless of distance)
-    const FIXED_DURATION = 150; // 150ms for all moves
+    // Matches auto-collect animation (280ms) for consistent feel
+    const FIXED_DURATION = 280;
     
     // Use custom speed if provided, otherwise use fixed duration
-    const clampedDuration = speed !== 200 ? speed : FIXED_DURATION;
+    const clampedDuration = speed !== 280 ? speed : FIXED_DURATION;
     
     // Start animation
     const animate = (timestamp: number) => {
