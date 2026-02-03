@@ -104,8 +104,19 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   const performCardAction = (cardIndex: number) => {
     console.log('🎯 performCardAction START:', { cardIndex, columnIndex, cardsLength: cards.length });
     const card = cards[cardIndex];
-    if (!card || !card.faceUp) {
-      console.log('🎯 performCardAction BLOCKED: card not found or face down', { card: card?.id, faceUp: card?.faceUp });
+    
+    // Check if this card is the one directly below an animating card (will become faceUp)
+    const isAnimatingFromHere = animatingCard && 
+      animatingCard.sourceTableauColumn === columnIndex &&
+      !animatingCard.isReturnAnimation && 
+      !animatingCard.isUndoAnimation;
+    const animatingCount = isAnimatingFromHere ? (animatingCard?.stackCards?.length || 1) : 0;
+    const cardBelowAnimatingIdx = animatingCount > 0 ? cards.length - animatingCount - 1 : -1;
+    const isCardBelowAnimating = cardIndex === cardBelowAnimatingIdx;
+    
+    // Allow card below animating even if it's still faceDown (it will flip)
+    if (!card || (!card.faceUp && !isCardBelowAnimating)) {
+      console.log('🎯 performCardAction BLOCKED: card not found or face down', { card: card?.id, faceUp: card?.faceUp, isCardBelowAnimating });
       return;
     }
     
@@ -324,12 +335,19 @@ export function TableauColumn({ cards, columnIndex }: TableauColumnProps) {
   // When a card is animating away, the card below it becomes immediately playable
   const movableStartIndex = (() => {
     if (animatingCardsCount > 0) {
-      // Card is flying - find the new top card (first faceUp from top, excluding animating)
-      for (let i = cards.length - animatingCardsCount - 1; i >= 0; i--) {
-        if (cards[i].faceUp) {
-          return i; // This card and all face-up cards below it in sequence are playable
+      // Card is flying - the card directly below the animating stack becomes playable
+      // Even if it's still faceDown in state (it will flip after animation completes)
+      const cardBelowAnimatingIdx = cards.length - animatingCardsCount - 1;
+      if (cardBelowAnimatingIdx >= 0) {
+        // The card below animating (even if faceDown) and all faceUp cards below it are playable
+        // Find the first faceUp card from this position downward
+        for (let i = cardBelowAnimatingIdx; i >= 0; i--) {
+          if (cards[i].faceUp) {
+            return i; // This card and all face-up cards below it are playable
+          }
         }
-        break; // Hit a face-down card
+        // If no faceUp cards, the card directly below animating is the "new top" (will flip)
+        return cardBelowAnimatingIdx;
       }
       return cards.length; // No playable cards
     }
