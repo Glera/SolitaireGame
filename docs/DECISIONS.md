@@ -171,14 +171,140 @@ GameBoard.tsx вырос до 4977 строк, 156 hooks, 27 handlers. "God comp
 
 ---
 
+## [2025-02] Извлечение кода в отдельные npm-пакеты
+
+**Контекст**:
+Проект (~15K+ строк) жил в одном репозитории. Это мешало: параллельной работе нескольких LLM-агентов, переиспользованию игровой логики для мобильного приложения, независимому развитию коров и ивентов.
+
+**Решение**:
+Извлечь 5 пакетов в отдельные git-репозитории + local npm workspace:
+- `@game/liveops-shared` — общие типы, pointsEvent, timeUtils (zero deps)
+- `@game/solitaire-core` — движок косынки (zero deps)
+- `@game/treasure-hunt` — LiveOps ивент (peers: liveops-shared, zustand)
+- `@game/dungeon-dig` — LiveOps ивент (peers: liveops-shared, zustand)
+- `@game/mahjong-core` — движок маджонга (zero deps, создан с нуля)
+
+**Альтернативы**:
+- Monorepo (Turborepo/Lerna) — избыточно для 6 пакетов, сложная конфигурация
+- npm publish — не нужен registry для внутренних пакетов
+- Подмодули git — плохой DX, сложное обновление
+
+**Последствия**:
+- ✅ Каждый пакет автономен и понятен одному LLM-агенту (~500-1800 строк)
+- ✅ npm workspace symlinks = мгновенный HMR при локальной разработке
+- ✅ git-based deps (github:you/repo#tag) для production
+- ✅ peerDependencies предотвращают дублирование zustand/react
+- ⚠️ При изменении пакета нужен `npm run build` (или workspace автоматически)
+
+---
+
+## [2025-02] Shell Barrel Pattern для LiveOps
+
+**Контекст**:
+LiveOps ивенты (Treasure Hunt, Dungeon Dig) используются двумя играми (солитер, маджонг), но с разными storage keys и DOM-зависимостями. Пакеты `@game/treasure-hunt` и `@game/dungeon-dig` содержат только чистую логику.
+
+**Решение**:
+Каждая игра имеет свой "barrel" файл в shell:
+```
+lib/liveops/treasureHunt/        # солитер: re-export + keyManager (DOM)
+lib/liveops/mahjongTreasureHunt/ # маджонг: re-export + mahjong localStorage
+```
+Barrel re-экспортирует чистую логику из пакета + добавляет game-specific localStorage API с уникальным storage key (`solitaire_*` vs `mahjong_*`).
+
+**Альтернативы**:
+- Передавать storage key как параметр в пакет — загромождает API
+- Единый storage с namespace — риск конфликтов при параллельной игре
+
+**Последствия**:
+- ✅ Пакеты остаются чистыми (без DOM, без game-specific логики)
+- ✅ Каждая игра имеет изолированный localStorage
+- ✅ Солитер-баррели дополнительно содержат keyManager/shovelManager (DOM-зависимые)
+- ✅ Маджонг-баррели — чистые функции
+
+---
+
+## [2025-02] Мультиигровая архитектура (build-time switching)
+
+**Контекст**:
+Платформа поддерживает несколько игр (солитер, маджонг). Нужен способ собирать разные версии из одного codebase.
+
+**Решение**:
+Переменная окружения `GAME` при сборке:
+```bash
+GAME=solitaire npx vite build  # → dist/solitaire/
+GAME=mahjong npx vite build    # → dist/mahjong/
+```
+Vite define: `__GAME__` → conditional rendering в App.tsx. Каждый game core — отдельный пакет.
+
+**Альтернативы**:
+- Runtime switching (один бандл, переключение в UI) — больше размер бандла
+- Отдельные проекты — дублирование бизнес-логики (коллекции, daily, shop)
+
+**Последствия**:
+- ✅ Минимальный размер бандла (только нужный core)
+- ✅ Общая бизнес-логика (коллекции, daily quests, shop) переиспользуется
+- ✅ Общие LiveOps попапы (TreasureHuntPopup, DungeonDigPopup)
+- ⚠️ Нужны отдельные dev-серверы (порт 3002 для солитера, 3005 для маджонга)
+
+---
+
+## [2025-02] Core/Platform boundary для маджонга
+
+**Контекст**:
+При создании mahjong-core нужно было определить границу между core (чистая логика) и platform (UI, scoring).
+
+**Решение**:
+Core содержит: тайлы, лейауты, свободу тайлов, генератор, selectTile → SelectResult с `matched?` field.
+Platform решает: scoring (сколько очков за пару), penalties, UI анимации, LiveOps интеграцию.
+selectTile **не** содержит score — возвращает `{ matched, removedTiles, ... }`, shell начисляет очки.
+
+**Альтернативы**:
+- Score в core — связывает core с конкретной системой прогрессии
+- Весь UI в core — нарушает портируемость на другие платформы
+
+**Последствия**:
+- ✅ Core остаётся zero deps, ~500 строк, 35 smoke tests
+- ✅ Разные платформы могут иметь разный scoring
+- ✅ Duck typing (структурная совместимость с GameCore интерфейсом)
+
+---
+
+## [2025-02] DungeonDigPopup не размонтируется
+
+**Контекст**:
+DungeonDigPopup (и TreasureHuntPopup) остаются в JSX-дереве всегда (возвращают `null` когда невидимы). При повторном открытии internal state (exitFoundLock, animation states) сохранялся от предыдущего ивента, что приводило к багу — тайлы не кликались.
+
+**Решение**:
+Добавить `useEffect` на `isVisible`, который сбрасывает **все** internal state при каждом открытии:
+```typescript
+useEffect(() => {
+  if (isVisible) {
+    setExitFoundLock(false);
+    setShowExitFound(false);
+    // ... сброс всех state
+  }
+}, [isVisible]);
+```
+
+**Альтернативы**:
+- Размонтировать компонент при закрытии — потеря CSS-анимаций, сложнее exit transitions
+- Использовать key для пересоздания — дороже, теряет DOM
+
+**Последствия**:
+- ✅ Надёжный сброс состояния при каждом открытии
+- ✅ Exit анимации работают
+- ⚠️ Нужно помнить добавлять новые state в сброс
+
+---
+
 ## Шаблон для новых решений
 
 ```
 ## [ДАТА] Название
 
-**Контекст**: 
+**Контекст**:
 
-**Решение**: 
+**Решение**:
 
 **Альтернативы**:
 

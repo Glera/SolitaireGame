@@ -458,17 +458,70 @@ for (let srcCol = 0; srcCol < state.tableau.length; srcCol++) {
 
 ---
 
+## [2025-02] DungeonDigPopup: тайлы не кликаются после перезапуска ивента
+
+**Симптомы**:
+После завершения ивента Dungeon Dig и запуска нового, тайлы подземелья не реагировали на клики, хотя лопатки были доступны.
+
+**Причина**:
+DungeonDigPopup **не размонтируется** — компонент остаётся в JSX-дереве и возвращает `null` когда невидим. Internal state (`exitFoundLock = true`) сохранялся от предыдущего ивента. `exitFoundLock` блокировал все клики по тайлам.
+
+**Решение**:
+Добавить `useEffect` на `isVisible` который сбрасывает **все** internal state:
+```typescript
+useEffect(() => {
+  if (isVisible) {
+    setExitFoundLock(false);
+    setShowExitFound(false);
+    setEntryRevealedFloors(new Set());
+    setAdjacentUnlockedFloors(new Set());
+    // ... и все остальные state
+  }
+}, [isVisible]);
+```
+
+**Файлы**: `components/solitaire/DungeonDigPopup.tsx`
+**Версия**: 5.0.6
+
+**Важно**: При добавлении нового internal state в DungeonDigPopup — обязательно добавить его сброс в этот useEffect!
+
+---
+
+## [2025-02] DD оверлей завершения не показывается при pack reward на 10-м этаже
+
+**Симптомы**:
+После прохождения 10-го этажа подземелья с pack наградой, оверлей "Поздравляем!" не появлялся. Окно ивента оставалось открытым без возможности его закрыть.
+
+**Причина**:
+В `finishPackClaim()` условие `completedFloorIdx === 9 && !completedReward?.packRarity` пропускало оверлей когда 10-й этаж имел pack reward (потому что `!packRarity` = false).
+
+**Решение**:
+1. Изменить условие на просто `completedFloorIdx === 9`
+2. Использовать `pendingEventComplete` state — ставит оверлей в очередь
+3. useEffect ждёт `!isPackPopupOpen` и показывает оверлей с 300ms задержкой
+
+```typescript
+if (completedFloorIdx === 9) {
+  setPendingEventComplete(true); // Покажется после pack popup
+}
+```
+
+**Файлы**: `components/solitaire/DungeonDigPopup.tsx`
+**Версия**: 5.0.6
+
+---
+
 ## Шаблон для новых проблем
 
 ```
 ## [ДАТА] Краткое описание
 
-**Симптомы**: 
+**Симптомы**:
 
-**Причина**: 
+**Причина**:
 
-**Решение**: 
+**Решение**:
 
-**Файлы**: 
-**Версия**: 
+**Файлы**:
+**Версия**:
 ```
