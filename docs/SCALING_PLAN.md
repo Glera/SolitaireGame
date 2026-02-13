@@ -102,6 +102,8 @@ interface GameShellContext {
 // В @game/treasure-hunt/src/store.ts
 export const createTreasureHuntStore = (config: {
   storageKey: string;           // 'solitaire_treasure_hunt_event' | 'mahjong_treasure_hunt_event'
+  storageVersion: number;       // Версия формата данных (для миграций)
+  migrate?: (old: unknown, oldVersion: number) => TreasureHuntEvent; // Миграция старых данных
   eventDurationMinutes: number; // 5 (солитер) | 1 (маджонг debug)
 }) => create<TreasureHuntStore>((set, get) => ({
   event: null,
@@ -115,11 +117,22 @@ export const createTreasureHuntStore = (config: {
   // Storage — параметризован через config.storageKey
   loadEvent: () => {
     const raw = localStorage.getItem(config.storageKey);
-    // ...
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Migration: если версия данных старее текущей — мигрируем
+    if (parsed._version !== config.storageVersion && config.migrate) {
+      const migrated = config.migrate(parsed, parsed._version ?? 0);
+      migrated._version = config.storageVersion;
+      localStorage.setItem(config.storageKey, JSON.stringify(migrated));
+      return migrated;
+    }
+    return parsed;
   },
   saveEvent: (event) => {
-    localStorage.setItem(config.storageKey, JSON.stringify(event));
-    // ...
+    localStorage.setItem(config.storageKey, JSON.stringify({
+      ...event,
+      _version: config.storageVersion,
+    }));
   },
 
   // Actions
@@ -135,14 +148,27 @@ export const createTreasureHuntStore = (config: {
 // В платформе
 export const useSolitaireTreasureHunt = createTreasureHuntStore({
   storageKey: 'solitaire_treasure_hunt_event',
+  storageVersion: 1,
   eventDurationMinutes: 5,
 });
 
 export const useMahjongTreasureHunt = createTreasureHuntStore({
   storageKey: 'mahjong_treasure_hunt_event',
+  storageVersion: 1,
   eventDurationMinutes: 1,
 });
 ```
+
+> **Правило:** Запрещены singleton store exports с top-level init (`export const useStore = create(...)`). Только фабрики: `export const createStore = (config) => create(...)`. Это гарантирует условную инициализацию — store создаётся только когда игра явно вызывает фабрику.
+
+### Migration policy (встроена в фабрики с первого дня)
+
+Каждый store хранит `_version` в localStorage. При загрузке данных:
+1. Если `_version` совпадает — данные используются как есть
+2. Если `_version` старее — вызывается `config.migrate(oldData, oldVersion)`
+3. Мигрированные данные перезаписываются с новой `_version`
+
+Это позволяет безопасно менять формат данных на live пользователях без потери прогресса.
 
 ### Что это убирает
 
@@ -233,21 +259,27 @@ export const eventRegistry: EventRegistration[] = [
 ];
 ```
 
-GameShell использует registry для рендеринга:
+GameShell использует registry для рендеринга, оборачивая каждый ивент в ErrorBoundary:
 
 ```tsx
 // В GameShell
 const activeEvents = eventRegistry.filter(e => playerLevel >= e.unlockLevel);
 // TopEventBar
-{activeEvents.map(event => <event.components.Icon key={event.id} />)}
-// Popups
-{activeEvents.map(event => <event.components.Popup key={event.id} />)}
+{activeEvents.map(event => (
+  <EventErrorBoundary key={event.id} eventId={event.id} fallback={<EventDisabledBanner />}>
+    <event.components.Icon />
+  </EventErrorBoundary>
+))}
+// Popups — аналогично с ErrorBoundary
 ```
+
+**EventErrorBoundary** — React Error Boundary на уровне каждого event plugin. Если ивент падает (баг в попапе, сломанные данные), он отключается с fallback-баннером, но игра продолжает работать. ~30 строк кода, встраивается в GameShell.
 
 ### Результат
 
 - **Новый ивент:** создать пакет + добавить 1 запись в registry. Ноль изменений в GameShell/GameBoard/MahjongGame.
 - **Удалить ивент:** убрать из registry. Ноль изменений в UI коде.
+- **Kill-switch:** registry фильтруется через LiveOps Calendar (описан в PLATFORM_PLAN.md). Если сервер убирает ивент из calendar response — ивент мгновенно отключается на клиенте. Fallback chain: Remote calendar → localStorage cache (5 мин TTL) → bundled default → hardcoded registry.
 - **A/B тест:** registry может быть динамическим (подгружаться с сервера через LiveOps Calendar).
 
 ---
@@ -513,33 +545,42 @@ GameShell работает через адаптер — не знает дет�
 
 | Шаг | Что | Зависит от |
 |-----|-----|-----------|
-| 1.1 | Store Factories в @game/treasure-hunt и @game/dungeon-dig | — |
+| 1.1 | Store Factories в @game/treasure-hunt и @game/dungeon-dig (с migration policy) | — |
 | 1.2 | createResourceManager\<TTarget\> | — |
 | 1.3 | Заменить баррели + хуки на фабрики | 1.1 |
+| 1.4 | 3 контрактных теста (самый рискованный рефактор — страхуем сразу) | 1.3 |
 
-**Результат:** ~1700 строк дублирования убрано. Инфраструктура для фазы 2.
+**Контрактные тесты фазы 1** (минимум, ~50 строк):
+1. `createStore({storageKey: 'test_th'})` — store пишет/читает именно по этому ключу, не по другому
+2. `migrate()` — вызывается при version mismatch, данные апгрейдятся корректно
+3. `eventRegistry` entry — валидация обязательных полей (id, name, createStore, components)
+
+**Результат:** ~1700 строк дублирования убрано. Инфраструктура для фазы 2. Migration безопасна.
 
 ### Фаза 2: GameShell + Registry
 
 | Шаг | Что | Зависит от |
 |-----|-----|-----------|
-| 2.1 | Event Registry конфигурация | 1.1 |
+| 2.1 | Event Registry конфигурация + связка с LiveOps Calendar (kill-switch) | 1.1 |
 | 2.2 | Перенести попапы в components/shared/ | — |
-| 2.3 | Создать GameShell (минимальный: popups + winflow) | 2.1, 2.2 |
+| 2.3 | Создать GameShell (popups + winflow + EventErrorBoundary) | 2.1, 2.2 |
 | 2.4 | Перевести маджонг на GameShell | 2.3 |
 | 2.5 | Перевести солитер на GameShell | 2.4 |
 
-**Результат:** единая оркестрация, новая игра = Board компонент + 0 оркестрации.
+**Результат:** единая оркестрация, failure isolation, kill-switch. Новая игра = Board компонент + 0 оркестрации.
 
-### Фаза 3: Контракты + документация
+### Фаза 3: Контракты + качество + документация
 
 | Шаг | Что | Зависит от |
 |-----|-----|-----------|
 | 3.1 | GameCoreAdapter в @game/liveops-shared | — |
 | 3.2 | Адаптеры в solitaire-core и mahjong-core | 3.1 |
-| 3.3 | Checklists в docs/ | 2.5 |
+| 3.3 | Bundle budget: CI проверка что GAME=mahjong не содержит solitaire-core (и наоборот) | — |
+| 3.4 | Checklists в docs/ | 2.5 |
 
-**Результат:** типобезопасность, документация для LLM-агентов.
+**Bundle budget (3.3):** Добавить в CI/build скрипт проверку: `vite build` + `grep` по output chunks. Если в билде `GAME=mahjong` найден chunk с `solitaire-core` — build fails. Аналогично в обратную сторону. Также установить бюджет: JS bundle < 800 KB (сейчас 591 KB).
+
+**Результат:** типобезопасность, bundle isolation, документация для LLM-агентов.
 
 ---
 
